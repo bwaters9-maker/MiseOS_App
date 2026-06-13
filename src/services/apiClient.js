@@ -1,38 +1,35 @@
-// src/services/apiClient.js
+/**
+ * src/services/apiClient.js
+ * Typed API Gateway for MiseOS.
+ * @typedef {import('../database/documents').Recipe} Recipe
+ * @typedef {import('../database/documents').Ingredient} Ingredient
+ */
 
-const BASE_URL = process.env.REACT_APP_API_URL || 'https://api.miseos.chef/v1';
+const BASE_URL = '/api/v1';
 
 export const apiClient = {
-  // Generic Fetch Wrapper
   async request(endpoint, options = {}) {
     const response = await fetch(`${BASE_URL}${endpoint}`, {
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('miseos_token')}`,
-        ...options.headers,
-      },
+      headers: { 'Content-Type': 'application/json', ...options.headers },
     });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'API Request Failed');
-    }
+    if (!response.ok) throw new Error('API Request Failed');
     return response.json();
   },
 
-  // Service Endpoints
   recipes: {
+    /** @returns {Promise<Recipe[]>} */
     getAll: () => apiClient.request('/recipes'),
-    save: (data) => apiClient.request('/recipes', { method: 'POST', body: JSON.stringify(data) }),
+    
+    /** @param {Recipe} recipeData */
+    save: (recipeData) => apiClient.request('/recipes', { 
+      method: 'POST', 
+      body: JSON.stringify(recipeData) 
+    }),
   },
-  
+
   ingredients: {
+    /** @returns {Promise<Ingredient[]>} */
     getAll: () => apiClient.request('/ingredients'),
-    sync: (data) => apiClient.request('/ingredients/sync', { method: 'POST', body: JSON.stringify(data) }),
-  },
-  
-  trends: {
-    getReport: () => apiClient.request('/trends/latest'),
   }
 };
