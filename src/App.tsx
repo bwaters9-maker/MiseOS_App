@@ -1,4 +1,17 @@
-import React, { useState } from 'react';
+// 1. Add this import near the top:
+import IngredientsTable from './IngredientsTable';
+
+// ... 2. Inside the return wrapper, update the <main> block view switches to match:
+<main className="flex-1 overflow-y-auto bg-zinc-950">
+  {currentRoute === 'Dashboard' && <DashboardView />}
+  {currentRoute === 'Ingredients' && <IngredientsTable />}
+  {currentRoute === 'Recipes' && <RecipeSpecSheetBuilder />}
+  {currentRoute !== 'Dashboard' && currentRoute !== 'Ingredients' && currentRoute !== 'Recipes' && (
+    <div className="p-8 text-center text-xs text-zinc-600 uppercase tracking-widest pt-24 border border-zinc-900/40 m-6 rounded-xl bg-zinc-900/10">
+      View segment link [{currentRoute}] mapped successfully. Awaiting template node population.
+    </div>
+  )}
+</main>import React, { useState } from 'react';
 import { LayoutDashboard, Apple, UtensilsCrossed, ClipboardList, Truck, Menu as MenuIcon, Layers, Beaker, LogOut } from 'lucide-react';
 import RecipeSpecSheetBuilder from './RecipeSpecSheet';
 
