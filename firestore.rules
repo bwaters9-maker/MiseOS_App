@@ -1,0 +1,102 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Deny Policy
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Reusable Security Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Validation Blueprint for Prep Items
+    function isValidPrepItem(data) {
+      return data.keys().hasAll(['id', 'name', 'quantity', 'unit', 'checked', 'assignedStation', 'priority'])
+        && data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 200
+        && data.quantity is string && data.quantity.size() <= 32
+        && data.unit is string && data.unit.size() <= 32
+        && data.checked is bool
+        && data.assignedStation in ['Sauté', 'Grill', 'Garde Manger', 'Pastry']
+        && data.priority in ['low', 'medium', 'high'];
+    }
+
+    // Validation Blueprint for Recipe
+    function isValidRecipe(data) {
+      return data.keys().hasAll(['id', 'name', 'originalCovers', 'targetCovers', 'station', 'ingredients', 'steps'])
+        && data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 200
+        && data.originalCovers is int && data.originalCovers >= 1
+        && data.targetCovers is int && data.targetCovers >= 1
+        && data.station in ['Sauté', 'Grill', 'Garde Manger', 'Pastry']
+        && data.ingredients is list && data.ingredients.size() <= 100
+        && data.steps is list && data.steps.size() <= 50;
+    }
+
+    // Validation Blueprint for Handover Log
+    function isValidHandover(data) {
+      return data.keys().hasAll(['id', 'sender', 'station', 'severity', 'message', 'timestamp', 'resolved'])
+        && data.id is string && data.id.size() <= 128
+        && data.sender is string && data.sender.size() <= 100
+        && data.station is string && data.station.size() <= 32
+        && data.severity in ['info', 'warning', 'critical']
+        && data.message is string && data.message.size() <= 2000
+        && data.resolved is bool;
+    }
+
+    // Validation Blueprint for 86 Items
+    function isValid86Item(data) {
+      return data.keys().hasAll(['id', 'name', 'status', 'timestamp'])
+        && data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 200
+        && data.status in ['out', 'limited'];
+    }
+
+    // Prep Items Rules
+    match /prepItems/{itemId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(itemId) && isValidPrepItem(incoming());
+      allow update: if isSignedIn() && isValidPrepItem(incoming());
+      allow delete: if isSignedIn();
+    }
+
+    // Recipes Rules
+    match /recipes/{recipeId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(recipeId) && isValidRecipe(incoming());
+      allow update: if isSignedIn() && isValidRecipe(incoming());
+      allow delete: if isSignedIn();
+    }
+
+    // Handover Logs Rules
+    match /handovers/{handoverId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(handoverId) && isValidHandover(incoming());
+      allow update: if isSignedIn() && isValidHandover(incoming());
+      allow delete: if isSignedIn();
+    }
+
+    // 86 Items Rules
+    match /items86/{item86Id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(item86Id) && isValid86Item(incoming());
+      allow update: if isSignedIn() && isValid86Item(incoming());
+      allow delete: if isSignedIn();
+    }
+  }
+}
