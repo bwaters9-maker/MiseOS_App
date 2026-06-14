@@ -1,22 +1,14 @@
-/**
- * src/firebaseConfig.ts
- * Core initialization file for cloud-native database connection.
- */
-import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { initializeApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
 
-// Core Firebase project configurations
 const firebaseConfig = {
-  apiKey: "AIzaSyFakeKey_MiseOS_2026_ProjectKey",
-  authDomain: "miseos-back-of-house.firebaseapp.com",
-  projectId: "miseos-back-of-house",
-  storageBucket: "miseos-back-of-house.appspot.com",
-  messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:a1b2c3d4e5f6g7h8i9j0k"
+  apiKey: "AIzaSyBgumKqhSUhmOLWM0g5rGRpaARBQGBU4WQ",
+  authDomain: "miseos-app.firebaseapp.com",
+  projectId: "miseos-app",
+  storageBucket: "miseos-app.firebasestorage.app",
+  messagingSenderId: "1023982146747",
+  appId: "1:1023982146747:web:9612f60c9da00eb55a059e"
 };
 
-// Initialize Firebase SDK Core
 const app = initializeApp(firebaseConfig);
-
-// Export instances for system-wide injection
 export const db = getFirestore(app);
