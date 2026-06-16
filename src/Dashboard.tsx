@@ -3,6 +3,7 @@ import { Printer } from 'lucide-react';
 import DailyCribSheet from './components/dashboard/DailyCribSheet';
 import { LineTimerModule } from './components/dashboard/LineTimerModule';
 import { MetricsHUD } from './components/dashboard/MetricsHUD';
+import { RecipeBuilder } from './components/dashboard/RecipeBuilder';
 import { useKitchenState } from '@/hooks/useKitchenState';
 
 export default function DashboardView() {
@@ -28,6 +29,9 @@ export default function DashboardView() {
 
       {/* METRIC CARD HUD */}
       <MetricsHUD />
+
+      {/* RECIPE BUILDER */}
+      {/* <RecipeBuilder /> */}
 
       {/* LOWER CONTENT PANEL GRID */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

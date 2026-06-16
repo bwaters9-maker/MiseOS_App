@@ -23,26 +23,26 @@ export const RecipeBuilder: React.FC = () => {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
 
   // Firestore listener for autocomplete search
-  useEffect(() => {
-    if (searchTerm.trim().length < 2) {
-      setSearchResults([]);
-      return;
-    }
-
-    const q = query(
-      collection(db, 'ingredients'),
-      where('name', '>=', searchTerm),
-      where('name', '<=', searchTerm + '\uf8ff'),
-      limit(5)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const results = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Ingredient));
-      setSearchResults(results);
-    });
-
-    return () => unsubscribe();
-  }, [searchTerm]);
+  // useEffect(() => {
+  //   if (searchTerm.trim().length < 2) {
+  //     setSearchResults([]);
+  //     return;
+  //   }
+  // 
+  //   const q = query(
+  //     collection(db, 'ingredients'),
+  //     where('name', '>=', searchTerm),
+  //     where('name', '<=', searchTerm + '\uf8ff'),
+  //     limit(5)
+  //   );
+  // 
+  //   const unsubscribe = onSnapshot(q, (snapshot) => {
+  //     const results = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Ingredient));
+  //     setSearchResults(results);
+  //   });
+  // 
+  //   return () => unsubscribe();
+  // }, [searchTerm]);
 
   const addIngredient = (ingredient: Ingredient) => {
     if (!recipeIngredients.find(i => i.id === ingredient.id)) {
