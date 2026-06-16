@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import Dashboard from './Dashboard';
 import { PrepChecklist } from './PrepChecklist';
 import { KitchenTimers } from './KitchenTimers';
-import { LayoutDashboard, ClipboardList, Clock } from 'lucide-react';
+import { ShiftHandoverLog } from './ShiftHandoverLog';
+import { LayoutDashboard, ClipboardList, Clock, BookOpen } from 'lucide-react';
 
 export default function App() {
   const [activeView, setActiveView] = useState('dashboard');
@@ -53,6 +54,17 @@ export default function App() {
                     <Clock className='w-3.5 h-3.5' />
                     Kitchen Timers
                 </button>
+                <button
+                    onClick={() => setActiveView('handover')}
+                    className={`px-3 py-1.5 text-xs font-extrabold uppercase tracking-wider rounded-lg transition-all border flex items-center gap-2 ${
+                    activeView === 'handover'
+                        ? 'bg-zinc-900 text-emerald-400 border-zinc-700 shadow-md'
+                        : 'bg-transparent text-zinc-500 hover:text-zinc-300 border-transparent'
+                    }`}
+                >
+                    <BookOpen className='w-3.5 h-3.5' />
+                    Handover Log
+                </button>
             </div>
           </div>
           <div className='text-right hidden sm:block'>
@@ -64,6 +76,7 @@ export default function App() {
         {activeView === 'dashboard' && <Dashboard />}
         {activeView === 'prep' && <PrepChecklist />}
         {activeView === 'timers' && <KitchenTimers />}
+        {activeView === 'handover' && <ShiftHandoverLog />}
       </main>
     </div>
   );
