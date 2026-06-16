@@ -98,5 +98,30 @@ service cloud.firestore {
       allow update: if isSignedIn() && isValid86Item(incoming());
       allow delete: if isSignedIn();
     }
+
+    // Ingredients & Deficiency Collection Rules
+    match /ingredients/{ingredientId} {
+      allow read: if true; // Allows line tablets to fetch station lists
+      allow write: if request.resource.data.name is string
+                   && request.resource.data.quantity is number
+                   && request.resource.data.parLevel is number;
+    }
+    
+    // Multi-Loop Kitchen Timers Rules
+    match /timers/{timerId} {
+      allow read, write: if request.resource.data.durationMs is number;
+    }
+    
+    // Shift Handover Logs Rules
+    match /handover_logs/{logId} {
+      allow read: if true;
+      allow create: if request.resource.data.message is string
+                    && request.resource.data.message.size() <= 2000
+                    && request.resource.data.station is string
+                    && request.resource.data.timestamp != null;
+      // Allow resolving handovers but prevent modifying message/meta or deleting
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resolved']);
+      allow delete: if false;
+    }
   }
 }
