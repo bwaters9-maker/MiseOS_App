@@ -35,7 +35,7 @@ const TimerDisplay: React.FC<{ timer: KitchenTimer }> = ({ timer }) => {
 
 
 export default function DashboardView() {
-  const { prepItems, timers, recipes, handovers, items86 } = useKitchenState();
+  const { prepItems, timers, recipes, handovers, setHandovers, items86, setItems86 } = useKitchenState();
   const [tick, setTick] = useState(0);
 
   // Single in-file interval loop tracking tick state
@@ -119,6 +119,8 @@ export default function DashboardView() {
               prepItems={prepItems}
               handovers={handovers}
               items86={items86}
+              onUpdateHandovers={setHandovers}
+              onUpdateItems86={setItems86}
             />
           </div>
         </div>
