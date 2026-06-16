@@ -34,6 +34,7 @@ export interface CostHistoryPoint {
 }
 
 export interface Ingredient {
+  id?: string;
   name: string;
   quantity: number; // Edible Portion (EP) quantity
   unit: string;
