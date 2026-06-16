@@ -1,7 +1,46 @@
 import React from 'react';
-import { Trash2, Edit2, PlusCircle, Minus, Save } from 'lucide-react';
+import { Trash2, Edit2, PlusCircle, Minus, Save, TrendingUp, TrendingDown } from 'lucide-react';
 import { useKitchenState } from '@/hooks/useKitchenState';
-import { Ingredient } from '@/types';
+import { Ingredient, CostHistoryPoint } from '@/types';
+
+const getIngredientTrend = (ing: Ingredient) => {
+  if (!ing.historicalCost || ing.historicalCost.length < 2) {
+    return {
+      direction: 'stable',
+      label: 'STABLE',
+      style: 'bg-zinc-800 border-zinc-700 text-zinc-400',
+      icon: <Minus className="w-2.5 h-2.5" />
+    };
+  }
+  
+  const latest = ing.historicalCost[ing.historicalCost.length - 1].cost;
+  const previous = ing.historicalCost[ing.historicalCost.length - 2].cost;
+
+  if (latest > previous) {
+    return {
+      direction: 'up',
+      label: 'RISING',
+      style: 'bg-red-950 border-red-800 text-red-400',
+      icon: <TrendingUp className="w-2.5 h-2.5" />
+    };
+  }
+  if (latest < previous) {
+    return {
+      direction: 'down',
+      label: 'DROPPING',
+      style: 'bg-emerald-950 border-emerald-800 text-emerald-400',
+      icon: <TrendingDown className="w-2.5 h-2.5" />
+    };
+  }
+
+  return {
+    direction: 'stable',
+    label: 'STABLE',
+    style: 'bg-zinc-800 border-zinc-700 text-zinc-400',
+    icon: <Minus className="w-2.5 h-2.5" />
+  };
+};
+
 
 export default function IngredientsTable() {
   const { recipes, setRecipes } = useKitchenState();
@@ -15,6 +54,23 @@ export default function IngredientsTable() {
     });
     return acc;
   }, []);
+  
+  // --- MOCK DATA INJECTION FOR DEMONSTRATION ---
+  const salmon = allIngredients.find(i => i.name.toLowerCase().includes('salmon'));
+  if (salmon) {
+    salmon.historicalCost = [
+      { date: '2023-01-01', cost: 32.50 },
+      { date: '2023-04-01', cost: 36.00 },
+    ];
+  }
+  const avocado = allIngredients.find(i => i.name.toLowerCase().includes('avocado'));
+  if (avocado) {
+    avocado.historicalCost = [
+        { date: '2023-01-01', cost: 12.00 },
+        { date: '2023-04-01', cost: 9.00 },
+    ]
+  }
+  // --- END MOCK DATA ---
 
   const handleQuantityChange = (ingredientName: string, newQuantity: number) => {
     const updatedRecipes = recipes.map(recipe => ({
@@ -47,11 +103,14 @@ export default function IngredientsTable() {
               <th className="p-4">Name</th>
               <th className="p-4 text-center">On-Hand Qty</th>
               <th className="p-4">Cost/Unit</th>
+              <th className="p-4 text-center">Trend</th>
               <th className="p-4 text-center">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-900 text-zinc-300">
-            {allIngredients.map((ing, i) => (
+            {allIngredients.map((ing, i) => {
+              const trend = getIngredientTrend(ing);
+              return (
               <tr key={i} className="hover:bg-zinc-900/30 transition-colors">
                 <td className="p-4 font-bold text-zinc-100 whitespace-nowrap">{ing.name}</td>
                 <td className="p-4 text-center">
@@ -75,6 +134,12 @@ export default function IngredientsTable() {
                   ${ing.costPerUnit.toFixed(4)}
                   <span className="text-zinc-600 font-normal"> / {ing.purchaseUnit}</span>
                 </td>
+                <td className="p-4 text-center">
+                  <div className={`flex items-center justify-center gap-1.5 w-24 mx-auto border rounded-full px-2 py-1 text-[9px] font-bold tracking-wider ${trend.style}`}>
+                    {trend.icon}
+                    <span>{trend.label}</span>
+                  </div>
+                </td>
                 <td className="p-4">
                   <div className="flex justify-center gap-3">
                     <button className="text-zinc-600 hover:text-zinc-300 transition-colors">
@@ -86,7 +151,7 @@ export default function IngredientsTable() {
                   </div>
                 </td>
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>

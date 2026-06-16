@@ -28,6 +28,11 @@ export interface KitchenTimer {
   startTime?: number; // Optional starting timestamp for active countdowns
 }
 
+export interface CostHistoryPoint {
+  date: string;
+  cost: number;
+}
+
 export interface Ingredient {
   name: string;
   quantity: number; // Edible Portion (EP) quantity
@@ -35,6 +40,7 @@ export interface Ingredient {
   costPerUnit: number; // Unit price as purchased (AP)
   purchaseUnit: string;
   yieldPercent: number; // Yield factor from trim wastage (50-100)
+  historicalCost?: CostHistoryPoint[];
 }
 
 export interface Recipe {
