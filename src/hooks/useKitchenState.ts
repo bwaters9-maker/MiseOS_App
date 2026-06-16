@@ -4,7 +4,7 @@
  * Optimized with a single state document and native Firestore offline persistence.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { PrepItem, KitchenTimer, Recipe } from '@/types';
+import { PrepItem, KitchenTimer, Recipe, HandoverEntry, Item86Entry } from '@/types';
 import { INITIAL_PREP_ITEMS, INITIAL_TIMERS, INITIAL_RECIPES } from '@/data';
 import { db } from '@/firebaseConfig';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
@@ -16,6 +16,8 @@ export const useKitchenState = () => {
   const [prepItems, setPrepItems] = useState<PrepItem[]>(INITIAL_PREP_ITEMS);
   const [timers, setTimers] = useState<KitchenTimer[]>(INITIAL_TIMERS);
   const [recipes, setRecipes] = useState<Recipe[]>(INITIAL_RECIPES);
+  const [handovers, setHandovers] = useState<HandoverEntry[]>([]);
+  const [items86, setItems86] = useState<Item86Entry[]>([]);
 
   // Real-time Cloud Listener for the single state document.
   // Firestore's offline persistence handles all caching automatically.
@@ -33,6 +35,12 @@ export const useKitchenState = () => {
         if (cloudState.recipes) {
             setRecipes(cloudState.recipes);
         }
+        if (cloudState.handovers) {
+            setHandovers(cloudState.handovers);
+        }
+        if (cloudState.items86) {
+            setItems86(cloudState.items86);
+        }
       } else {
         // If the document doesn't exist, create it with initial data.
         // This is useful for first-time app setup.
@@ -40,6 +48,8 @@ export const useKitchenState = () => {
           prepItems: INITIAL_PREP_ITEMS,
           timers: INITIAL_TIMERS,
           recipes: INITIAL_RECIPES,
+          handovers: [],
+          items86: []
         }).catch(err => console.error("Failed to initialize kitchen state document:", err));
       }
     });
@@ -68,13 +78,27 @@ export const useKitchenState = () => {
     updateCloudState({ recipes: updatedRecipes });
   }, [updateCloudState]);
 
+  const updateHandovers = useCallback((newHandovers: HandoverEntry[]) => {
+    setHandovers(newHandovers);
+    updateCloudState({ handovers: newHandovers });
+  }, [updateCloudState]);
+
+  const updateItems86 = useCallback((newItems86: Item86Entry[]) => {
+    setItems86(newItems86);
+    updateCloudState({ items86: newItems86 });
+  }, [updateCloudState]);
+
   return {
     prepItems,
     setPrepItems: updatePrepItems,
     timers,
     setTimers: updateTimers,
     recipes,
-    setRecipes: updateRecipes
+    setRecipes: updateRecipes,
+    handovers,
+    setHandovers: updateHandovers,
+    items86,
+    setItems86: updateItems86
   };
 };
 

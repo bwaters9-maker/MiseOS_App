@@ -1,17 +1,15 @@
 import React from 'react';
 import { AlertTriangle, ListTodo, Ban } from 'lucide-react';
-import { PrepItem, HandoverLog, Item86 } from '@/types';
+import { PrepItem, HandoverEntry, Item86Entry } from '@/types';
 
 interface DailyCribSheetProps {
   prepItems: PrepItem[];
-  handovers: HandoverLog[];
-  items86: Item86[];
+  handovers: HandoverEntry[];
+  items86: Item86Entry[];
 }
 
 const DailyCribSheet: React.FC<DailyCribSheetProps> = ({ prepItems, handovers, items86 }) => {
   const highPriorityPrep = prepItems.filter(item => item.priority === 'high' && !item.checked);
-  const criticalHandovers = handovers.filter(log => log.severity === 'critical');
-  const outOfStockItems = items86.filter(item => item.status === 'out');
 
   return (
     <div className="space-y-6">
@@ -22,12 +20,11 @@ const DailyCribSheet: React.FC<DailyCribSheetProps> = ({ prepItems, handovers, i
           <span>86'd Items</span>
         </h4>
         <ul className="space-y-1.5 text-xs text-zinc-400 list-none">
-          {outOfStockItems.length > 0 ? (
-            outOfStockItems.map(item => (
-              <li key={item.id} className="flex items-center">
+          {items86.length > 0 ? (
+            items86.map(item => (
+              <li key={item.id} className="flex justify-between items-center">
                 <span className="font-semibold text-zinc-300">{item.name}</span>
-                <span className="text-zinc-500 mx-1.5">›</span>
-                <span className="italic">Sub: {item.substitute}</span>
+                <span className="text-zinc-500 text-[10px] uppercase font-bold">{item.station}</span>
               </li>
             ))
           ) : (
@@ -36,22 +33,22 @@ const DailyCribSheet: React.FC<DailyCribSheetProps> = ({ prepItems, handovers, i
         </ul>
       </div>
 
-      {/* Critical Handovers */}
+      {/* Handovers */}
       <div>
         <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-400 mb-2">
           <AlertTriangle className="w-4 h-4" />
-          <span>Critical Handovers</span>
+          <span>Handovers</span>
         </h4>
         <ul className="space-y-2 text-xs text-zinc-400 list-none">
-          {criticalHandovers.length > 0 ? (
-            criticalHandovers.map(log => (
+          {handovers.length > 0 ? (
+            handovers.map(log => (
               <li key={log.id}>
-                <p className="font-semibold text-zinc-300">{log.message}</p>
+                <p className="font-semibold text-zinc-300">{log.comment}</p>
                 <p className="text-zinc-500 text-[10px] uppercase tracking-wider">From: {log.sender} @ {log.timestamp}</p>
               </li>
             ))
           ) : (
-             <p className="text-xs text-zinc-500 italic">No critical handovers.</p>
+             <p className="text-xs text-zinc-500 italic">No handovers.</p>
           )}
         </ul>
       </div>

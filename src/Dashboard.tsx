@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Apple, Utensils, Timer, Printer, ChefHat } from 'lucide-react';
 import DailyCribSheet from './components/dashboard/DailyCribSheet';
 import { useKitchenState } from '@/hooks/useKitchenState';
-import { INITIAL_HANDOVERS, INITIAL_86_ITEMS } from './data';
 import { KitchenTimer } from './types';
 import { formatDuration } from './utils';
 
@@ -36,7 +35,7 @@ const TimerDisplay: React.FC<{ timer: KitchenTimer }> = ({ timer }) => {
 
 
 export default function DashboardView() {
-  const { prepItems, timers, recipes } = useKitchenState();
+  const { prepItems, timers, recipes, handovers, items86 } = useKitchenState();
   const [tick, setTick] = useState(0);
 
   // Single in-file interval loop tracking tick state
@@ -118,8 +117,8 @@ export default function DashboardView() {
           <div className="pt-2">
             <DailyCribSheet 
               prepItems={prepItems}
-              handovers={INITIAL_HANDOVERS}
-              items86={INITIAL_86_ITEMS}
+              handovers={handovers}
+              items86={items86}
             />
           </div>
         </div>

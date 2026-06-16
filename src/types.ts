@@ -75,3 +75,26 @@ export interface SubRecipe {
   steps: string[];
 }
 
+export interface HandoverEntry {
+  id: string;
+  comment: string;
+  timestamp: string;
+  sender: string;
+}
+
+export interface Item86Entry {
+  id: string;
+  name: string;
+  station: PrepStation | 'All';
+  blockedAt: string;
+}
+
+export interface KitchenState {
+  prepItems: PrepItem[];
+  timers: KitchenTimer[];
+  recipes: Recipe[];
+  handovers?: HandoverEntry[];
+  items86?: Item86Entry[];
+}
+
+
