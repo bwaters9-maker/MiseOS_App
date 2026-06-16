@@ -1,38 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Apple, Utensils, Timer, Printer, ChefHat } from 'lucide-react';
 import DailyCribSheet from './components/dashboard/DailyCribSheet';
+import { LineTimerModule } from './components/dashboard/LineTimerModule';
 import { useKitchenState } from '@/hooks/useKitchenState';
-import { KitchenTimer } from './types';
-import { formatDuration } from './utils';
-
-// --- HIGH-PERFORMANCE IN-FILE TIMER ENGINE ---
-// Uses Date.now() directly inside render, triggered dynamically by the parent's tick state.
-const TimerDisplay: React.FC<{ timer: KitchenTimer }> = ({ timer }) => {
-  const isRunning = timer.status === 'running';
-  const now = Date.now();
-  const timeSinceStart = isRunning ? now - (timer.startTime || now) : 0;
-  const remainingMs = timer.durationMs - timer.elapsedMs - timeSinceStart;
-  
-  const isAlarm = remainingMs <= 0;
-  const displayTime = formatDuration(remainingMs);
-
-  const statusColor = isAlarm ? 'text-red-500 animate-pulse font-black' : 
-                      isRunning ? 'text-emerald-400 font-bold' : 'text-zinc-500';
-
-  return (
-    <div className={`flex justify-between items-center p-4 rounded-lg bg-zinc-950 border transition-colors ${isAlarm ? 'border-red-600 bg-red-950/20' : 'border-zinc-800'}`}>
-      <div>
-        <p className="text-sm font-bold text-zinc-100 uppercase tracking-tight">{timer.label}</p>
-        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-0.5">Station: <span className="text-zinc-300">{timer.station}</span></p>
-      </div>
-      <div className={`font-mono text-2xl tracking-tighter ${statusColor}`}>
-        {displayTime}
-      </div>
-    </div>
-  );
-};
-// --- END TIMER ENGINE ---
-
 
 export default function DashboardView() {
   const { prepItems, timers, recipes, handovers, setHandovers, items86, setItems86 } = useKitchenState();
@@ -126,24 +96,8 @@ export default function DashboardView() {
         </div>
 
         {/* Right 2/3 Panel: Active Kitchen Timers */}
-        <div className="md:col-span-2 bg-zinc-900/20 border border-zinc-900 rounded-xl p-5 space-y-4">
-          <div className="border-b border-zinc-900 pb-2">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Active Kitchen Timers</h3>
-          </div>
-          <div className="pt-2 space-y-2.5">
-            {timers.length > 0 ? (
-              timers.map(timer => (
-                <TimerDisplay key={timer.id} timer={timer} />
-              ))
-            ) : (
-              <div className="border border-dashed border-zinc-800 rounded-xl p-8 text-center text-xs text-zinc-600 uppercase tracking-widest flex flex-col items-center justify-center gap-2">
-                <div className="w-8 h-8 rounded-full border border-zinc-800 flex items-center justify-center text-zinc-500">
-                  <Timer className="w-4 h-4" />
-                </div>
-                <span>No active timers registered.</span>
-              </div>
-            )}
-          </div>
+        <div className="md:col-span-2">
+          <LineTimerModule />
         </div>
 
       </div>
