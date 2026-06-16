@@ -15,7 +15,8 @@ export const INITIAL_PREP_ITEMS: PrepItem[] = [
     assignedStation: 'Garde Manger',
     priority: 'high',
     notes: 'Keep wrapped in damp paper towels, tightly sealed to prevent oxidation.',
-    lastModified: '08:30 AM'
+    lastModified: '08:30 AM',
+    par: 1000
   },
   {
     id: 'p-2',
@@ -26,7 +27,8 @@ export const INITIAL_PREP_ITEMS: PrepItem[] = [
     assignedStation: 'Sauté',
     priority: 'high',
     notes: 'Skin off, pinbones removed, cut to exactly 150g portions.',
-    lastModified: '08:45 AM'
+    lastModified: '08:45 AM',
+    par: 20
   },
   {
     id: 'p-3',
@@ -37,7 +39,8 @@ export const INITIAL_PREP_ITEMS: PrepItem[] = [
     assignedStation: 'Pastry',
     priority: 'medium',
     notes: 'Use 64% Valrhona chocolate. Keep warm in bain-marie if needed immediately.',
-    lastModified: '09:15 AM'
+    lastModified: '09:15 AM',
+    par: 2
   },
   {
     id: 'p-4',
@@ -48,7 +51,8 @@ export const INITIAL_PREP_ITEMS: PrepItem[] = [
     assignedStation: 'Grill',
     priority: 'medium',
     notes: 'Trim excess exterior fat to 1/4 inch. Store on wire rack in drawer.',
-    lastModified: '09:00 AM'
+    lastModified: '09:00 AM',
+    par: 15
   }
 ];
 

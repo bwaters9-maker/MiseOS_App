@@ -129,24 +129,50 @@ const DailyCribSheet: React.FC<DailyCribSheetProps> = ({
         </div>
       </div>
 
-      {/* High-Priority Prep */}
+      {/* Prep Par Matrix */}
       <div>
-        <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-cyan-400 mb-2">
+        <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-cyan-400 mb-3">
           <ListTodo className="w-4 h-4" />
-          <span>High-Priority Prep</span>
+          <span>Prep Par Matrix</span>
         </h4>
-        <ul className="space-y-1.5 text-xs text-zinc-400 list-none">
-          {highPriorityPrep.length > 0 ? (
-            highPriorityPrep.map(item => (
-              <li key={item.id} className="flex justify-between">
-                <span className="font-semibold text-zinc-300">{item.name}</span>
-                <span className="text-zinc-500 font-mono">{item.quantity}{item.unit}</span>
-              </li>
-            ))
-          ) : (
-            <p className="text-xs text-zinc-500 italic">No outstanding high-priority prep items.</p>
-          )}
-        </ul>
+        <div className="overflow-hidden border border-zinc-800 rounded bg-zinc-950/20 text-[10px]">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-zinc-900/60 text-zinc-500 uppercase tracking-widest text-[9px] border-b border-zinc-800">
+              <tr>
+                <th className="p-2">Item</th>
+                <th className="p-2 text-right">On-Hand</th>
+                <th className="p-2 text-right">Par</th>
+                <th className="p-2 text-right">Deficit</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-900 text-zinc-300">
+              {prepItems.length > 0 ? (
+                prepItems.map(item => {
+                  const onHand = Number(item.quantity) || 0;
+                  const par = item.par ?? 0;
+                  const deficit = Math.max(0, par - onHand);
+                  const isUnderPar = onHand < par;
+                  const rowClass = isUnderPar ? 'text-red-400 font-bold bg-red-950/10' : 'text-zinc-300';
+
+                  return (
+                    <tr key={item.id} className={`hover:bg-zinc-900/10 transition-colors ${rowClass}`}>
+                      <td className="p-2 font-semibold truncate max-w-[100px]">{item.name}</td>
+                      <td className="p-2 text-right font-mono">{onHand}{item.unit}</td>
+                      <td className="p-2 text-right font-mono">{par}{item.unit}</td>
+                      <td className={`p-2 text-right font-mono ${deficit > 0 ? 'text-red-400' : 'text-zinc-500'}`}>
+                        {deficit > 0 ? `${deficit}${item.unit}` : '—'}
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={4} className="p-4 text-center text-zinc-500 italic">No prep items registered.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
     </div>

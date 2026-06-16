@@ -15,6 +15,7 @@ export interface PrepItem {
   priority: 'low' | 'medium' | 'high';
   notes?: string;
   lastModified: string;
+  par?: number; // Optional par level for par calculations
 }
 
 export interface KitchenTimer {
