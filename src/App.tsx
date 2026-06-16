@@ -4,50 +4,6 @@ import { PrepChecklist } from './PrepChecklist';
 import { KitchenTimers } from './KitchenTimers';
 import { LayoutDashboard, ClipboardList, Clock } from 'lucide-react';
 
-// Mock data for the PrepChecklist component
-const mockPrepItems = [
-  {
-    name: 'Shallots, Brunoise',
-    quantity: 0.5,
-    unit: 'kg',
-    costPerUnit: 5.00,
-    purchaseUnit: 'kg',
-    yieldPercent: 92,
-    parLevel: 1,
-    station: 'Garde Manger',
-  },
-  {
-    name: 'Atlantic Salmon, Portioned',
-    quantity: 8,
-    unit: 'portions',
-    costPerUnit: 36.00,
-    purchaseUnit: 'kg',
-    yieldPercent: 80,
-    parLevel: 15,
-    station: 'Sauté',
-  },
-  {
-    name: 'Compound Herb Butter',
-    quantity: 0.8,
-    unit: 'kg',
-    costPerUnit: 12.00,
-    purchaseUnit: 'kg',
-    yieldPercent: 100,
-    parLevel: 1,
-    station: 'Grill',
-  },
-  {
-    name: 'Veal Demi-Glace',
-    quantity: 2,
-    unit: 'L',
-    costPerUnit: 25,
-    purchaseUnit: 'L',
-    yieldPercent: 100,
-    parLevel: 4,
-    station: 'Saucier',
-  }
-];
-
 export default function App() {
   const [activeView, setActiveView] = useState('dashboard');
 
@@ -106,7 +62,7 @@ export default function App() {
       </header>
       <main className='py-6'>
         {activeView === 'dashboard' && <Dashboard />}
-        {activeView === 'prep' && <PrepChecklist ingredients={mockPrepItems} />}
+        {activeView === 'prep' && <PrepChecklist />}
         {activeView === 'timers' && <KitchenTimers />}
       </main>
     </div>

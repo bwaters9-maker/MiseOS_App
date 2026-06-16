@@ -1,4 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { db } from './firebaseConfig';
+import { collection, onSnapshot, DocumentData } from 'firebase/firestore';
 import { Ingredient } from './types';
 
 interface PrepItem extends Ingredient {
@@ -6,9 +8,21 @@ interface PrepItem extends Ingredient {
   station: string;
 }
 
-export const PrepChecklist: React.FC<{ ingredients: PrepItem[] }> = ({ ingredients }) => {
+export const PrepChecklist: React.FC = () => {
+  const [liveIngredients, setLiveIngredients] = useState<PrepItem[]>([]);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, 'ingredients'), (snapshot) => {
+      const fetchedIngredients = snapshot.docs.map(doc => ({ ...doc.data() } as PrepItem));
+      setLiveIngredients(fetchedIngredients);
+    });
+    
+    // Cleanup the listener on component unmount
+    return () => unsubscribe();
+  }, []);
+  
   const checklistData = useMemo(() => {
-    return ingredients.map(ing => {
+    return liveIngredients.map(ing => {
       const onHand = ing.quantity || 0;
       const par = ing.parLevel || 0;
       const deficit = Math.max(0, par - onHand);
@@ -16,7 +30,7 @@ export const PrepChecklist: React.FC<{ ingredients: PrepItem[] }> = ({ ingredien
       
       return { ...ing, onHand, par, deficit, status };
     });
-  }, [ingredients]);
+  }, [liveIngredients]);
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 bg-zinc-950 text-zinc-100 font-mono tracking-tight">
