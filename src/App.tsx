@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import Dashboard from './Dashboard';
 import { PrepChecklist } from './PrepChecklist';
-import { LayoutDashboard, ClipboardList } from 'lucide-react';
+import { KitchenTimers } from './KitchenTimers';
+import { LayoutDashboard, ClipboardList, Clock } from 'lucide-react';
 
 // Mock data for the PrepChecklist component
 const mockPrepItems = [
@@ -85,6 +86,17 @@ export default function App() {
                     <ClipboardList className='w-3.5 h-3.5' />
                     Prep Checklist
                 </button>
+                <button
+                    onClick={() => setActiveView('timers')}
+                    className={`px-3 py-1.5 text-xs font-extrabold uppercase tracking-wider rounded-lg transition-all border flex items-center gap-2 ${
+                    activeView === 'timers'
+                        ? 'bg-zinc-900 text-emerald-400 border-zinc-700 shadow-md'
+                        : 'bg-transparent text-zinc-500 hover:text-zinc-300 border-transparent'
+                    }`}
+                >
+                    <Clock className='w-3.5 h-3.5' />
+                    Kitchen Timers
+                </button>
             </div>
           </div>
           <div className='text-right hidden sm:block'>
@@ -95,6 +107,7 @@ export default function App() {
       <main className='py-6'>
         {activeView === 'dashboard' && <Dashboard />}
         {activeView === 'prep' && <PrepChecklist ingredients={mockPrepItems} />}
+        {activeView === 'timers' && <KitchenTimers />}
       </main>
     </div>
   );
