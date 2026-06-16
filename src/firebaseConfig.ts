@@ -6,12 +6,12 @@ import {
 } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBgumKqhSUhmOLWM0g5rGRpaARBQGBU4WQ",
-  authDomain: "miseos-app.firebaseapp.com",
-  projectId: "miseos-app",
-  storageBucket: "miseos-app.firebasestorage.app",
-  messagingSenderId: "1023982146747",
-  appId: "1:1023982146747:web:9612f60c9da00eb55a059e"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 const app = initializeApp(firebaseConfig);
