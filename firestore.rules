@@ -98,14 +98,19 @@ service cloud.firestore {
       allow update: if isSignedIn() && isValid86Item(incoming());
       allow delete: if isSignedIn();
     }
+// Rules for single state document
+match /miseos_data/kitchen_state {
+  allow read, write: if true;
+}
 
-    // Ingredients & Deficiency Collection Rules
-    match /ingredients/{ingredientId} {
-      allow read: if true; // Allows line tablets to fetch station lists
-      allow write: if request.resource.data.name is string
-                   && request.resource.data.quantity is number
-                   && request.resource.data.parLevel is number;
-    }
+// Ingredients & Deficiency Collection Rules inside miseos_data
+match /miseos_data/{ingredientId} {
+  allow read: if true; // Allows line tablets to fetch station lists
+  allow write: if request.resource.data.name is string
+               && request.resource.data.quantity is number
+               && request.resource.data.quantity >= 0
+               && request.resource.data.parLevel is number;
+}
     
     // Multi-Loop Kitchen Timers Rules
     match /timers/{timerId} {

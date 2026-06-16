@@ -12,7 +12,7 @@ export const PrepChecklist: React.FC = () => {
   const [liveIngredients, setLiveIngredients] = useState<PrepItem[]>([]);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'ingredients'), (snapshot) => {
+    const unsubscribe = onSnapshot(collection(db, 'miseos_data'), (snapshot) => {
       const fetchedIngredients = snapshot.docs.map(doc => ({ ...doc.data() } as PrepItem));
       setLiveIngredients(fetchedIngredients);
     });
