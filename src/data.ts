@@ -67,7 +67,8 @@ export const INITIAL_TIMERS: KitchenTimer[] = [
     durationMs: 45 * 60 * 1000, // 45 mins
     elapsedMs: 15 * 60 * 1000,
     status: 'running',
-    station: 'Sauté'
+    station: 'Sauté',
+    startTime: Date.now()
   },
   {
     id: 't-3',

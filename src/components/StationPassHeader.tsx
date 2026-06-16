@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { PrepStation } from '../types';
+import { PrepStation } from '@/types';
 import { ChefHat, AlertTriangle, CheckSquare } from 'lucide-react';
 
 interface StationPassHeaderProps {

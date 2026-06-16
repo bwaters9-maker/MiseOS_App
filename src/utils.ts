@@ -6,14 +6,26 @@
 import { Recipe, Ingredient } from './types';
 
 /**
- * Format a duration in milliseconds to MM:SS string.
+ * Format a duration in milliseconds to HH:MM:SS string.
+ * Hides hours if the total duration is less than one hour.
  */
-export function formatMs(ms: number): string {
+export function formatDuration(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+  const paddedMinutes = minutes.toString().padStart(2, '0');
+  const paddedSeconds = seconds.toString().padStart(2, '0');
+
+  if (hours > 0) {
+    const paddedHours = hours.toString().padStart(2, '0');
+    return `${paddedHours}:${paddedMinutes}:${paddedSeconds}`;
+  }
+  
+  return `${paddedMinutes}:${paddedSeconds}`;
 }
+
 
 /**
  * Calculate As Purchased (AP) quantity from Edible Portion (EP) quantity and yield percent.

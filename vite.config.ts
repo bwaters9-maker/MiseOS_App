@@ -6,8 +6,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import path from 'path';
 
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     react(),
@@ -16,11 +16,25 @@ export default defineConfig({
   server: {
     port: 3000,
     strictPort: true,
-    host: true
+    host: true,
+    hmr: {
+      // Explicitly define the HMR client port for middleware mode
+      clientPort: 3000,
+    },
   },
   preview: {
     port: 3000,
     strictPort: true,
     host: true
+  },
+  resolve: {
+    alias: {
+      // Set up a path alias for cleaner imports
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+  build: {
+    // Generate sourcemaps for production debugging
+    sourcemap: 'hidden',
   }
 });

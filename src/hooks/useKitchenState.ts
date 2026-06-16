@@ -1,86 +1,72 @@
 /**
  * src/hooks/useKitchenState.ts
  * Complete state management hook with resilient data parsing and real-time cloud syncing logic.
+ * Optimized with a single state document and native Firestore offline persistence.
  */
-import { useState, useEffect } from 'react';
-import { PrepItem, KitchenTimer, Recipe } from '../types';
-import { INITIAL_PREP_ITEMS, INITIAL_TIMERS, INITIAL_RECIPES } from '../data';
-import { db } from '../firebaseConfig';
+import { useState, useEffect, useCallback } from 'react';
+import { PrepItem, KitchenTimer, Recipe } from '@/types';
+import { INITIAL_PREP_ITEMS, INITIAL_TIMERS, INITIAL_RECIPES } from '@/data';
+import { db } from '@/firebaseConfig';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 
-// Helper function to safely read and parse localStorage items
-const getSafeLocalStorage = <T>(key: string, fallback: T): T => {
-  try {
-    const saved = localStorage.getItem(key);
-    if (!saved || saved === "undefined" || saved === "null") return fallback;
-    return JSON.parse(saved) as T;
-  } catch (error) {
-    console.error(`Error parsing localStorage key "${key}":`, error);
-    return fallback;
-  }
-};
+// A single document in Firestore holds the entire kitchen state.
+const kitchenStateDocRef = doc(db, "miseos_data", "kitchen_state");
 
 export const useKitchenState = () => {
-  const [prepItems, setPrepItems] = useState<PrepItem[]>(() => 
-    getSafeLocalStorage('miseos_prep_items', INITIAL_PREP_ITEMS)
-  );
-  const [timers, setTimers] = useState<KitchenTimer[]>(() => 
-    getSafeLocalStorage('miseos_timers', INITIAL_TIMERS)
-  );
-  const [recipes, setRecipes] = useState<Recipe[]>(() => 
-    getSafeLocalStorage('miseos_recipes', INITIAL_RECIPES)
-  );
+  const [prepItems, setPrepItems] = useState<PrepItem[]>(INITIAL_PREP_ITEMS);
+  const [timers, setTimers] = useState<KitchenTimer[]>(INITIAL_TIMERS);
+  const [recipes, setRecipes] = useState<Recipe[]>(INITIAL_RECIPES);
 
-  // Real-time Cloud Listeners on Boot
+  // Real-time Cloud Listener for the single state document.
+  // Firestore's offline persistence handles all caching automatically.
   useEffect(() => {
-    const unsubPrep = onSnapshot(doc(db, "miseos_data", "prep_checklist"), (docSnap) => {
-      if (docSnap.exists() && docSnap.data().items) {
-        setPrepItems(docSnap.data().items);
-        localStorage.setItem('miseos_prep_items', JSON.stringify(docSnap.data().items));
+    const unsubscribe = onSnapshot(kitchenStateDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const cloudState = docSnap.data();
+        // Set state only if the cloud data is valid to avoid overwriting with empty arrays
+        if (cloudState.prepItems) {
+            setPrepItems(cloudState.prepItems);
+        }
+        if (cloudState.timers) {
+            setTimers(cloudState.timers);
+        }
+        if (cloudState.recipes) {
+            setRecipes(cloudState.recipes);
+        }
+      } else {
+        // If the document doesn't exist, create it with initial data.
+        // This is useful for first-time app setup.
+        setDoc(kitchenStateDocRef, {
+          prepItems: INITIAL_PREP_ITEMS,
+          timers: INITIAL_TIMERS,
+          recipes: INITIAL_RECIPES,
+        }).catch(err => console.error("Failed to initialize kitchen state document:", err));
       }
     });
 
-    const unsubTimers = onSnapshot(doc(db, "miseos_data", "line_timers"), (docSnap) => {
-      if (docSnap.exists() && docSnap.data().updatedTimers) {
-        setTimers(docSnap.data().updatedTimers);
-        localStorage.setItem('miseos_timers', JSON.stringify(docSnap.data().updatedTimers));
-      }
-    });
-
-    const unsubRecipes = onSnapshot(doc(db, "miseos_data", "recipe_catalog"), (docSnap) => {
-      if (docSnap.exists() && docSnap.data().updatedRecipes) {
-        setRecipes(docSnap.data().updatedRecipes);
-        localStorage.setItem('miseos_recipes', JSON.stringify(docSnap.data().updatedRecipes));
-      }
-    });
-
-    return () => {
-      unsubPrep();
-      unsubTimers();
-      unsubRecipes();
-    };
+    return () => unsubscribe();
   }, []);
 
-  const updatePrepItems = (items: PrepItem[]) => {
+  // Generic update function to merge changes into the cloud state.
+  const updateCloudState = useCallback((stateUpdate: object) => {
+    setDoc(kitchenStateDocRef, stateUpdate, { merge: true })
+      .catch((error) => console.error("Cloud synchronization failed:", error));
+  }, []);
+
+  const updatePrepItems = useCallback((items: PrepItem[]) => {
     setPrepItems(items);
-    localStorage.setItem('miseos_prep_items', JSON.stringify(items));
-    setDoc(doc(db, "miseos_data", "prep_checklist"), { items })
-      .catch((error) => console.error("Cloud synchronization failed for prep items:", error));
-  };
+    updateCloudState({ prepItems: items });
+  }, [updateCloudState]);
 
-  const updateTimers = (updatedTimers: KitchenTimer[]) => {
+  const updateTimers = useCallback((updatedTimers: KitchenTimer[]) => {
     setTimers(updatedTimers);
-    localStorage.setItem('miseos_timers', JSON.stringify(updatedTimers));
-    setDoc(doc(db, "miseos_data", "line_timers"), { updatedTimers })
-      .catch((error) => console.error("Cloud synchronization failed for timers:", error));
-  };
+    updateCloudState({ timers: updatedTimers });
+  }, [updateCloudState]);
 
-  const updateRecipes = (updatedRecipes: Recipe[]) => {
+  const updateRecipes = useCallback((updatedRecipes: Recipe[]) => {
     setRecipes(updatedRecipes);
-    localStorage.setItem('miseos_recipes', JSON.stringify(updatedRecipes));
-    setDoc(doc(db, "miseos_data", "recipe_catalog"), { updatedRecipes })
-      .catch((error) => console.error("Cloud synchronization failed for recipes:", error));
-  };
+    updateCloudState({ recipes: updatedRecipes });
+  }, [updateCloudState]);
 
   return {
     prepItems,
@@ -91,3 +77,4 @@ export const useKitchenState = () => {
     setRecipes: updateRecipes
   };
 };
+

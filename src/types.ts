@@ -24,6 +24,7 @@ export interface KitchenTimer {
   elapsedMs: number;
   status: 'idle' | 'paused' | 'running' | 'alarm';
   station: PrepStation;
+  startTime?: number; // Optional starting timestamp for active countdowns
 }
 
 export interface Ingredient {

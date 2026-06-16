@@ -1,5 +1,9 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { 
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager 
+} from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBgumKqhSUhmOLWM0g5rGRpaARBQGBU4WQ",
@@ -11,4 +15,12 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+
+// Initialize Firestore with modern multi-tab persistent local cache
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+});
+
+
