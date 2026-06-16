@@ -1,15 +1,81 @@
 /**
- * src/lib/costEngine.js
+ * src/lib/costEngine.ts
  * Backend logic framework for assessing real-time food cost metrics, yield expenses,
  * and market vector alerts (Seasonal data, pricing trends, and volume forecasts).
  */
 
-export const calculateTrueCost = (apCost, yieldPercent) => {
+export type MarketTrendStatus = 'Trending' | 'Consistent' | 'Cold';
+export type PriceTrend = 'Skyrocketing' | 'Stable' | 'Dropping';
+export type Seasonality = 'Out of Season' | 'In Season';
+
+export interface MarketTrendInsight {
+  status: MarketTrendStatus;
+  priceTrend: PriceTrend;
+  seasonality: Seasonality;
+  notes: string;
+  priceBadgeStyle: string;
+  seasonBadgeStyle: string;
+}
+
+export interface RecipeIngredientLine {
+  id?: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  costPerUnit?: number;
+  purchaseUnit?: string;
+  yieldPercent?: number;
+}
+
+export interface CostCalculationRecipe {
+  ingredients?: RecipeIngredientLine[];
+  yield_quantity?: number | string;
+  menu_price?: string | number;
+  target_food_cost_percent?: string | number;
+  total_cost?: number;
+  cost_per_portion?: number;
+  food_cost_percent?: number;
+}
+
+export const calculateRecipeCosts = (
+  recipe: CostCalculationRecipe,
+  ingMap: Record<string, { cost_per_usable_unit?: number }> = {}
+): CostCalculationRecipe => {
+  let totalCost = 0;
+
+  const ingredients = recipe.ingredients || [];
+  ingredients.forEach((ing) => {
+    const mapped = ing.id ? (ingMap[ing.id] || ingMap[`recipe:${ing.id}`]) : null;
+    const costPerUnit = mapped?.cost_per_usable_unit ?? ing.costPerUnit ?? 0;
+    const yieldPercent = ing.yieldPercent ?? 100;
+
+    const yieldFactor = yieldPercent / 100;
+    const rawQty = yieldFactor > 0 ? ing.quantity / yieldFactor : ing.quantity;
+    const lineCost = rawQty * costPerUnit;
+    
+    totalCost += lineCost;
+  });
+
+  const yieldQty = Number(recipe.yield_quantity) || 1;
+  const costPerPortion = yieldQty > 0 ? totalCost / yieldQty : totalCost;
+
+  const menuPrice = Number(recipe.menu_price) || 0;
+  const foodCostPercent = menuPrice > 0 ? (costPerPortion / menuPrice) * 100 : 0;
+
+  return {
+    ...recipe,
+    total_cost: totalCost,
+    cost_per_portion: costPerPortion,
+    food_cost_percent: foodCostPercent
+  };
+};
+
+export const calculateTrueCost = (apCost: number, yieldPercent: number): number => {
   if (!yieldPercent || yieldPercent <= 0) return apCost;
   return apCost / (yieldPercent / 100);
 };
 
-export const getMarketTrendInsight = (ingredientName) => {
+export const getMarketTrendInsight = (ingredientName: string): MarketTrendInsight => {
   // Normalize checking keys
   const name = ingredientName?.toLowerCase() || '';
 
