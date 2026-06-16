@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useKitchenState } from './hooks/useKitchenState';
+import { db } from './firebaseConfig';
+import { collection, onSnapshot, addDoc, deleteDoc, updateDoc, doc, getDocs } from 'firebase/firestore';
 import { KitchenTimer, PrepStation } from './types';
 import { formatDuration } from './utils';
 import { Play, Pause, RotateCcw, Plus, Trash2, Clock, Bell } from 'lucide-react';
 
-const STATIONS: PrepStation[] = ['Sauté', 'Grill', 'Garde Manger', 'Pastry'];
-
 export const KitchenTimers: React.FC = () => {
-  const { timers, setTimers } = useKitchenState();
+  const [timers, setTimers] = useState<KitchenTimer[]>([]);
+  const [stations, setStations] = useState<PrepStation[]>([]);
   const [tick, setTick] = useState(0);
 
   // Form states for creating a new timer
@@ -15,87 +15,90 @@ export const KitchenTimers: React.FC = () => {
   const [newMinutes, setNewMinutes] = useState(10);
   const [newStation, setNewStation] = useState<PrepStation>('Sauté');
 
+  // Fetch station presets from Firestore on mount
+  useEffect(() => {
+    const fetchStations = async () => {
+      const stationSnap = await getDocs(collection(db, "station_presets"));
+      const stationData = stationSnap.docs.map(d => d.data().name as PrepStation);
+      setStations(stationData.length > 0 ? stationData : ['Sauté', 'Grill', 'Garde Manger', 'Pastry']);
+      if (stationData.length > 0) {
+        setNewStation(stationData[0]);
+      }
+    };
+    fetchStations();
+  }, []);
+
+  // Set up the live listener for the timers collection
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, 'timers'), (snapshot) => {
+      const fetchedTimers = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as KitchenTimer));
+      setTimers(fetchedTimers);
+    });
+    return () => unsubscribe();
+  }, []);
+
   // Trigger a re-render every second to update running timers
   useEffect(() => {
-    const interval = setInterval(() => {
-      setTick(prev => prev + 1);
-    }, 1000);
+    const interval = setInterval(() => setTick(prev => prev + 1), 1000);
     return () => clearInterval(interval);
   }, []);
 
-  const addTimer = (e: React.FormEvent) => {
+  const addTimer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newLabel.trim()) return;
 
-    const newTimer: KitchenTimer = {
-      id: `timer-${Date.now()}`,
+    await addDoc(collection(db, 'timers'), {
       label: newLabel.trim(),
       durationMs: newMinutes * 60 * 1000,
       elapsedMs: 0,
       status: 'idle',
       station: newStation,
-    };
-
-    setTimers([...timers, newTimer]);
+    });
     setNewLabel('');
   };
 
-  const deleteTimer = (id: string) => {
-    setTimers(timers.filter(t => t.id !== id));
+  const deleteTimer = async (id: string) => {
+    await deleteDoc(doc(db, 'timers', id));
   };
 
-  const toggleTimer = (id: string) => {
-    const updated = timers.map(t => {
-      if (t.id === id) {
-        const now = Date.now();
-        if (t.status === 'running') {
-          // Pause
-          const sessionElapsed = now - (t.startTime || now);
-          return {
-            ...t,
-            status: 'paused' as const,
-            elapsedMs: t.elapsedMs + sessionElapsed,
-            startTime: undefined,
-          };
-        } else {
-          // Start / Resume
-          return {
-            ...t,
-            status: 'running' as const,
-            startTime: now,
-          };
-        }
-      }
-      return t;
+  const toggleTimer = async (id: string) => {
+    const timer = timers.find(t => t.id === id);
+    if (!timer) return;
+
+    const now = Date.now();
+    let updateData: Partial<KitchenTimer> = {};
+
+    if (timer.status === 'running') {
+      const sessionElapsed = now - (timer.startTime || now);
+      updateData = {
+        status: 'paused',
+        elapsedMs: timer.elapsedMs + sessionElapsed,
+        startTime: undefined,
+      };
+    } else {
+      updateData = {
+        status: 'running',
+        startTime: now,
+      };
+    }
+    await updateDoc(doc(db, 'timers', id), updateData);
+  };
+  
+  const resetTimer = async (id: string) => {
+    await updateDoc(doc(db, 'timers', id), {
+      status: 'idle',
+      elapsedMs: 0,
+      startTime: undefined,
     });
-    setTimers(updated);
   };
 
-  const resetTimer = (id: string) => {
-    const updated = timers.map(t => {
-      if (t.id === id) {
-        return {
-          ...t,
-          status: 'idle' as const,
-          elapsedMs: 0,
-          startTime: undefined,
-        };
-      }
-      return t;
-    });
-    setTimers(updated);
-  };
-
-  const adjustTimerDuration = (id: string, minutes: number) => {
-    const updated = timers.map(t => {
-      if (t.id === id) {
-        const msAdjustment = minutes * 60 * 1000;
-        const newDuration = Math.max(0, t.durationMs + msAdjustment);
-        return { ...t, durationMs: newDuration };
-      }
-      return t;
-    });
-    setTimers(updated);
+  const adjustTimerDuration = async (id: string, minutes: number) => {
+    const timer = timers.find(t => t.id === id);
+    if (!timer) return;
+    
+    const msAdjustment = minutes * 60 * 1000;
+    const newDuration = Math.max(0, timer.durationMs + msAdjustment);
+    await updateDoc(doc(db, 'timers', id), { durationMs: newDuration });
   };
 
   return (
@@ -141,7 +144,7 @@ export const KitchenTimers: React.FC = () => {
             onChange={(e) => setNewStation(e.target.value as PrepStation)}
             className="w-full bg-zinc-950 border border-zinc-800 p-2.5 rounded-lg text-xs focus:outline-none focus:border-zinc-700 text-emerald-400 font-bold font-mono"
           >
-            {STATIONS.map(st => (
+            {stations.map(st => (
               <option key={st} value={st}>{st}</option>
             ))}
           </select>
