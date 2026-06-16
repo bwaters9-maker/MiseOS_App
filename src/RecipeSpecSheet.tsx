@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Recipe } from './types';
+import { calculateRecipeCosts } from './lib/costEngine';
 
 interface RecipeSpecSheetProps {
   recipe?: Recipe;
@@ -9,19 +10,23 @@ interface RecipeSpecSheetProps {
 export const RecipeSpecSheet: React.FC<RecipeSpecSheetProps> = ({ recipe, onBack }) => {
   const [scalingFactor, setScalingFactor] = useState(1);
 
-  if (!recipe) {
+  // Memoize the cost calculation to avoid re-running on every render
+  const costedRecipe = useMemo(() => {
+    if (!recipe) return null;
+    // The second argument, ingMap, is optional and defaults to {}
+    return calculateRecipeCosts(recipe);
+  }, [recipe]);
+
+  if (!costedRecipe) {
     return (
       <div className="p-6 text-zinc-400 font-mono">
         No recipe selected. Select a card from the dashboard to display specifications.
       </div>
     );
   }
-
-  // Calculate total batch cost based on individual ingredients configuration
-  const calculatedTotalCost = recipe.ingredients?.reduce((sum, ing) => {
-    const ingredientCost = (ing.quantity * ing.costPerUnit) / (ing.yieldPercent / 100);
-    return sum + (ingredientCost || 0);
-  }, 0) || 0;
+  
+  const menuPrice = Number(costedRecipe.menu_price) || 0;
+  const foodCostPercent = Number(costedRecipe.food_cost_percent) || 0;
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 bg-zinc-950 text-zinc-100 font-mono tracking-tight selection:bg-emerald-800">
@@ -31,20 +36,18 @@ export const RecipeSpecSheet: React.FC<RecipeSpecSheetProps> = ({ recipe, onBack
           <button onClick={onBack} className="text-xs text-zinc-500 hover:text-emerald-400 mb-2 transition-colors">
             &larr; BACK TO THE PASS
           </button>
-          <h1 className="text-3xl font-black text-white tracking-tighter uppercase">{recipe.name}</h1>
-          <p className="text-xs text-zinc-400 mt-1">STATION: <span className="text-emerald-400 font-bold">{recipe.station}</span></p>
+          <h1 className="text-3xl font-black text-white tracking-tighter uppercase">{costedRecipe.name}</h1>
+          <p className="text-xs text-zinc-400 mt-1">STATION: <span className="text-emerald-400 font-bold">{costedRecipe.station}</span></p>
         </div>
         <div className="flex gap-3">
           <div className="bg-zinc-900 border border-zinc-800 px-4 py-2 rounded-lg text-center">
             <span className="block text-[10px] text-zinc-500 uppercase font-bold">Menu Price</span>
-            <span className="text-lg font-bold text-emerald-400">${recipe.salePrice?.toFixed(2) || '0.00'}</span>
+            <span className="text-lg font-bold text-emerald-400">${menuPrice.toFixed(2)}</span>
           </div>
           <div className="bg-zinc-900 border border-zinc-800 px-4 py-2 rounded-lg text-center">
             <span className="block text-[10px] text-zinc-500 uppercase font-bold">Food Cost</span>
             <span className="text-lg font-bold text-zinc-300">
-              {recipe.salePrice && calculatedTotalCost 
-                ? ((calculatedTotalCost / recipe.salePrice) * 100).toFixed(1) 
-                : '0.0'}%
+              {foodCostPercent.toFixed(1)}%
             </span>
           </div>
         </div>
@@ -82,7 +85,7 @@ export const RecipeSpecSheet: React.FC<RecipeSpecSheetProps> = ({ recipe, onBack
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-900">
-                  {recipe.ingredients?.map((ing, idx) => (
+                  {costedRecipe.ingredients?.map((ing, idx) => (
                     <tr key={idx} className="hover:bg-zinc-900/20 text-zinc-300">
                       <td className="py-2.5 font-medium">{ing.name}</td>
                       <td className="py-2.5 text-right text-zinc-500">{ing.quantity} {ing.unit}</td>
@@ -104,7 +107,7 @@ export const RecipeSpecSheet: React.FC<RecipeSpecSheetProps> = ({ recipe, onBack
               Execution Methodology
             </h2>
             <ol className="space-y-4 text-xs text-zinc-300 list-decimal list-inside">
-              {recipe.steps?.map((step, idx) => (
+              {costedRecipe.steps?.map((step: string, idx: number) => (
                 <li key={idx} className="leading-relaxed pl-1 marker:text-zinc-500 marker:font-bold">
                   <span className="text-zinc-200">{step}</span>
                 </li>
@@ -116,3 +119,4 @@ export const RecipeSpecSheet: React.FC<RecipeSpecSheetProps> = ({ recipe, onBack
     </div>
   );
 };
+

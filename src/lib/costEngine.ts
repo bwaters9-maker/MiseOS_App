@@ -27,7 +27,9 @@ export interface RecipeIngredientLine {
   yieldPercent?: number;
 }
 
-export interface CostCalculationRecipe {
+import { Recipe } from '../types';
+
+export interface CostCalculationRecipe extends Omit<Recipe, 'ingredients'> {
   ingredients?: RecipeIngredientLine[];
   yield_quantity?: number | string;
   menu_price?: string | number;
