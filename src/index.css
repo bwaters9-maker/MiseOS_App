@@ -6,3 +6,109 @@
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   }
 }
+
+/* PRODUCTION PRINT ENGINE SPECIFICATION */
+@media print {
+  html, body {
+    background-color: #ffffff !important;
+    background-image: none !important;
+    color: #000000 !important;
+    font-size: 10pt !important;
+    font-family: system-ui, sans-serif !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide interactive, operational operator components */
+  header,
+  nav,
+  button,
+  select,
+  input,
+  textarea,
+  .no-print,
+  .toggle-controls {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Force layout container to utilize full physical printed layout */
+  main,
+  .max-w-7xl,
+  .mx-auto {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  /* Force background color clearance & pitch-black text for paper legibility */
+  div,
+  section,
+  span,
+  p,
+  li,
+  td,
+  th,
+  h1,
+  h2,
+  h3,
+  h4 {
+    background: transparent !important;
+    background-color: transparent !important;
+    color: #000000 !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Crisp physical border specifications for physical ink grids */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin-top: 15px !important;
+    margin-bottom: 15px !important;
+  }
+
+  th, td,
+  .border,
+  .border-zinc-800,
+  .border-zinc-900 {
+    border: 1px solid #000000 !important;
+    border-color: #000000 !important;
+    padding: 6px 10px !important;
+  }
+
+  th {
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+    background-color: #f4f4f5 !important; /* Soft gray for print header */
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Prevent page-overflows and split blocks on physical laser hardware */
+  tr,
+  .card,
+  .p-5,
+  .p-6,
+  section {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  h1, h2, h3 {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  /* Define soft margins to prevent physical margins clipping content */
+  @page {
+    size: portrait;
+    margin: 0.5in;
+  }
+}
