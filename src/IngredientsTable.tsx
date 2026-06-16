@@ -15,19 +15,30 @@ const getIngredientTrend = (ing: Ingredient) => {
   
   const latest = ing.historicalCost[ing.historicalCost.length - 1].cost;
   const previous = ing.historicalCost[ing.historicalCost.length - 2].cost;
+  const variance = previous > 0 ? ((latest - previous) / previous) * 100 : 0;
 
-  if (latest > previous) {
+  if (variance >= 10) {
+    return {
+      direction: 'spike',
+      label: `SPIKE +${variance.toFixed(1)}%`,
+      style: 'bg-red-900/40 border-red-500 text-red-200 animate-pulse font-black',
+      icon: <TrendingUp className="w-2.5 h-2.5 text-red-400 animate-bounce" />
+    };
+  }
+
+  if (variance > 0) {
     return {
       direction: 'up',
-      label: 'RISING',
+      label: `RISING +${variance.toFixed(1)}%`,
       style: 'bg-red-950 border-red-800 text-red-400',
       icon: <TrendingUp className="w-2.5 h-2.5" />
     };
   }
-  if (latest < previous) {
+
+  if (variance < 0) {
     return {
       direction: 'down',
-      label: 'DROPPING',
+      label: `DOWN ${variance.toFixed(1)}%`,
       style: 'bg-emerald-950 border-emerald-800 text-emerald-400',
       icon: <TrendingDown className="w-2.5 h-2.5" />
     };
