@@ -1,113 +1,91 @@
-export type PrepStation = string;
-
-export interface CostHistoryPoint {
-  date: string;
-  cost: number;
-}
-
-// Base ingredient definition from master list
-export interface Ingredient {
+/**
+ * Represents a single task on the daily back-of-house prep checklist.
+ * This type is also used for `ProductionRun` props in components.
+ */
+export interface PrepItem {
   id: string;
-  name:string;
-  costPerUnit: number;
-  purchaseUnit: string;
-  yieldPercent?: number;
-  historicalCost?: CostHistoryPoint[];
-  // quantity and unit are part of on-hand inventory, not master data
-}
-
-// Represents an on-hand prep item, often derived from an Ingredient
-export interface ProductionRun {
-  id: string;
-  name: string;
-  quantity: number; // Current on-hand amount
-  unit: string;
-  par?: number;
-  checked: boolean;
-  station?: PrepStation;
-  priority?: 'low' | 'medium' | 'high'; // from DailyCribSheet
-  notes?: string;
-  lastModified?: string;
-  recipe_id: string;
-  requires_temp_check?: boolean;
-  // Computed for UI
-  deficit?: number;
-  status?: 'SHORTAGE' | 'STABLE';
-}
-
-export interface Item86Entry {
-  id: string;
-  name: string;
-  station: PrepStation | 'All';
-  blockedAt: string;
-}
-
-// A formal record of a shift transition for a specific station.
-export interface HandoverLog {
-  id: string;
-  shift_id: string; // e.g., '2024-06-17-PM'
-  station: PrepStation;
-  status: 'pass' | 'fail' | 'incomplete';
-  notes: string;
-  items86: string[]; // Names of items 86'd during the shift
-  submitted_by: string; // Name of the station lead
-  timestamp: string; // ISO String
-}
-
-export interface KitchenTimer {
-  id: string;
-  label: string;
-  station: PrepStation;
-  durationMs: number;
-  elapsedMs: number;
-  status: 'idle' | 'running' | 'paused';
-  startTime?: number; // JS timestamp (ms)
-}
-
-// Ingredient as part of a recipe spec
-export interface RecipeIngredient {
   name: string;
   quantity: number;
   unit: string;
-  costPerUnit: number;
-  purchaseUnit: string;
-  yieldPercent: number;
-  isSubRecipe?: boolean;
+  checked: boolean;
+  assignedStation: 'Sauté' | 'Grill' | 'Garde Manger' | 'Pastry';
+  priority: 'low' | 'medium' | 'high';
+  par?: number;
+  requires_temp_check?: boolean;
+  station?: string;
+  notes?: string;
+  lastModified?: string;
+  recipe_id: string;
 }
 
+/**
+ * Represents a culinary recipe with dynamic scaling and cost analysis.
+ */
 export interface Recipe {
   id: string;
   name: string;
-  station: PrepStation;
   originalCovers: number;
   targetCovers: number;
-  ingredients: RecipeIngredient[];
-  steps: string[];
-  totalCost: number;
-  salePrice: number;
-  createdAt: any; // Firestore serverTimestamp
-  // from costEngine
-  menu_price?: number;
-  food_cost_percent?: number;
+  station: 'Sauté' | 'Grill' | 'Garde Manger' | 'Pastry';
+  ingredients: any[]; // Consider defining a more specific Ingredient type
+  steps: any[]; // Consider defining a more specific Step type
+  salePrice?: number;
 }
 
-export interface KitchenAlert {
+/**
+ * Represents an end-of-shift coordinating safety note.
+ */
+export interface HandoverLog {
   id: string;
-  recipeId: string;
-  recipeName: string;
-  type: 'REVENUE_RISK';
+  sender: string;
+  submitted_by?: string;
+  station: string;
+  severity: 'info' | 'warning' | 'critical';
+  status?: 'pass' | 'fail' | 'incomplete';
   message: string;
-  timestamp: any; // Firestore Timestamp
-  read: boolean;
+  notes?: string;
+  items86?: string[];
+  timestamp: string;
+  resolved: boolean;
 }
+
+/**
+ * Represents an 86'd (out-of-stock) item.
+ */
+export interface Item86 {
+  id: string;
+  name: string;
+  status: 'out' | 'limited';
+  station?: PrepStation | 'All';
+  substitute?: string;
+  blockedAt: string;
+  timestamp: string;
+}
+
+export type PrepStation = 'Sauté' | 'Grill' | 'Garde Manger' | 'Pastry';
+
+export type ProductionRun = PrepItem;
+
+export type Item86Entry = Item86;
 
 export interface TrendReport {
-  recipe_scores: {
+  recipe_scores?: {
     [recipe_id: string]: {
       status: 'hot' | 'cold' | 'stable';
     };
   };
+  // Other potential properties for TrendReport
 }
 
-// Alias for backward compatibility
-export type PrepItem = ProductionRun;
+/**
+ * Represents an active countdown timer in the kitchen.
+ */
+export interface KitchenTimer {
+  id: string;
+  label: string;
+  station: string;
+  durationMs: number;
+  elapsedMs: number;
+  status: 'running' | 'paused' | 'idle';
+  startTime?: number;
+}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebaseConfig';
 import { doc, updateDoc } from 'firebase/firestore';
-import { KitchenTimer } from '../../types';
+import { KitchenTimer } from '@/types';
 import { formatDuration } from '../../utils';
 import { Play, RotateCcw } from 'lucide-react';
 

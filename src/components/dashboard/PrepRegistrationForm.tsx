@@ -119,13 +119,13 @@ export const PrepRegistrationForm: React.FC<PrepRegistrationFormProps> = ({ onSu
           <select
             value={priority}
             onChange={(e) => setPriority(e.target.value as 'low' | 'medium' | 'high')}
-            className={`w-full bg-zinc-950 border border-zinc-800 p-2.5 rounded-lg text-xs focus:outline-none focus:border-zinc-700 font-bold ${
+            className={`w-full bg-zinc-950 border border-zinc-800 p-2.5 rounded-lg text-xs focus:outline-none focus:border-zinc-700 font-bold appearance-none ${
               priority === 'high' ? 'text-red-400 animate-pulse' : priority === 'medium' ? 'text-amber-400' : 'text-zinc-400'
             }`}
           >
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
+            <option value="low">⚪ Low Priority</option>
+            <option value="medium">🟡 Medium Priority</option>
+            <option value="high">🔴 High Priority</option>
           </select>
         </div>
 

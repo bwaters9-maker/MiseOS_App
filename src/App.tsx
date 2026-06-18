@@ -1,28 +1,39 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
+import ErrorBoundary from './components/ErrorBoundary';
 import { AppHeader } from './components/AppHeader';
 import { useKitchenState } from './hooks/useKitchenState';
 
-// Lazy load the main views to split them into separate chunks
-const DashboardView = lazy(() => import('./Dashboard'));
-const PrepChecklist = lazy(() => import('./PrepChecklist').then(module => ({ default: module.PrepChecklist })));
-const KitchenTimers = lazy(() => import('./KitchenTimers').then(module => ({ default: module.KitchenTimers })));
-const ShiftHandoverLog = lazy(() => import('./ShiftHandoverLog').then(module => ({ default: module.ShiftHandoverLog })));
-const HandoverLogForm = lazy(() => import('./HandoverLog').then(module => ({ default: module.HandoverLogForm })));
-const Settings = lazy(() => import('./Settings').then(module => ({ default: module.Settings })));
-const TestKitchenHub = lazy(() => import('./TestKitchenHub'));
-const HistoricalAlerts = lazy(() => import('./HistoricalAlerts').then(module => ({ default: module.HistoricalAlerts })));
+// --- LAZY-LOADING STRUCTURE ---
+const Dashboard = React.lazy(() => import('./components/dashboard/DailyCribSheet'));
+const TestKitchenHub = React.lazy(() => import('./TestKitchenHub'));
+const PrepChecklist = React.lazy(() => import('./PrepChecklist').then(m => ({ default: m.PrepChecklist })));
+const KitchenTimers = React.lazy(() => import('./KitchenTimers').then(m => ({ default: m.KitchenTimers })));
+const ShiftHandoverLog = React.lazy(() => import('./ShiftHandoverLog').then(m => ({ default: m.ShiftHandoverLog })));
+const HandoverLogForm = React.lazy(() => import('./HandoverLog').then(m => ({ default: m.HandoverLogForm })));
+const Settings = React.lazy(() => import('./Settings').then(m => ({ default: m.Settings })));
 
-// A simple loading fallback component to show while chunks are loading
-const LoadingFallback = () => (
-  <div className="p-12 text-center text-sm text-zinc-500 uppercase tracking-widest">
-    Loading View...
-  </div>
-);
+// --- VIEW MAPPING ---
+const viewMap: { [key: string]: React.LazyExoticComponent<React.ComponentType<any>> } = {
+  dashboard: Dashboard,
+  prep: PrepChecklist,
+  timers: KitchenTimers,
+  handover: ShiftHandoverLog,
+  'new-handover': HandoverLogForm,
+  'test-kitchen': TestKitchenHub,
+  settings: Settings,
+};
+
+// --- RENDERER AND APP COMPONENTS ---
+const ActiveViewRenderer = ({ view, ...props }: { view: string; [key: string]: any }) => {
+  const Component = viewMap[view];
+  if (!Component) return <div className="p-6 text-zinc-500">View not found.</div>;
+  return <Component {...props} />;
+};
 
 export default function App() {
   const [activeView, setActiveView] = useState('dashboard');
-  const { prepItems, setPrepItems, recipes } = useKitchenState();
-  const [theme, setTheme] = useState('dark');
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+  const kitchenState = useKitchenState();
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -31,28 +42,14 @@ export default function App() {
   }, [theme]);
 
   return (
-    <div className='min-h-screen bg-black text-zinc-100 antialiased font-sans'>
+    <div className="min-h-screen bg-black text-zinc-100 antialiased font-sans">
       <AppHeader activeView={activeView} onNavigate={setActiveView} />
-      <main className='py-6'>
-        <Suspense fallback={<LoadingFallback />}>
-          {activeView === 'dashboard' && <DashboardView />}
-          {activeView === 'prep' && <PrepChecklist prepItems={prepItems} />}
-          {activeView === 'timers' && <KitchenTimers />}
-          {activeView === 'handover' && <ShiftHandoverLog />}
-          {activeView === 'alert-history' && <HistoricalAlerts />}
-          {activeView === 'test-kitchen' && <TestKitchenHub />}
-          {activeView === 'settings' && <Settings theme={theme} setTheme={setTheme} />}
-          {activeView === 'new-handover' && (
-            <div className="max-w-4xl mx-auto p-6">
-              <HandoverLogForm
-                recipes={recipes}
-                productionRuns={prepItems}
-                setProductionRuns={setPrepItems}
-                currentUser="Chef Brian"
-              />
-            </div>
-          )}
-        </Suspense>
+      <main className="py-6">
+        <ErrorBoundary>
+          <Suspense fallback={<div className="p-12 text-center text-sm text-zinc-500">Loading...</div>}>
+            <ActiveViewRenderer view={activeView} {...kitchenState} theme={theme} setTheme={setTheme} />
+          </Suspense>
+        </ErrorBoundary>
       </main>
     </div>
   );

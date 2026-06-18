@@ -9,32 +9,28 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+  errorInfo: ErrorInfo | null;
 }
 
 export default class ErrorBoundary extends React.Component<Props, State> {
-  // Explicitly assign properties to satisfy strict compiler configurations
-  props: Props;
-  state: State;
-
-  constructor(props: Props) {
-    super(props);
-    this.props = props;
-    this.state = {
-      hasError: false,
-      error: null
-    };
-  }
+  state: State = {
+    hasError: false,
+    error: null,
+    errorInfo: null,
+  };
 
   public static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+    return { hasError: true, error, errorInfo: null };
   }
 
-  public componentDidCatch(error: Error, _errorInfo: ErrorInfo) {
-    console.error('MiseOS Module Crash caught in ErrorBoundary:', error);
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('MiseOS Module Crash caught in ErrorBoundary:', error, errorInfo);
+    this.setState({ errorInfo });
   }
 
   private handleReset = () => {
-    (this as any).setState({ hasError: false, error: null });
+    // The setState call here is redundant because window.location.reload()
+    // will discard the current component state anyway.
     window.location.reload();
   };
 
@@ -53,6 +49,9 @@ export default class ErrorBoundary extends React.Component<Props, State> {
           </p>
           <div className="bg-zinc-900 border border-zinc-805 p-3 rounded text-[10px] font-mono text-zinc-400 max-h-40 overflow-auto mb-4">
             {this.state.error?.toString() || 'Unknown Error'}
+            {this.state.errorInfo?.componentStack && (
+              <pre className="mt-2 whitespace-pre-wrap">{this.state.errorInfo.componentStack}</pre>
+            )}
           </div>
           <button
             onClick={this.handleReset}

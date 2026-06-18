@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebaseConfig';
-import { collection, addDoc, serverTimestamp, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { HandoverLog, PrepStation, ProductionRun, Recipe } from '@/types';
 import { Check, Send } from 'lucide-react';
+import { useStationPresets } from '@/hooks/useStationPresets';
 
 interface HandoverLogFormProps {
   recipes: Recipe[];
@@ -17,24 +18,17 @@ export const HandoverLogForm: React.FC<HandoverLogFormProps> = ({
   setProductionRuns,
   currentUser,
 }) => {
-  const [stationPresets, setStationPresets] = useState<PrepStation[]>([]);
+  const { presets: stationPresets } = useStationPresets();
   const [station, setStation] = useState<PrepStation>('');
   const [status, setStatus] = useState<'pass' | 'fail' | 'incomplete'>('pass');
   const [notes, setNotes] = useState('');
   const [items86, setItems86] = useState<string[]>([]);
 
   useEffect(() => {
-    const q = query(collection(db, 'station_presets'), orderBy('name'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const presets = snapshot.docs.map(doc => doc.data().name as PrepStation);
-      setStationPresets(presets);
-      if (presets.length > 0) {
-        setStation(currentStation => currentStation || presets[0]);
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
+    if (stationPresets.length > 0 && !station) {
+      setStation(stationPresets[0]);
+    }
+  }, [stationPresets, station]);
 
   const handleItem86Toggle = (itemName: string) => {
     setItems86(prev =>
