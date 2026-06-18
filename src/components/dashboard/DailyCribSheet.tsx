@@ -1,38 +1,48 @@
-import React, { useState } from 'react';
-import { AlertTriangle, ListTodo, Ban, PlusCircle, XCircle } from 'lucide-react';
-import { PrepItem, HandoverEntry, Item86Entry, PrepStation } from '@/types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { AlertTriangle, ListTodo, Ban, PlusCircle, XCircle, TrendingUp, ClipboardCheck, CheckCircle } from 'lucide-react';
+import { db } from '../../firebaseConfig';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { ProductionRun, HandoverLog, Item86Entry, PrepStation, TrendReport } from '@/types';
+import { Section } from '../CribComponents';
 
 interface DailyCribSheetProps {
-  prepItems: PrepItem[];
-  handovers: HandoverEntry[];
+  prepRuns: ProductionRun[];
+  handovers: HandoverLog[];
   items86: Item86Entry[];
-  onUpdateHandovers: (handovers: HandoverEntry[]) => void;
+  latestReport: TrendReport | null;
   onUpdateItems86: (items86: Item86Entry[]) => void;
 }
 
-const STATIONS: (PrepStation | 'All')[] = ['Sauté', 'Grill', 'Garde Manger', 'Pastry', 'All'];
-
 const DailyCribSheet: React.FC<DailyCribSheetProps> = ({ 
-  prepItems, 
+  prepRuns, 
   handovers, 
   items86,
-  onUpdateHandovers,
+  latestReport,
   onUpdateItems86 
 }) => {
-  const [newHandover, setNewHandover] = useState('');
+  const [stationPresets, setStationPresets] = useState<(PrepStation | 'All')[]>(['All']);
   const [newItemName, setNewItemName] = useState('');
   const [newItemStation, setNewItemStation] = useState<PrepStation | 'All'>('All');
 
-  const handleAddHandover = () => {
-    if (!newHandover.trim()) return;
-    const entry: HandoverEntry = {
-      id: `handover-${Date.now()}`,
-      comment: newHandover.trim(),
-      timestamp: new Date().toISOString(),
-      sender: 'system' // Placeholder for user auth
-    };
-    onUpdateHandovers([...handovers, entry]);
-    setNewHandover('');
+  useEffect(() => {
+    const q = query(collection(db, 'station_presets'), orderBy('name'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const presets = snapshot.docs.map(doc => doc.data().name as PrepStation);
+      setStationPresets(['All', ...presets]);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const STATUS_STYLES = {
+    pass: 'text-green-400 border-green-800',
+    fail: 'text-red-400 border-red-800',
+    incomplete: 'text-amber-400 border-amber-800',
+  };
+
+  const STATUS_ICONS = {
+    pass: <CheckCircle className="w-3 h-3" />,
+    fail: <XCircle className="w-3 h-3" />,
+    incomplete: <AlertTriangle className="w-3 h-3" />,
   };
 
   const handleAddItem86 = () => {
@@ -48,7 +58,18 @@ const DailyCribSheet: React.FC<DailyCribSheetProps> = ({
     setNewItemStation('All');
   };
 
-  const highPriorityPrep = prepItems.filter(item => item.priority === 'high' && !item.checked);
+  const groupedPrep = useMemo(() => {
+    const groups = prepRuns.reduce((acc, run) => {
+      const station = run.station || 'General';
+      if (!acc[station]) {
+        acc[station] = [];
+      }
+      acc[station].push(run);
+      return acc;
+    }, {} as Record<string, ProductionRun[]>);
+    console.log(`[CribSheet-Intelligence] Loaded ${prepRuns.length} tasks across ${Object.keys(groups).length} stations.`);
+    return groups;
+  }, [prepRuns]);
 
   return (
     <div className="space-y-6">
@@ -83,8 +104,8 @@ const DailyCribSheet: React.FC<DailyCribSheetProps> = ({
             placeholder="Item Name (e.g., Salmon)"
             className="flex-grow bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs rounded px-2 py-1 h-8"
           />
-          <select value={newItemStation} onChange={(e) => setNewItemStation(e.target.value as PrepStation | 'All')} className="bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs rounded px-2 py-1 h-8">
-            {STATIONS.map(s => <option key={s} value={s}>{s}</option>)}
+          <select value={newItemStation} onChange={(e) => setNewItemStation(e.target.value as PrepStation | 'All')} className="bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs rounded px-2 py-1 h-8 max-w-[120px]">
+            {stationPresets.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
           <button onClick={handleAddItem86} className="bg-red-900/50 text-red-300 h-8 px-2.5 rounded border border-red-800 hover:bg-red-900">
             <PlusCircle className="w-4 h-4" />
@@ -99,80 +120,64 @@ const DailyCribSheet: React.FC<DailyCribSheetProps> = ({
           <span>Handovers</span>
         </h4>
         <ul className="space-y-2 text-xs text-zinc-400 list-none mb-3">
-          {handovers.length > 0 ? (
-            handovers.map(log => (
-              <li key={log.id} className="bg-zinc-950/30 p-2 rounded">
-                 <p className="font-semibold text-zinc-300">{log.comment}</p>
-                 <div className="flex justify-between items-center">
-                   <p className="text-zinc-500 text-[10px] uppercase tracking-wider">From: {log.sender} @ <span className="font-mono">{new Date(log.timestamp).toLocaleTimeString()}</span></p>
-                   <button onClick={() => onUpdateHandovers(handovers.filter(h => h.id !== log.id))} className="text-zinc-600 hover:text-red-400">
-                     <XCircle className="w-3.5 h-3.5" />
-                   </button>
-                 </div>
-              </li>
-            ))
-          ) : (
+          {handovers.length > 0 ? handovers.map(log => (
+            <li key={log.id} className="bg-zinc-950/30 p-2.5 rounded border border-zinc-800/50">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="font-semibold text-zinc-300">{log.notes || <span className="italic text-zinc-500">No notes.</span>}</p>
+                  {log.items86.length > 0 && (
+                    <div className="mt-1.5 text-[10px]">
+                      <span className="font-bold text-red-400/80">86'd: </span>
+                      <span className="text-red-400/70">{log.items86.join(', ')}</span>
+                    </div>
+                  )}
+                </div>
+                <div className={`flex items-center gap-1.5 text-[10px] font-bold uppercase border px-1.5 py-0.5 rounded-full ${STATUS_STYLES[log.status]}`}>
+                  {STATUS_ICONS[log.status]}
+                  <span>{log.status}</span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center mt-2 pt-1.5 border-t border-zinc-800/50">
+                <p className="text-zinc-500 text-[10px] uppercase tracking-wider">From: {log.submitted_by} @ <span className="font-mono">{new Date(log.timestamp).toLocaleTimeString()}</span></p>
+                <p className="text-zinc-500 text-[10px] uppercase font-bold">{log.station}</p>
+              </div>
+            </li>
+          )) : (
              <p className="text-xs text-zinc-500 italic">No handovers.</p>
           )}
         </ul>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newHandover}
-            onChange={(e) => setNewHandover(e.target.value)}
-            placeholder="Add handover note..."
-            className="flex-grow bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs rounded px-2 py-1 h-8"
-          />
-          <button onClick={handleAddHandover} className="bg-amber-900/50 text-amber-300 h-8 px-2.5 rounded border border-amber-800 hover:bg-amber-900">
-            <PlusCircle className="w-4 h-4" />
-          </button>
-        </div>
       </div>
 
       {/* Prep Par Matrix */}
       <div>
-        <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-cyan-400 mb-3">
-          <ListTodo className="w-4 h-4" />
-          <span>Prep Par Matrix</span>
-        </h4>
-        <div className="overflow-hidden border border-zinc-800 rounded bg-zinc-950/20 text-[10px]">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-zinc-900/60 text-zinc-500 uppercase tracking-widest text-[9px] border-b border-zinc-800">
-              <tr>
-                <th className="p-2">Item</th>
-                <th className="p-2 text-right">On-Hand</th>
-                <th className="p-2 text-right">Par</th>
-                <th className="p-2 text-right">Deficit</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-900 text-zinc-300">
-              {prepItems.length > 0 ? (
-                prepItems.map(item => {
-                  const onHand = Number(item.quantity) || 0;
-                  const par = item.par ?? 0;
-                  const deficit = Math.max(0, par - onHand);
-                  const isUnderPar = onHand < par;
-                  const rowClass = isUnderPar ? 'text-red-400 font-bold bg-red-950/10' : 'text-zinc-300';
-
-                  return (
-                    <tr key={item.id} className={`hover:bg-zinc-900/10 transition-colors ${rowClass}`}>
-                      <td className="p-2 font-semibold truncate max-w-[100px]">{item.name}</td>
-                      <td className="p-2 text-right font-mono">{onHand}{item.unit}</td>
-                      <td className="p-2 text-right font-mono">{par}{item.unit}</td>
-                      <td className={`p-2 text-right font-mono ${deficit > 0 ? 'text-red-400' : 'text-zinc-500'}`}>
-                        {deficit > 0 ? `${deficit}${item.unit}` : '—'}
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                <tr>
-                  <td colSpan={4} className="p-4 text-center text-zinc-500 italic">No prep items registered.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        {Object.entries(groupedPrep).map(([station, runs]) => (
+          <Section key={station} title={station} icon={<ListTodo className="w-4 h-4" />}>
+            {runs.map(run => {
+              const isHot = latestReport?.recipe_scores?.[run.recipe_id]?.status === 'hot';
+              const needsCheck = run.requires_temp_check;
+              const deficit = Math.max(0, (run.par || 0) - run.quantity);
+              return (
+                <div key={run.id} className="bg-zinc-950/30 p-2 rounded flex justify-between items-center text-xs">
+                  <div className="flex items-center gap-2">
+                    {isHot && <TrendingUp className="w-3.5 h-3.5 text-orange-500" title="Trend-Bump: Hot Item" />}
+                    {needsCheck && <ClipboardCheck className="w-3.5 h-3.5 text-blue-400" title="Requires Temp Check" />}
+                    <span className="font-semibold text-zinc-300">{run.name}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-zinc-500 font-mono">
+                      {run.quantity} / {run.par || 'N/A'} {run.unit}
+                    </span>
+                    {deficit > 0 && (
+                      <span className="font-bold text-red-400 font-mono bg-red-950/40 border border-red-800 px-1.5 py-0.5 rounded text-[10px]">
+                        -{deficit}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </Section>
+        ))}
       </div>
 
     </div>

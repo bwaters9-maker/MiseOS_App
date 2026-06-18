@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Printer } from 'lucide-react';
+import { Printer, AlertTriangle } from 'lucide-react';
 import DailyCribSheet from './components/dashboard/DailyCribSheet';
 import { LineTimerModule } from './components/dashboard/LineTimerModule';
 import { MetricsHUD } from './components/dashboard/MetricsHUD';
 import { RecipeBuilder } from './components/dashboard/RecipeBuilder';
 import { useKitchenState } from '@/hooks/useKitchenState';
+import { TrendReport, KitchenAlert } from './types';
 
 export default function DashboardView() {
-  const { prepItems, timers, recipes, handovers, setHandovers, items86, setItems86 } = useKitchenState();
+  const { prepItems, timers, recipes, handovers, items86, setItems86, latestReport, kitchenAlerts, markAlertAsRead } = useKitchenState();
   const [tick, setTick] = useState(0);
 
   // Single in-file interval loop tracking tick state
@@ -20,6 +21,30 @@ export default function DashboardView() {
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto font-mono text-zinc-100 selection:bg-emerald-800">
+      {kitchenAlerts.length > 0 && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-md">
+          {kitchenAlerts.map((alert: KitchenAlert) => (
+            <div
+              key={alert.id}
+              className="relative bg-red-900 border border-red-700 text-white p-4 rounded-lg shadow-xl mb-2 cursor-pointer animate-pulse-once"
+              onClick={() => markAlertAsRead(alert.id)}
+              title="Click to acknowledge"
+            >
+              <div className="absolute inset-0 ring-2 ring-red-500 rounded-lg animate-pulse" />
+              <div className="flex items-center gap-3 relative z-10">
+                <AlertTriangle className="w-6 h-6 text-red-300 flex-shrink-0" />
+                <div>
+                  <p className="font-bold text-sm uppercase tracking-wide text-red-100">{alert.type}</p>
+                  <p className="text-xs text-red-200 mt-1">{alert.message}</p>
+                  <p className="text-[10px] text-red-400 mt-1">
+                    {new Date(alert.timestamp?.toDate()).toLocaleTimeString()} - {alert.recipeName}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* HEADER SECTION */}
       <div className="border-b border-zinc-900 pb-4">
@@ -28,10 +53,16 @@ export default function DashboardView() {
       </div>
 
       {/* METRIC CARD HUD */}
-      <MetricsHUD />
+      <MetricsHUD
+        prepItems={prepItems}
+        timers={timers}
+        recipes={recipes}
+        handovers={handovers}
+        items86={items86}
+      />
 
       {/* RECIPE BUILDER */}
-      {/* <RecipeBuilder /> */}
+      <RecipeBuilder />
 
       {/* LOWER CONTENT PANEL GRID */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -46,10 +77,10 @@ export default function DashboardView() {
           </div>
           <div className="pt-2">
             <DailyCribSheet 
-              prepItems={prepItems}
+              prepRuns={prepItems}
               handovers={handovers}
               items86={items86}
-              onUpdateHandovers={setHandovers}
+              latestReport={latestReport ?? { recipe_scores: {} }}
               onUpdateItems86={setItems86}
             />
           </div>
@@ -57,7 +88,7 @@ export default function DashboardView() {
 
         {/* Right 2/3 Panel: Active Kitchen Timers */}
         <div className="md:col-span-2">
-          <LineTimerModule />
+          <LineTimerModule timers={timers} />
         </div>
 
       </div>

@@ -26,10 +26,10 @@ export const PrepRegistrationForm: React.FC<PrepRegistrationFormProps> = ({ onSu
     const newPrepItem: PrepItem = {
       id: `prep-${Date.now()}`,
       name: description.trim(),
-      quantity: quantity.toString(),
+      quantity: quantity,
       unit: unit.trim(),
       checked: false,
-      assignedStation: station,
+      station: station,
       priority: priority,
       notes: instructions.trim() || undefined,
       lastModified: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),

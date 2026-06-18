@@ -1,93 +1,38 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-export type PrepStation = 'Sauté' | 'Grill' | 'Garde Manger' | 'Pastry';
-
-export interface PrepItem {
-  id: string;
-  name: string;
-  quantity: string;
-  unit: string;
-  checked: boolean;
-  assignedStation: PrepStation;
-  priority: 'low' | 'medium' | 'high';
-  notes?: string;
-  lastModified: string;
-  par?: number; // Optional par level for par calculations
-}
-
-export interface KitchenTimer {
-  id: string;
-  label: string;
-  durationMs: number;
-  elapsedMs: number;
-  status: 'idle' | 'paused' | 'running' | 'alarm';
-  station: PrepStation;
-  startTime?: number; // Optional starting timestamp for active countdowns
-}
+export type PrepStation = string;
 
 export interface CostHistoryPoint {
   date: string;
   cost: number;
 }
 
+// Base ingredient definition from master list
 export interface Ingredient {
-  id?: string;
-  name: string;
-  quantity: number; // Edible Portion (EP) quantity
-  unit: string;
-  costPerUnit: number; // Unit price as purchased (AP)
+  id: string;
+  name:string;
+  costPerUnit: number;
   purchaseUnit: string;
-  yieldPercent: number; // Yield factor from trim wastage (50-100)
+  yieldPercent?: number;
   historicalCost?: CostHistoryPoint[];
+  // quantity and unit are part of on-hand inventory, not master data
 }
 
-export interface Recipe {
+// Represents an on-hand prep item, often derived from an Ingredient
+export interface ProductionRun {
   id: string;
   name: string;
-  originalCovers: number;
-  targetCovers: number;
-  station: PrepStation;
-  ingredients: Ingredient[];
-  steps: string[];
-  salePrice?: number;
-}
-
-export interface HandoverLog {
-  id: string;
-  sender: string;
-  station: PrepStation | 'All';
-  severity: 'info' | 'warning' | 'critical';
-  message: string;
-  timestamp: string;
-  resolved: boolean;
-}
-
-export interface Item86 {
-  id: string;
-  name: string;
-  status: 'out' | 'limited';
-  substitute?: string;
-  timestamp: string;
-}
-
-export interface SubRecipe {
-  id: string;
-  name: string;
-  station: PrepStation;
-  batchSize: number;
-  unit: string; // e.g., 'kg', 'L', 'portions'
-  ingredients: Ingredient[];
-  steps: string[];
-}
-
-export interface HandoverEntry {
-  id: string;
-  comment: string;
-  timestamp: string;
-  sender: string;
+  quantity: number; // Current on-hand amount
+  unit: string;
+  par?: number;
+  checked: boolean;
+  station?: PrepStation;
+  priority?: 'low' | 'medium' | 'high'; // from DailyCribSheet
+  notes?: string;
+  lastModified?: string;
+  recipe_id: string;
+  requires_temp_check?: boolean;
+  // Computed for UI
+  deficit?: number;
+  status?: 'SHORTAGE' | 'STABLE';
 }
 
 export interface Item86Entry {
@@ -97,12 +42,72 @@ export interface Item86Entry {
   blockedAt: string;
 }
 
-export interface KitchenState {
-  prepItems: PrepItem[];
-  timers: KitchenTimer[];
-  recipes: Recipe[];
-  handovers?: HandoverEntry[];
-  items86?: Item86Entry[];
+// A formal record of a shift transition for a specific station.
+export interface HandoverLog {
+  id: string;
+  shift_id: string; // e.g., '2024-06-17-PM'
+  station: PrepStation;
+  status: 'pass' | 'fail' | 'incomplete';
+  notes: string;
+  items86: string[]; // Names of items 86'd during the shift
+  submitted_by: string; // Name of the station lead
+  timestamp: string; // ISO String
 }
 
+export interface KitchenTimer {
+  id: string;
+  label: string;
+  station: PrepStation;
+  durationMs: number;
+  elapsedMs: number;
+  status: 'idle' | 'running' | 'paused';
+  startTime?: number; // JS timestamp (ms)
+}
 
+// Ingredient as part of a recipe spec
+export interface RecipeIngredient {
+  name: string;
+  quantity: number;
+  unit: string;
+  costPerUnit: number;
+  purchaseUnit: string;
+  yieldPercent: number;
+  isSubRecipe?: boolean;
+}
+
+export interface Recipe {
+  id: string;
+  name: string;
+  station: PrepStation;
+  originalCovers: number;
+  targetCovers: number;
+  ingredients: RecipeIngredient[];
+  steps: string[];
+  totalCost: number;
+  salePrice: number;
+  createdAt: any; // Firestore serverTimestamp
+  // from costEngine
+  menu_price?: number;
+  food_cost_percent?: number;
+}
+
+export interface KitchenAlert {
+  id: string;
+  recipeId: string;
+  recipeName: string;
+  type: 'REVENUE_RISK';
+  message: string;
+  timestamp: any; // Firestore Timestamp
+  read: boolean;
+}
+
+export interface TrendReport {
+  recipe_scores: {
+    [recipe_id: string]: {
+      status: 'hot' | 'cold' | 'stable';
+    };
+  };
+}
+
+// Alias for backward compatibility
+export type PrepItem = ProductionRun;

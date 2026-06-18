@@ -14,7 +14,11 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-const app = initializeApp(firebaseConfig);
+if (!firebaseConfig.projectId) {
+  throw new Error("VITE_FIREBASE_PROJECT_ID is not set in your .env file. Please add it to connect to Firestore.");
+}
+
+export const app = initializeApp(firebaseConfig);
 
 // Initialize Firestore with modern multi-tab persistent local cache
 export const db = initializeFirestore(app, {
@@ -22,5 +26,3 @@ export const db = initializeFirestore(app, {
     tabManager: persistentMultipleTabManager()
   })
 });
-
-

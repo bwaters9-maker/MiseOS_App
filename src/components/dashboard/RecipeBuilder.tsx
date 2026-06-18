@@ -1,17 +1,22 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { db } from '../../firebaseConfig';
-import { collection, onSnapshot, query, where, limit, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, limit, addDoc, serverTimestamp, getDocs, doc } from 'firebase/firestore';
 import { Ingredient, Recipe, PrepStation } from '../../types';
-import { Plus, X, FileText, Save } from 'lucide-react';
+import { Plus, X, FileText, Save, AlertTriangle } from 'lucide-react';
 
-interface RecipeIngredient extends Ingredient {
+interface RecipeIngredient extends Partial<Ingredient> {
+  id: string; // id is always required
   recipeQuantity: number;
+  isSubRecipe?: boolean;
+  isCostMissing?: boolean;
 }
 
 export const RecipeBuilder: React.FC = () => {
+  console.log("RecipeBuilder mounting...");
   const [recipeName, setRecipeName] = useState('');
   const [yieldPortion, setYieldPortion] = useState(1);
   const [recipeIngredients, setRecipeIngredients] = useState<RecipeIngredient[]>([]);
+  const [station, setStation] = useState<PrepStation>('Sauté');
   
   // Autocomplete state
   const [searchTerm, setSearchTerm] = useState('');
@@ -21,32 +26,52 @@ export const RecipeBuilder: React.FC = () => {
   // Generated output state
   const [generatedProtocol, setGeneratedProtocol] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [totalCost, setTotalCost] = useState(0);
 
   // Firestore listener for autocomplete search
-  // useEffect(() => {
-  //   if (searchTerm.trim().length < 2) {
-  //     setSearchResults([]);
-  //     return;
-  //   }
-  // 
-  //   const q = query(
-  //     collection(db, 'ingredients'),
-  //     where('name', '>=', searchTerm),
-  //     where('name', '<=', searchTerm + '\uf8ff'),
-  //     limit(5)
-  //   );
-  // 
-  //   const unsubscribe = onSnapshot(q, (snapshot) => {
-  //     const results = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Ingredient));
-  //     setSearchResults(results);
-  //   });
-  // 
-  //   return () => unsubscribe();
-  // }, [searchTerm]);
+  useEffect(() => {
+    const fetchResults = async () => {
+      if (searchTerm.trim().length < 2) {
+        setSearchResults([]);
+        return;
+      }
 
-  const addIngredient = (ingredient: Ingredient) => {
-    if (!recipeIngredients.find(i => i.id === ingredient.id)) {
-      setRecipeIngredients(prev => [...prev, { ...ingredient, recipeQuantity: 1 }]);
+      const ingredientsQuery = query(
+        collection(db, 'ingredients'),
+        where('name', '>=', searchTerm),
+        where('name', '<=', searchTerm + '\uf8ff'),
+        limit(3)
+      );
+      const recipesQuery = query(
+        collection(db, 'recipes'),
+        where('name', '>=', searchTerm),
+        where('name', '<=', searchTerm + '\uf8ff'),
+        limit(3)
+      );
+
+      const [ingredientsSnapshot, recipesSnapshot] = await Promise.all([
+        getDocs(ingredientsQuery),
+        getDocs(recipesQuery),
+      ]);
+
+      const ingredientResults = ingredientsSnapshot.docs.map(doc => ({ ...(doc.data() as Ingredient), id: doc.id, type: 'ingredient' }));
+      const recipeResults = recipesSnapshot.docs.map(doc => ({ ...(doc.data() as Recipe), id: doc.id, type: 'recipe' }));
+
+      setSearchResults([...ingredientResults, ...recipeResults] as (Ingredient & { type: string })[]);
+    };
+
+    const debounceTimeout = setTimeout(() => fetchResults(), 200);
+    return () => clearTimeout(debounceTimeout);
+  }, [searchTerm]);
+
+  const addIngredient = (ingredient: Ingredient & { type?: string }) => {
+    // Add a flag if costPerUnit is missing for visual feedback
+    const newIngredient: RecipeIngredient = { ...ingredient, recipeQuantity: 1, isSubRecipe: ingredient.type === 'recipe' };
+    if (!newIngredient.isSubRecipe && (newIngredient.costPerUnit === undefined || newIngredient.costPerUnit <= 0)) {
+      newIngredient.isCostMissing = true;
+    }
+    if (!recipeIngredients.find(i => i.id === newIngredient.id)) {
+      setRecipeIngredients(prev => [...prev, newIngredient]);
     }
     setSearchTerm('');
     setSearchResults([]);
@@ -63,12 +88,53 @@ export const RecipeBuilder: React.FC = () => {
     );
   };
 
-  const totalCost = useMemo(() => {
-    return recipeIngredients.reduce((sum, ing) => {
-      const price = ing.costPerUnit ?? 0;
-      const quantity = ing.recipeQuantity ?? 0;
-      return sum + (price * quantity);
-    }, 0);
+  useEffect(() => {
+    const calculateTotalCost = async () => {
+      console.log('[Dry-Run] Recalculating total cost...');
+      let sum = 0;
+      const missingCostIds = new Set<string>();
+
+      for (const ing of recipeIngredients) {
+        if (ing.isSubRecipe) {
+          const subRecipeDoc = await getDoc(doc(db, 'recipes', ing.id));
+          if (subRecipeDoc.exists()) {
+            const subRecipe = subRecipeDoc.data() as Recipe;
+            if (subRecipe.totalCost !== undefined && subRecipe.targetCovers > 0) {
+              const costPerBasePortion = subRecipe.totalCost / subRecipe.targetCovers;
+              const contribution = costPerBasePortion * ing.recipeQuantity;
+              sum += contribution;
+              console.log(`[Dry-Run] Sub-Recipe Cost: Calculating cost for sub-recipe "${ing.name}" (ID: ${ing.id}). Cost per base portion: $${costPerBasePortion.toFixed(2)}. Quantity: ${ing.recipeQuantity}. Contribution: $${contribution.toFixed(2)}`);
+            } else {
+              missingCostIds.add(ing.id);
+              console.warn(`[Dry-Run] Sub-recipe "${ing.name}" (ID: ${ing.id}) has invalid costing data.`);
+            }
+          } else {
+            missingCostIds.add(ing.id);
+            console.warn(`[Dry-Run] Sub-recipe "${ing.name}" (ID: ${ing.id}) not found. This will be flagged as missing cost.`);
+          }
+        } else {
+          if (ing.costPerUnit === undefined || ing.costPerUnit <= 0) {
+            missingCostIds.add(ing.id);
+          } else {
+            const contribution = (ing.costPerUnit ?? 0) * ing.recipeQuantity;
+            sum += contribution;
+            console.log(`[Dry-Run] Ingredient Cost: Calculating cost for ingredient "${ing.name}". Unit Cost: $${(ing.costPerUnit ?? 0).toFixed(2)}. Quantity: ${ing.recipeQuantity}. Contribution: $${contribution.toFixed(2)}`);
+          }
+        }
+      }
+      setTotalCost(sum);
+      console.log(`[Dry-Run] Total Recipe Cost Calculated: $${sum.toFixed(2)}`);
+
+      // Update isCostMissing flags for UI feedback
+      setRecipeIngredients(prev =>
+        prev.map(ing => ({
+          ...ing,
+          isCostMissing: missingCostIds.has(ing.id),
+        }))
+      );
+    };
+
+    calculateTotalCost();
   }, [recipeIngredients]);
 
   const costPerPortion = useMemo(() => {
@@ -108,6 +174,11 @@ export const RecipeBuilder: React.FC = () => {
   };
 
   const saveRecipe = async () => {
+    // Prevent saving if any ingredient has a missing cost
+    if (recipeIngredients.some(ing => ing.isCostMissing)) {
+      alert("Cannot save recipe: Some ingredients have missing cost data. Please update them first.");
+      return;
+    }
     if (!recipeName.trim() || recipeIngredients.length === 0) return;
     setSaveStatus('saving');
 
@@ -119,14 +190,16 @@ export const RecipeBuilder: React.FC = () => {
         name: recipeName.trim(),
         originalCovers: 1,
         targetCovers: yieldPortion,
-        station: 'Sauté' as PrepStation, // Fallback to Sauté station
+        station: station, // Use state
+        totalCost: totalCost, // Save calculated cost
         ingredients: recipeIngredients.map(ing => ({
           name: ing.name,
           quantity: ing.recipeQuantity,
           unit: ing.unit,
           costPerUnit: ing.costPerUnit ?? 0,
           purchaseUnit: ing.purchaseUnit ?? 'kg',
-          yieldPercent: ing.yieldPercent ?? 100
+          yieldPercent: ing.yieldPercent ?? 100,
+          isSubRecipe: ing.isSubRecipe ?? false,
         })),
         steps: generatedProtocol ? [generatedProtocol] : ['No method configured.'],
         salePrice: parseFloat((costPerPortion * 3.3).toFixed(2)), // standard 30% target food cost multiplier
@@ -151,15 +224,27 @@ export const RecipeBuilder: React.FC = () => {
     <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-6 space-y-6 font-mono selection:bg-emerald-800">
       <h2 className="text-lg font-extrabold tracking-wider uppercase text-white">Recipe Builder</h2>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <input type="text" value={recipeName} onChange={(e) => setRecipeName(e.target.value)} placeholder="Recipe Name" className="w-full bg-zinc-900 border border-zinc-700 p-3 rounded-lg text-sm" />
         <input type="number" value={yieldPortion} onChange={(e) => setYieldPortion(parseInt(e.target.value, 10) || 1)} placeholder="Yield/Portion" className="w-full bg-zinc-900 border border-zinc-700 p-3 rounded-lg text-sm" min={1} />
+        <select value={station} onChange={(e) => setStation(e.target.value as PrepStation)} className="w-full bg-zinc-900 border border-zinc-700 p-3 rounded-lg text-sm">
+            <option value="Sauté">Sauté</option>
+            <option value="Grill">Grill</option>
+            <option value="Garde Manger">Garde Manger</option>
+            <option value="Pastry">Pastry</option>
+        </select>
       </div>
 
       {/* Ingredient List */}
       <div className="space-y-2">
         {recipeIngredients.map(ing => (
-          <div key={ing.id} className="flex items-center gap-2 p-2 bg-zinc-900 rounded-lg border border-zinc-800">
+          <div key={ing.id} className={`flex items-center gap-2 p-2 bg-zinc-900 rounded-lg border ${ing.isCostMissing ? 'border-red-500' : 'border-zinc-800'}`}>
+            {ing.isCostMissing && (
+              <div title="Cost data missing or zero. Update ingredient in master list." className="text-red-400">
+                <AlertTriangle className="w-4 h-4" />
+              </div>
+            )}
+
             <span className="flex-1 text-sm font-bold text-zinc-200">{ing.name}</span>
             <input type="number" value={ing.recipeQuantity} onChange={(e) => ing.id && updateIngredientQuantity(ing.id, parseFloat(e.target.value) || 0)} className="w-20 bg-zinc-950 border border-zinc-700 p-2 rounded-md text-xs text-center" />
             <span className="text-xs text-zinc-500 w-12">{ing.unit}</span>
@@ -184,9 +269,10 @@ export const RecipeBuilder: React.FC = () => {
         </div>
         {isSearchFocused && searchResults.length > 0 && (
           <div className="absolute z-10 w-full mt-1 bg-zinc-950 border border-zinc-800 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-            {searchResults.map(result => (
-              <div key={result.id} onClick={() => addIngredient(result)} className="p-3 text-sm text-zinc-300 hover:bg-emerald-900/40 cursor-pointer">
-                {result.name}
+            {searchResults.map((result: Ingredient & { type?: string }) => (
+              <div key={result.id} onClick={() => addIngredient(result)} className="flex justify-between items-center p-3 text-sm text-zinc-300 hover:bg-emerald-900/40 cursor-pointer">
+                <span>{result.name}</span>
+                {result.type === 'recipe' && <span className="text-[9px] font-bold uppercase bg-purple-900/50 text-purple-300 border border-purple-800 px-1.5 py-0.5 rounded">Sub-Recipe</span>}
               </div>
             ))}
           </div>

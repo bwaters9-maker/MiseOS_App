@@ -1,10 +1,95 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, RefreshCw, Send, AlertCircle, Flame, Lightbulb, Zap } from 'lucide-react';
+import { getAI, getGenerativeModel, GoogleAIBackend, ChatSession } from "firebase/ai";
+import { app } from './firebaseConfig';
+
+// AI Model Initialization
+const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+if (!apiKey) {
+  // This is a common setup issue.
+  throw new Error("VITE_FIREBASE_API_KEY is not set. Please add it to your .env file.");
+}
+
+const ai = getAI(app); // The API key is passed via the app instance.
+const model = getGenerativeModel(ai, { model: "gemini-1.5-flash" });
+
+interface Message {
+  role: 'user' | 'model';
+  content: string;
+}
+
+// A simple component to render text content while preserving whitespace and newlines.
+const MarkdownContent = ({ content }: { content: string }) => {
+  return (
+    <div className="text-xs whitespace-pre-wrap font-mono">
+      {content}
+    </div>
+  );
+};
 
 export default function TestKitchenHub() {
   const [activeSubTab, setActiveSubTab] = useState<'trends' | 'optimizer'>('trends');
   const [userInput, setUserInput] = useState('');
-  const [sessionError, setSessionError] = useState(true);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const chatRef = useRef<ChatSession | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  const startChat = () => {
+    setSessionError(null);
+    setMessages([]);
+    chatRef.current = model.startChat({
+      systemInstruction: {
+        parts: [{
+          text: `You are a world-class executive chef and culinary director for an upscale, modern restaurant. Your expertise lies in menu engineering, flavor pairing, and innovative dish creation. Respond to prompts with creativity, precision, and a deep understanding of both classic techniques and current food trends. Provide detailed recipes, costing analysis, or conceptual feedback as requested.`
+        }]
+      },
+    });
+  };
+
+  useEffect(() => {
+    if (activeSubTab === 'optimizer' && !chatRef.current) {
+      startChat();
+    }
+  }, [activeSubTab]);
+
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const handleNewSession = () => {
+    startChat();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userInput.trim() || isGenerating || !chatRef.current) return;
+
+    setIsGenerating(true);
+    setSessionError(null);
+    const userMessage: Message = { role: 'user', content: userInput };
+    setMessages(prev => [...prev, userMessage]);
+    const prompt = userInput;
+    setUserInput('');
+
+    try {
+      const result = await chatRef.current.sendMessageStream(prompt);
+      let modelResponse = '';
+      setMessages(prev => [...prev, { role: 'model', content: modelResponse }]);
+
+      for await (const chunk of result.stream) {
+        modelResponse += chunk.text();
+        setMessages(prev => prev.map((msg, i) => i === prev.length - 1 ? { ...msg, content: modelResponse } : msg));
+      }
+    } catch (error: any) {
+      setSessionError(error.message || "An error occurred while communicating with the AI.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto font-mono text-zinc-100 selection:bg-emerald-800">
@@ -127,7 +212,11 @@ export default function TestKitchenHub() {
 
       {/* SUB-VIEW NODE 2: AI RECIPE OPTIMIZER NODE INTERFACE */}
       {activeSubTab === 'optimizer' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start animate-fadeIn font-mono tracking-tight">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start animate-fadeIn font-mono tracking-tight"
+          // This logic is being moved into the component itself
+          // The user's request is to implement the chat functionality
+          // I will now proceed with the implementation
+        >
           
           {/* Main Chat Interface Body (Left 2/3) */}
           <div className="lg:col-span-2 space-y-4">
@@ -138,44 +227,65 @@ export default function TestKitchenHub() {
                 <div className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
                   Interactive Formula Engineering Shell
                 </div>
-                <button className="text-[10px] font-bold uppercase text-zinc-500 hover:text-zinc-300 flex items-center gap-1 transition-colors">
+                <button onClick={handleNewSession} className="text-[10px] font-bold uppercase text-zinc-500 hover:text-zinc-300 flex items-center gap-1 transition-colors">
                   <RefreshCw className="w-3 h-3" /> New Session
                 </button>
               </div>
 
               {/* Central Stream Terminal Container */}
-              <div className="flex-1 flex items-center justify-center p-6 text-center">
-                <p className="text-xs text-zinc-600 uppercase max-w-md leading-relaxed tracking-wider">
-                  Brainstorm and develop brand-new dishes from scratch. Get AI guidance on trending ingredients, flavor pairings, and precise menu costing adjustments.
-                </p>
+              <div ref={chatContainerRef} className="flex-1 p-4 my-4 overflow-y-auto h-96">
+                {messages.length === 0 && !isGenerating ? (
+                  <div className="flex items-center justify-center h-full text-center">
+                    <p className="text-xs text-zinc-600 uppercase max-w-md leading-relaxed tracking-wider">
+                      Brainstorm and develop brand-new dishes from scratch. Get AI guidance on trending ingredients, flavor pairings, and precise menu costing adjustments.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {messages.map((msg, index) => (
+                      <div key={index} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        {msg.role === 'model' && <div className="w-6 h-6 rounded-full bg-emerald-900/50 flex items-center justify-center text-emerald-400 shrink-0"><Sparkles className="w-3.5 h-3.5" /></div>}
+                        <div className={`max-w-xl p-3 rounded-xl ${msg.role === 'user' ? 'bg-zinc-800 text-zinc-200' : 'bg-transparent'}`}>
+                          <MarkdownContent content={msg.content} />
+                        </div>
+                      </div>
+                    ))}
+                    {isGenerating && messages[messages.length - 1]?.role === 'user' && (
+                       <div className="flex gap-3 justify-start">
+                         <div className="w-6 h-6 rounded-full bg-emerald-900/50 flex items-center justify-center text-emerald-400 shrink-0"><Sparkles className="w-3.5 h-3.5" /></div>
+                         <div className="max-w-xl p-3 rounded-xl">
+                           <span className="animate-pulse text-zinc-500">...</span>
+                         </div>
+                       </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Lower Input Box Terminal */}
-              <div className="space-y-3 pt-3">
+              <form onSubmit={handleSubmit} className="space-y-3 pt-3">
                 <div className="relative">
                   <input
                     type="text"
                     value={userInput}
                     onChange={(e) => setUserInput(e.target.value)}
                     placeholder="Describe a dish concept you want to develop, ingredients you want to work with..."
-                    className="w-full bg-zinc-950 border border-zinc-800 p-3.5 pr-12 rounded-xl text-xs focus:outline-none focus:border-zinc-700 text-zinc-200 placeholder:text-zinc-700 font-mono"
+                    className="w-full bg-zinc-950 border border-zinc-800 p-3.5 pr-12 rounded-xl text-xs focus:outline-none focus:border-zinc-700 text-zinc-200 placeholder:text-zinc-700 font-mono disabled:opacity-50"
+                    disabled={isGenerating}
                   />
-                  <button className="absolute right-3 top-3 text-zinc-700 hover:text-emerald-500 transition-colors">
+                  <button type="submit" disabled={isGenerating} className="absolute right-3 top-3 text-zinc-700 hover:text-emerald-500 transition-colors disabled:opacity-50 disabled:hover:text-zinc-700">
                     <Send className="w-4 h-4" />
                   </button>
                 </div>
-              </div>
+              </form>
             </div>
 
             {/* Simulated Handshake Error Feedback Alert (Matches Screenshot exactly) */}
             {sessionError && (
               <div className="bg-zinc-950 border border-red-950 rounded-xl p-3 flex justify-between items-center shadow-md animate-slideUp">
-                <div className="flex items-center gap-2.5 text-red-400 text-xs font-bold">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
-                  <span className="uppercase tracking-wider">Failed to start session</span>
-                </div>
+                <div className="flex items-center gap-2.5 text-red-400 text-xs font-bold"><AlertCircle className="w-4 h-4 shrink-0 text-red-500" /><span className="uppercase tracking-wider">{sessionError}</span></div>
                 <button 
-                  onClick={() => setSessionError(false)}
+                  onClick={() => setSessionError(null)}
                   className="text-[9px] uppercase font-bold tracking-widest bg-zinc-900 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 px-2 py-1 rounded border border-zinc-800 transition-colors"
                 >
                   Clear Status

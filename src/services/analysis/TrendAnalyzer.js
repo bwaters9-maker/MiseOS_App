@@ -3,14 +3,32 @@
  * Translates trend insights into database updates.
  */
 
-// Replace this with your actual DB service client (e.g., Firebase Admin or Azure SDK)
-import { db } from '../../lib/firebase'; 
+import { db } from '../../firebaseConfig'; 
+import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
+
+// Placeholder for the LLM invocation
+async function invokeGemini(prompt) {
+  // In a real implementation, this would call the Gemini API
+  console.log("Invoking Gemini with prompt:", prompt);
+  return {
+    recipe_scores: [],
+    ...{}
+  };
+}
 
 export async function runTrendAnalysis() {
   try {
     // 1. Fetch data
-    const recipes = await db.collection('recipes').where('is_active', '==', true).get();
-    const ingredients = await db.collection('ingredients').where('is_active', '==', true).get();
+    const recipesQuery = query(collection(db, 'recipes'), where('is_active', '==', true));
+    const ingredientsQuery = query(collection(db, 'ingredients'), where('is_active', '==', true));
+    
+    const [recipesSnapshot, ingredientsSnapshot] = await Promise.all([
+      getDocs(recipesQuery),
+      getDocs(ingredientsQuery)
+    ]);
+
+    const recipes = recipesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const ingredients = ingredientsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
     // 2. Prepare context for LLM (Gemini 1.5 Flash recommended for speed/cost)
     const prompt = `You are a food industry analyst. Analyze this data for Bacchus Wine Bar...`; 
@@ -19,20 +37,22 @@ export async function runTrendAnalysis() {
     const analysis = await invokeGemini(prompt);
 
     // 4. Batch Database Updates
-    const batch = db.batch();
+    const batch = writeBatch(db);
     
     // Update Recipes with trend scores
-    analysis.recipe_scores.forEach(score => {
-      const recipeRef = db.collection('recipes').doc(score.recipe_id);
-      batch.update(recipeRef, {
-        trend_status: score.trend_status,
-        trend_score: score.trend_score,
-        trend_updated: new Date().toISOString()
+    if (analysis.recipe_scores) {
+      analysis.recipe_scores.forEach((score) => {
+        const recipeRef = doc(db, 'recipes', score.recipe_id);
+        batch.update(recipeRef, {
+          trend_status: score.trend_status,
+          trend_score: score.trend_score,
+          trend_updated: new Date().toISOString()
+        });
       });
-    });
+    }
 
     // Save the Report
-    const reportRef = db.collection('trend_reports').doc();
+    const reportRef = doc(collection(db, 'trend_reports'));
     batch.set(reportRef, {
       ...analysis,
       report_date: new Date().toISOString()

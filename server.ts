@@ -6,6 +6,7 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import http from 'http';
 import { GoogleGenAI, Type } from '@google/genai';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -45,7 +46,7 @@ app.post('/api/parse-recipe', async (req, res) => {
     const ai = getAi();
     
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-1.5-flash',
       contents: `Please parse this back-of-house recipe text into a structured JSON representation matching the required schema. Extract ingredients (EP quantities, purchase names, and trim yields), preparation steps, station context, and estimated platter sell pricing: \n\n${recipeText}`,
       config: {
         systemInstruction: `You are an veteran BOH Executive Chef and systems architect. Analyze standard restaurant recipe cards, handwritten prep sheets, or messy notes, and transcribe them into mathematically yield-adjusted JSON formats. Station must be strictly one of: 'Sauté', 'Grill', 'Garde Manger', 'Pastry'. If you encounter yield percents that are unspecified, default to 100. If you encounter cost estimates, map them to decimal numeric rates in costPerUnit.`,
@@ -117,19 +118,27 @@ app.post('/api/parse-recipe', async (req, res) => {
   }
 });
 
-const PORT = 3000;
+const PORT = 3001;
 const isProd = process.env.NODE_ENV === 'production';
 
 async function startServer() {
   if (!isProd) {
     // Dynamically require Vite in development to bind its middleware
+    const server = http.createServer(app);
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: { server }
+      },
       appType: 'spa'
     });
     app.use(vite.middlewares);
     console.log('Integrated Vite HMR middleware client.');
+
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log(`MiseOS full-stack server running strictly on http://localhost:${PORT}`);
+    });
   } else {
     // Serve production static assets compiled to 'dist'
     app.use(express.static(path.resolve(__dirname, 'dist')));
@@ -137,11 +146,10 @@ async function startServer() {
       res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
     });
     console.log('Serving production-ready precompiled static bundles.');
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`MiseOS full-stack server running strictly on http://localhost:${PORT}`);
+    });
   }
-
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`MiseOS full-stack server running strictly on http://localhost:${PORT}`);
-  });
 }
 
 startServer().catch((err) => {
