@@ -8,12 +8,18 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import http from 'http';
 import { GoogleGenAI, Type } from '@google/genai';
+import inventoryRoutes from './src/modules/inventory/inventoryRoutes.js';
+import financialsRoutes from './src/modules/financials/financialsRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json());
+
+// Mount the router configurations to handle paths under the /api/inventory and /api/financials namespaces.
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/financials', financialsRoutes);
 
 // Shared Gemini Client Helper
 let aiClient: GoogleGenAI | null = null;
@@ -152,7 +158,11 @@ async function startServer() {
   }
 }
 
-startServer().catch((err) => {
-  console.error('Fatal initialization error:', err);
-  process.exit(1);
-});
+if (process.env.NODE_ENV !== 'test') {
+  startServer().catch((err) => {
+    console.error('Fatal initialization error:', err);
+    process.exit(1);
+  });
+}
+
+export { app };
