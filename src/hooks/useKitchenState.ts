@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebaseConfig';
-import { collection, onSnapshot, DocumentData, QuerySnapshot, QueryDocumentSnapshot, FirestoreError } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 
 // Based on firebase-blueprint.json
 export interface PrepItem {
@@ -51,17 +51,17 @@ export const useKitchenState = () => {
   const [handoverLogs, setHandoverLogs] = useState<HandoverLog[]>([]);
   const [items86, setItems86] = useState<Item86[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<FirestoreError | null>(null);
+  const [error, setError] = useState<any | null>(null);
 
   useEffect(() => {
     const unsubPrep = onSnapshot(
       collection(db, 'prepItems'),
-      (snapshot: QuerySnapshot<DocumentData>) => {
-        const items = snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as PrepItem));
+      (snapshot: any) => {
+        const items = snapshot.docs.map((d: any) => ({ id: d.id, ...d.data() } as PrepItem));
         setPrepItems(items);
         setLoading(false);
       },
-      (err: FirestoreError) => {
+      (err: any) => {
         setError(err);
         setLoading(false);
       }
@@ -69,33 +69,33 @@ export const useKitchenState = () => {
 
     const unsubRecipes = onSnapshot(
       collection(db, 'recipes'),
-      (snapshot: QuerySnapshot<DocumentData>) => {
-        const items = snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as Recipe));
+      (snapshot: any) => {
+        const items = snapshot.docs.map((d: any) => ({ id: d.id, ...d.data() } as Recipe));
         setRecipes(items);
       },
-      (error: FirestoreError) => {
+      (error: any) => {
         setError(error);
       }
     );
 
     const unsubHandovers = onSnapshot(
       collection(db, 'handovers'),
-      (snapshot: QuerySnapshot<DocumentData>) => {
-        const logs = snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as HandoverLog));
+      (snapshot: any) => {
+        const logs = snapshot.docs.map((d: any) => ({ id: d.id, ...d.data() } as HandoverLog));
         setHandoverLogs(logs);
       },
-      (error: FirestoreError) => {
+      (error: any) => {
         setError(error);
       }
     );
 
     const unsub86 = onSnapshot(
       collection(db, 'items86'),
-      (snapshot: QuerySnapshot<DocumentData>) => {
-        const items = snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as Item86));
+      (snapshot: any) => {
+        const items = snapshot.docs.map((d: any) => ({ id: d.id, ...d.data() } as Item86));
         setItems86(items);
       },
-      (error: FirestoreError) => {
+      (error: any) => {
         setError(error);
       }
     );
@@ -108,5 +108,14 @@ export const useKitchenState = () => {
     };
   }, []);
 
-  return { prepItems, setPrepItems, recipes, setRecipes, handoverLogs, items86, loading, error };
+  return useMemo(() => ({
+    prepItems,
+    setPrepItems,
+    recipes,
+    setRecipes,
+    handoverLogs,
+    items86,
+    loading,
+    error
+  }), [prepItems, recipes, handoverLogs, items86, loading, error]);
 };

@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebaseConfig';
-import { collection, onSnapshot, addDoc, deleteDoc, updateDoc, doc, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, deleteDoc, updateDoc, doc } from 'firebase/firestore';
 import { KitchenTimer, PrepStation } from './types';
 import { formatDuration } from './utils';
 import { Play, Pause, RotateCcw, Plus, Trash2, Clock, Bell } from 'lucide-react';
+import { useStationPresets } from './hooks/useStationPresets';
 
-export const KitchenTimers: React.FC = () => {
+export const KitchenTimers: React.FC = React.memo(() => {
   const [timers, setTimers] = useState<KitchenTimer[]>([]);
-  const [stations, setStations] = useState<PrepStation[]>([]);
+  const { presets: stationPresets } = useStationPresets();
   const [tick, setTick] = useState(0);
 
   // Form states for creating a new timer
@@ -15,23 +16,17 @@ export const KitchenTimers: React.FC = () => {
   const [newMinutes, setNewMinutes] = useState(10);
   const [newStation, setNewStation] = useState<PrepStation>('Sauté');
 
-  // Fetch station presets from Firestore on mount
+  // Sync default station with available presets
   useEffect(() => {
-    const fetchStations = async () => {
-      const stationSnap = await getDocs(collection(db, "station_presets"));
-      const stationData = stationSnap.docs.map(d => d.data().name as PrepStation);
-      setStations(stationData.length > 0 ? stationData : ['Sauté', 'Grill', 'Garde Manger', 'Pastry']);
-      if (stationData.length > 0) {
-        setNewStation(stationData[0]);
-      }
-    };
-    fetchStations();
-  }, []);
+    if (stationPresets.length > 0) {
+      setNewStation(stationPresets[0]);
+    }
+  }, [stationPresets]);
 
   // Set up the live listener for the timers collection
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'timers'), (snapshot) => {
-      const fetchedTimers = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as KitchenTimer));
+    const unsubscribe = onSnapshot(collection(db, 'timers'), (snapshot: any) => {
+      const fetchedTimers = snapshot.docs.map((d: any) => ({ ...d.data(), id: d.id } as KitchenTimer));
       setTimers(fetchedTimers);
     });
     return () => unsubscribe();
@@ -144,9 +139,15 @@ export const KitchenTimers: React.FC = () => {
             onChange={(e) => setNewStation(e.target.value as PrepStation)}
             className="w-full bg-zinc-950 border border-zinc-800 p-2.5 rounded-lg text-xs focus:outline-none focus:border-zinc-700 text-emerald-400 font-bold font-mono"
           >
-            {stations.map(st => (
-              <option key={st} value={st}>{st}</option>
-            ))}
+            {stationPresets.length > 0 ? (
+              stationPresets.map(st => (
+                <option key={st} value={st}>{st}</option>
+              ))
+            ) : (
+              ['Sauté', 'Grill', 'Garde Manger', 'Pastry'].map(st => (
+                <option key={st} value={st}>{st}</option>
+              ))
+            )}
           </select>
         </div>
 
@@ -285,4 +286,4 @@ export const KitchenTimers: React.FC = () => {
       </div>
     </div>
   );
-};
+});

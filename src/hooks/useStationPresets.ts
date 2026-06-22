@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebaseConfig';
-import { collection, query, orderBy, onSnapshot, QuerySnapshot, QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { PrepStation } from '../types';
 
 export function useStationPresets() {
@@ -11,17 +11,17 @@ export function useStationPresets() {
     const q = query(collection(db, 'station_presets'), orderBy('name'));
 
     const unsubscribe = onSnapshot(q,
-      (snapshot: QuerySnapshot) => {
+      (snapshot: any) => {
         try {
           const fetchedPresets = snapshot.docs
-            .map((doc: QueryDocumentSnapshot) => doc.data()?.name)
-            .filter((name): name is PrepStation => typeof name === 'string');
+            .map((doc: any) => doc.data()?.name)
+            .filter((name: any): name is PrepStation => typeof name === 'string');
           setPresets(fetchedPresets);
         } catch (e) {
           setError(e as Error);
         }
       },
-      (err) => {
+      (err: any) => {
         setError(err);
       }
     );
@@ -29,5 +29,5 @@ export function useStationPresets() {
     return () => unsubscribe();
   }, []);
 
-  return { presets, error };
+  return useMemo(() => ({ presets, error }), [presets, error]);
 }
