@@ -8,12 +8,16 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import http from 'http';
 import { GoogleGenAI, Type } from '@google/genai';
+import menuStrategyRouter from "./src/modules/menu_strategy/menuStrategy.router";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json());
+
+// Mount Menu Strategy Router
+app.use("/api/strategy", menuStrategyRouter);
 
 // Shared Gemini Client Helper
 let aiClient: GoogleGenAI | null = null;
@@ -152,7 +156,11 @@ async function startServer() {
   }
 }
 
-startServer().catch((err) => {
-  console.error('Fatal initialization error:', err);
-  process.exit(1);
-});
+if (process.env.NODE_ENV !== 'test') {
+  startServer().catch((err) => {
+    console.error('Fatal initialization error:', err);
+    process.exit(1);
+  });
+}
+
+export { app };
