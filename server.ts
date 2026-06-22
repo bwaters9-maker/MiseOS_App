@@ -8,11 +8,12 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import http from 'http';
 import { GoogleGenAI, Type } from '@google/genai';
+import conceptRouter from './src/modules/curation_rail/conceptModule.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const app = express();
+export const app = express();
 app.use(express.json());
 
 // Shared Gemini Client Helper
@@ -34,6 +35,9 @@ function getAi(): GoogleGenAI {
   }
   return aiClient;
 }
+
+// Mount Curation Rail Module
+app.use('/api/concepts', conceptRouter);
 
 // BOH AI Transcription & Culinary Logic Parsing Endpoint
 app.post('/api/parse-recipe', async (req, res) => {
@@ -136,9 +140,12 @@ async function startServer() {
     app.use(vite.middlewares);
     console.log('Integrated Vite HMR middleware client.');
 
-    server.listen(PORT, '0.0.0.0', () => {
-      console.log(`MiseOS full-stack server running strictly on http://localhost:${PORT}`);
-    });
+    // Only listen if not being imported for tests
+    if (process.env.NODE_ENV !== 'test') {
+      server.listen(PORT, '0.0.0.0', () => {
+        console.log(`MiseOS full-stack server running strictly on http://localhost:${PORT}`);
+      });
+    }
   } else {
     // Serve production static assets compiled to 'dist'
     app.use(express.static(path.resolve(__dirname, 'dist')));
@@ -146,13 +153,22 @@ async function startServer() {
       res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
     });
     console.log('Serving production-ready precompiled static bundles.');
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`MiseOS full-stack server running strictly on http://localhost:${PORT}`);
-    });
+
+    // Only listen if not being imported for tests
+    if (process.env.NODE_ENV !== 'test') {
+      app.listen(PORT, '0.0.0.0', () => {
+        console.log(`MiseOS full-stack server running strictly on http://localhost:${PORT}`);
+      });
+    }
   }
 }
 
-startServer().catch((err) => {
-  console.error('Fatal initialization error:', err);
-  process.exit(1);
-});
+// Run startServer only if this file is executed directly
+if (import.meta.url === `file://${process.argv[1]}` || process.env.NODE_ENV === 'production') {
+  startServer().catch((err) => {
+    console.error('Fatal initialization error:', err);
+    process.exit(1);
+  });
+}
+
+export default app;
