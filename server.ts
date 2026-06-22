@@ -9,11 +9,23 @@ import { fileURLToPath } from 'url';
 import http from 'http';
 import { GoogleGenAI, Type } from '@google/genai';
 
+// @ts-ignore
+import inventoryLedger from "./src/modules/inventory/inventoryLedger.js";
+// @ts-ignore
+import wasteAdjuster from "./src/modules/inventory/wasteAdjuster.js";
+// @ts-ignore
+import financialSmokeDetector from "./src/modules/financials/financialSmokeDetector.js";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json());
+
+// Module Routes
+app.use("/api/inventory", inventoryLedger);
+app.use("/api/waste", wasteAdjuster);
+app.use("/api/financials", financialSmokeDetector);
 
 // Shared Gemini Client Helper
 let aiClient: GoogleGenAI | null = null;
