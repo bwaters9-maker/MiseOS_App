@@ -36,5 +36,14 @@ export default defineConfig({
   build: {
     // Generate sourcemaps for production debugging
     sourcemap: 'hidden',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-firebase': ['firebase/app', 'firebase/firestore'],
+          'vendor-ui': ['lucide-react', 'motion'],
+        },
+      },
+    },
   }
 });
