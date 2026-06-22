@@ -9,11 +9,23 @@ import { fileURLToPath } from 'url';
 import http from 'http';
 import { GoogleGenAI, Type } from '@google/genai';
 
+// @ts-ignore
+import inventoryLedger from "./src/modules/inventory/inventoryLedger.js";
+// @ts-ignore
+import wasteAdjuster from "./src/modules/inventory/wasteAdjuster.js";
+// @ts-ignore
+import financials from "./src/modules/financials/index.js";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const app = express();
+export const app = express();
 app.use(express.json());
+
+// Module Routes
+app.use("/api/inventory", inventoryLedger);
+app.use("/api/waste", wasteAdjuster);
+app.use("/api/financials", financials);
 
 // Shared Gemini Client Helper
 let aiClient: GoogleGenAI | null = null;
@@ -152,7 +164,9 @@ async function startServer() {
   }
 }
 
-startServer().catch((err) => {
+if (process.env.NODE_ENV !== "test") {
+  startServer().catch((err) => {
   console.error('Fatal initialization error:', err);
   process.exit(1);
 });
+}
