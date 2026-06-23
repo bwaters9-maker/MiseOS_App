@@ -3,6 +3,14 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@google/genai",
+      "esbuild",
+      "protobufjs",
+      "@firebase/util"
+    ]
+  },
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build",
