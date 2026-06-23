@@ -8,12 +8,48 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import http from 'http';
 import { GoogleGenAI, Type } from '@google/genai';
+import { rateLimit } from 'express-rate-limit';
+
+// @ts-ignore
+import inventoryLedger from "./src/modules/inventory/inventoryLedger.js";
+// @ts-ignore
+import wasteAdjuster from "./src/modules/inventory/wasteAdjuster.js";
+// @ts-ignore
+import conceptRouter from './src/modules/curation_rail/conceptModule.js';
+// @ts-ignore
+import menuStrategyRouter from "./src/modules/menu_strategy/menuStrategy.router.js";
+// @ts-ignore
+import batchScaler from "./src/modules/production/batchScaler.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const app = express();
+export const app = express();
 app.use(express.json());
+
+// --- GLOBAL RATE LIMITERS ---
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  limit: 100, // Limit each IP to 100 requests per windowMs
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
+
+const aiLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  limit: 10, // Limit each IP to 10 AI requests per hour to control Gemini costs
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'AI credit limit reached for this hour. Please try again later.' }
+});
+
+// Module Routes
+app.use("/api/inventory", inventoryLedger);
+app.use("/api/waste", wasteAdjuster);
+app.use("/api/concepts", apiLimiter, conceptRouter);
+app.use("/api/strategy", menuStrategyRouter);
+app.use("/api/production", batchScaler);
 
 // Shared Gemini Client Helper
 let aiClient: GoogleGenAI | null = null;
@@ -35,8 +71,8 @@ function getAi(): GoogleGenAI {
   return aiClient;
 }
 
-// BOH AI Transcription & Culinary Logic Parsing Endpoint
-app.post('/api/parse-recipe', async (req, res) => {
+// BOH AI Transcription & Culinary Logic Parsing Endpoint with strict AI limiter
+app.post('/api/parse-recipe', aiLimiter, async (req, res) => {
   try {
     const { recipeText } = req.body;
     if (!recipeText || typeof recipeText !== 'string' || !recipeText.trim()) {
@@ -136,9 +172,12 @@ async function startServer() {
     app.use(vite.middlewares);
     console.log('Integrated Vite HMR middleware client.');
 
-    server.listen(PORT, '0.0.0.0', () => {
-      console.log(`MiseOS full-stack server running strictly on http://localhost:${PORT}`);
-    });
+    // Only listen if not being imported for tests
+    if (process.env.NODE_ENV !== 'test') {
+      server.listen(PORT, '0.0.0.0', () => {
+        console.log(`MiseOS full-stack server running strictly on http://localhost:${PORT}`);
+      });
+    }
   } else {
     // Serve production static assets compiled to 'dist'
     app.use(express.static(path.resolve(__dirname, 'dist')));
@@ -146,13 +185,22 @@ async function startServer() {
       res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
     });
     console.log('Serving production-ready precompiled static bundles.');
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`MiseOS full-stack server running strictly on http://localhost:${PORT}`);
-    });
+
+    // Only listen if not being imported for tests
+    if (process.env.NODE_ENV !== 'test') {
+      app.listen(PORT, '0.0.0.0', () => {
+        console.log(`MiseOS full-stack server running strictly on http://localhost:${PORT}`);
+      });
+    }
   }
 }
 
-startServer().catch((err) => {
-  console.error('Fatal initialization error:', err);
-  process.exit(1);
-});
+// Run startServer only if this file is executed directly
+if (import.meta.url === `file://${process.argv[1]}` || process.env.NODE_ENV === 'production') {
+  startServer().catch((err) => {
+    console.error('Fatal initialization error:', err);
+    process.exit(1);
+  });
+}
+
+export default app;
