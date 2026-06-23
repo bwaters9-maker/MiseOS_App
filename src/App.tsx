@@ -1,7 +1,7 @@
 import React, { Suspense, useState, useEffect } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AppHeader } from './components/AppHeader';
-import { useKitchenState } from './hooks/useKitchenState';
+import { KitchenStateProvider } from './context/KitchenStateContext';
 
 // --- LAZY-LOADING STRUCTURE ---
 const Dashboard = React.lazy(() => import('./components/dashboard/DailyCribSheet'));
@@ -33,7 +33,6 @@ const ActiveViewRenderer = ({ view, ...props }: { view: string; [key: string]: a
 export default function App() {
   const [activeView, setActiveView] = useState('dashboard');
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
-  const kitchenState = useKitchenState();
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -42,15 +41,17 @@ export default function App() {
   }, [theme]);
 
   return (
-    <div className="min-h-screen bg-black text-zinc-100 antialiased font-sans">
-      <AppHeader activeView={activeView} onNavigate={setActiveView} />
-      <main className="py-6">
-        <ErrorBoundary>
-          <Suspense fallback={<div className="p-12 text-center text-sm text-zinc-500">Loading...</div>}>
-            <ActiveViewRenderer view={activeView} {...kitchenState} theme={theme} setTheme={setTheme} />
-          </Suspense>
-        </ErrorBoundary>
-      </main>
-    </div>
+    <KitchenStateProvider>
+      <div className="min-h-screen bg-black text-zinc-100 antialiased font-sans">
+        <AppHeader activeView={activeView} onNavigate={setActiveView} />
+        <main className="py-6">
+          <ErrorBoundary>
+            <Suspense fallback={<div className="p-12 text-center text-sm text-zinc-500">Loading...</div>}>
+              <ActiveViewRenderer view={activeView} theme={theme} setTheme={setTheme} />
+            </Suspense>
+          </ErrorBoundary>
+        </main>
+      </div>
+    </KitchenStateProvider>
   );
 }

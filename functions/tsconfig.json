@@ -1,15 +1,18 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
-    "noImplicitAny": false,
+    "module": "NodeNext",
+    "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "removeComments": true,
     "preserveConstEnums": true,
     "outDir": "lib",
     "sourceMap": true,
     "target": "es2020",
-    "moduleResolution": "node",
+    "moduleResolution": "NodeNext",
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["../src/*"]
     },
     "rootDir": "./src"
   },
