@@ -12,7 +12,7 @@ interface DailyCribSheetProps {
   onUpdateItems86: (items86: Item86Entry[]) => void;
 }
 
-const DailyCribSheet: React.FC<DailyCribSheetProps> = ({ 
+const DailyCribSheet: React.FC<DailyCribSheetProps> = React.memo(({
   prepRuns = [], 
   handovers = [], 
   items86 = [],
@@ -181,6 +181,8 @@ const DailyCribSheet: React.FC<DailyCribSheetProps> = ({
       </div>
     </div>
   );
-};
+});
+
+DailyCribSheet.displayName = 'DailyCribSheet';
 
 export default DailyCribSheet;

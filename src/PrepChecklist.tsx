@@ -5,7 +5,7 @@ interface PrepChecklistProps {
   prepItems: PrepItem[];
 }
 
-export const PrepChecklist: React.FC<PrepChecklistProps> = ({ prepItems }) => {
+export const PrepChecklist: React.FC<PrepChecklistProps> = React.memo(({ prepItems }) => {
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 bg-zinc-950 text-zinc-100 font-mono tracking-tight">
@@ -57,4 +57,6 @@ export const PrepChecklist: React.FC<PrepChecklistProps> = ({ prepItems }) => {
       </div>
     </div>
   );
-};
+});
+
+PrepChecklist.displayName = 'PrepChecklist';
