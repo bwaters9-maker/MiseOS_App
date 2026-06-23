@@ -1,0 +1,14 @@
+{
+  "name": "functions",
+  "description": "MiseOS Cloud Functions",
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "firebase-functions": "^5.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": "18"
+  }
+}

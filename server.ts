@@ -119,9 +119,15 @@ app.post('/api/parse-recipe', async (req, res) => {
 });
 
 const PORT = 3001;
-const isProd = process.env.NODE_ENV === 'production';
 
 async function startServer() {
+  // Startup validation for NODE_ENV to prevent misconfiguration.
+  if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'development') {
+    const errorMessage = `FATAL: NODE_ENV is not set to 'production' or 'development'. Current value: "${process.env.NODE_ENV}".`;
+    console.error(errorMessage);
+    throw new Error(errorMessage);
+  }
+  const isProd = process.env.NODE_ENV === 'production';
   if (!isProd) {
     // Dynamically require Vite in development to bind its middleware
     const server = http.createServer(app);

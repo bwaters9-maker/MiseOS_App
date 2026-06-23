@@ -1,0 +1,7 @@
+﻿﻿Feature|Status
+Brain Dump Modules|LOCKED
+Financial Smoke Detector|PURGED
+Intelligent Insight Rail|LOCKED
+Station Matrix|LOCKED
+Live POS Sync|PURGED
+Automatic Reservation Sync|PURGED

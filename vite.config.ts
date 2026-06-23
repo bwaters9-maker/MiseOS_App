@@ -14,16 +14,16 @@ export default defineConfig({
     tailwindcss()
   ],
   server: {
-    port: 3000,
+    port: 3001,
     strictPort: true,
     host: true,
     hmr: {
       // Explicitly define the HMR client port for middleware mode
-      clientPort: 3000,
+      clientPort: 3001,
     },
   },
   preview: {
-    port: 3000,
+    port: 3001,
     strictPort: true,
     host: true
   },

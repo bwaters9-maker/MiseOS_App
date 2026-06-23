@@ -1,0 +1,118 @@
+﻿﻿Collection: users
+- name (string)
+- role (string)
+- permissions (string) # Admin, Sous, Line
+- subscription_status (string)
+- trial_end_date (timestamp)
+- admin_session (map) # Tracks 20-min auth window { expiresAt: timestamp }
+- location_context (string)
+- user_settings (map)
+  - ui_toggles (map)
+    - calendar_forecasting (boolean)
+    - weather_tracking (boolean)
+    - revenue_analytics (boolean)
+    - station_matrix (boolean)
+    - dish_development (boolean)
+    - order_sheets (boolean)
+    - intelligent_insight_rail (boolean)
+- availability (map) # Defines working constraints, e.g., { monday: { start: "09:00", end: "17:00" } }
+
+
+Collection: ingredients
+- name (string)
+- vendor_id (reference)
+- cost_per_unit (number)
+- quantity (number)
+- createdAt (timestamp)
+- category (string)
+- price_source (string) # enum: 'regional_estimate', 'invoice_scan'
+- culinary_trend (string)
+- price_trend (string)
+- nutrition_info (map)
+  - calories (number)
+  - protein (number)
+  - carbs (number)
+  - fat (number)
+- allergens (array of strings)
+- source_authority (string) # Chef-verified source for trend data
+- price_alert (map)
+  - is_volatile (boolean)
+  - reason (string)
+  - expected_duration (string)
+
+
+Collection: recipes
+- title (string)
+- yield (number)
+- margin_goal (number)
+- station (string)
+Subcollection: recipeComponents
+  - ingredient_id (reference)
+  - quantity (number)
+  - unit (string)
+  - calculated_cost (number)
+
+Collection: menuItems
+- name (string)
+- recipe_id (reference)
+- status (string)
+- price (number)
+
+Collection: vendors
+- company_name (string)
+- contact_info (string)
+- lead_time (number)
+
+Collection: brainDumps
+- content (string)
+- userId (string)
+- createdAt (timestamp)
+
+Collection: stations
+- name (string)
+- active_cooks (array)
+
+Collection: tasks
+- station_id (reference)
+- prep_time_minutes (number)
+- assigned_initials (string)
+- status (string) # e.g., 'pending', 'in-progress', 'completed'
+
+Collection: events
+- date (timestamp)
+- revenue (number)
+- covers (number)
+- weather_context (map)
+- menu_item_references (array of reference)
+
+Collection: schedules
+- user_id (reference)
+- shifts (array of map)
+  - start_time (timestamp)
+  - end_time (timestamp)
+  - is_repeating (boolean)
+
+Collection: dishConcepts
+- name (string)
+- description (string)
+- status (string) # enum: 'new_idea', 'in_progress'
+Subcollection: plating_configs
+  - visual_layout_data (map) # JSON representation of the plating layout
+  - associated_recipe_ids (array of reference)
+
+Collection: orderBrainDump
+- entry_text (string) # Raw text like "case of onions"
+- userId (string)
+- createdAt (timestamp)
+- status (string) # enum: 'new', 'routed'
+
+Collection: vendorOrderSheets
+- vendor_id (reference)
+- createdAt (timestamp)
+- status (string) # enum: 'draft', 'submitted'
+Subcollection: orderItems
+  - ingredient_id (reference)
+  - item_name (string)
+  - quantity (string)
+  - notes (string)
+  - status (string) # enum: 'pending', 'ordered'

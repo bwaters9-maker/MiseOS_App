@@ -3,45 +3,205 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Default deny all access.
-    match /{document=**} {
-      allow read, write: if false;
+    // ===============================================================
+    // Assumed Data Models
+    // ===============================================================
+
+    // Collection: users
+    // - name: string (1-50 chars)
+    // - role: string ('Admin', 'Sous', 'Line')
+    // - permissions: string (optional, 1-100 chars)
+    // - subscription_status: string (optional)
+    // - trial_end_date: timestamp (optional)
+    // - admin_session: map (optional)
+    // - location_context: string (optional)
+    // - user_settings: map (optional)
+    // - availability: map (optional)
+
+    // Collection: ingredients
+    // - name: string (1-100 chars)
+    // - vendor_id: reference
+    // - cost_per_unit: number (> 0)
+    // - quantity: number (>= 0)
+    // - createdAt: timestamp (immutable)
+    // - category: string (1-50 chars)
+    // - price_source: string ('regional_estimate', 'invoice_scan')
+    // - allergens: array (of strings, max 20)
+
+    // Collection: recipes
+    // - title: string (1-150 chars)
+    // - yield: number (> 0)
+    // - margin_goal: number (0-1)
+    // - station: string (1-50 chars)
+    // Subcollection: recipeComponents
+
+    // Collection: menuItems
+    // - name: string (1-100 chars)
+    // - recipe_id: reference
+    // - status: string ('active', 'inactive', '86d')
+    // - price: number (> 0)
+
+    // Collection: vendors
+    // - company_name: string (1-100 chars)
+    // - contact_info: string (1-200 chars)
+    // - lead_time: number (>= 0)
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    // Allow authenticated users to read station presets for UI population.
-    match /station_presets/{presetId} {
-      allow read: if request.auth != null;
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Allow authenticated users to read trend reports.
-    match /trend_reports/{reportId} {
-      allow read: if request.auth != null;
+    // Admin check relies on custom claims set on the user's auth token.
+    // This is more secure than checking a field in the database.
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.admin == true;
     }
 
-    // Rules for handover logs.
-    match /handover_logs/{logId} {
-      // Anyone authenticated can create a handover log, provided the data is valid.
-      // The `submitted_by_uid` should be the UID of the user creating the log.
-      allow create: if request.auth != null && isValidHandoverLog(request.resource.data);
-
-      // Only the user who created the log can update it.
-      // This assumes a 'submitted_by_uid' field is stored on the document.
-      allow update: if request.auth.uid == resource.data.submitted_by_uid && isValidHandoverLog(request.resource.data);
-
-      // Allow any authenticated user to read logs.
-      allow read: if request.auth != null;
+    function isEditor() {
+      // Allows Admins or Sous-Chefs
+      return isAdmin() || (isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Sous');
     }
 
-    // Helper function to validate the structure of a handover log document.
-    function isValidHandoverLog(data) {
-      return data.shift_id is string
-        && data.station is string
-        && data.status in ['pass', 'fail', 'incomplete']
-        && data.notes is string
-        && data.items86 is list
-        && data.submitted_by is string
-        && data.submitted_by_uid == request.auth.uid // Enforce creator UID
-        && data.timestamp == request.time; // Enforce server timestamp
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.keys().hasOnly(['name', 'role', 'permissions', 'subscription_status', 'trial_end_date', 'admin_session', 'location_context', 'user_settings', 'availability'])
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 50
+        && data.role is string && data.role in ['Admin', 'Sous', 'Line']
+        && (!('permissions' in data) || data.permissions is string && data.permissions.size() <= 100)
+        && (!('subscription_status' in data) || data.subscription_status is string)
+        && (!('trial_end_date' in data) || data.trial_end_date is timestamp)
+        && (!('admin_session' in data) || data.admin_session is map)
+        && (!('location_context' in data) || data.location_context is string)
+        && (!('user_settings' in data) || data.user_settings is map)
+        && (!('availability' in data) || data.availability is map);
+    }
+
+    function isValidIngredient(data) {
+      return data.keys().hasOnly(['name', 'vendor_id', 'cost_per_unit', 'quantity', 'createdAt', 'category', 'price_source', 'nutrition_info', 'allergens', 'source_authority', 'price_alert', 'culinary_trend', 'price_trend'])
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.vendor_id is path
+        && data.cost_per_unit is number && data.cost_per_unit > 0
+        && data.quantity is number && data.quantity >= 0
+        && data.createdAt is timestamp
+        && data.category is string && data.category.size() > 0 && data.category.size() <= 50
+        && data.price_source is string && data.price_source in ['regional_estimate', 'invoice_scan']
+        && data.allergens is list && data.allergens.size() <= 20
+        && (!('nutrition_info' in data) || data.nutrition_info is map)
+        && (!('source_authority' in data) || data.source_authority is string)
+        && (!('price_alert' in data) || data.price_alert is map)
+        && (!('culinary_trend' in data) || data.culinary_trend is string)
+        && (!('price_trend' in data) || data.price_trend is string);
+    }
+
+    function isValidRecipe(data) {
+      return data.keys().hasOnly(['title', 'yield', 'margin_goal', 'station'])
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 150
+        && data.yield is number && data.yield > 0
+        && data.margin_goal is number && data.margin_goal >= 0 && data.margin_goal <= 1
+        && data.station is string && data.station.size() > 0 && data.station.size() <= 50;
+    }
+
+    function isValidRecipeComponent(data) {
+        return data.keys().hasOnly(['ingredient_id', 'quantity', 'unit', 'calculated_cost'])
+            && data.ingredient_id is path
+            && data.quantity is number && data.quantity > 0
+            && data.unit is string && data.unit.size() > 0 && data.unit.size() <= 20
+            && data.calculated_cost is number && data.calculated_cost >= 0;
+    }
+
+    function isValidMenuItem(data) {
+      return data.keys().hasOnly(['name', 'recipe_id', 'status', 'price'])
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.recipe_id is path
+        && data.status is string && data.status in ['active', 'inactive', '86d']
+        && data.price is number && data.price > 0;
+    }
+
+    function isValidVendor(data) {
+      return data.keys().hasOnly(['company_name', 'contact_info', 'lead_time'])
+        && data.company_name is string && data.company_name.size() > 0 && data.company_name.size() <= 100
+        && data.contact_info is string && data.contact_info.size() > 0 && data.contact_info.size() <= 200
+        && data.lead_time is number && data.lead_time >= 0;
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      // READ: Owner or Admin only, to prevent Mixed Content Leak.
+      allow read: if isOwner(userId) || isAdmin();
+
+      // CREATE: New users can create their own doc, but are locked to the 'Line' role. Prevents Privilege Escalation.
+      allow create: if isOwner(userId)
+        && isValidUser(request.resource.data)
+        && request.resource.data.role == 'Line';
+
+      // UPDATE: Owner can update non-critical fields. Role changes require an Admin. Prevents Privilege Escalation & Update Bypass.
+      allow update: if (isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role)
+        || (isAdmin() && isValidUser(request.resource.data));
+
+      // DELETE: Only Admins can delete user accounts.
+      allow delete: if isAdmin();
+    }
+
+    match /ingredients/{ingredientId} {
+      // READ: Any authenticated user can read ingredient data.
+      allow read: if isAuthenticated();
+
+      // WRITE: Only Editors (Admin/Sous) can manage ingredients. Prevents data corruption/pollution.
+      allow create: if isEditor() && isValidIngredient(request.resource.data);
+      allow update: if isEditor() && isValidIngredient(request.resource.data)
+        // Protect immutable creation timestamp
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isEditor();
+    }
+
+    match /recipes/{recipeId} {
+      // READ: Any authenticated user can read recipes.
+      allow read: if isAuthenticated();
+
+      // WRITE: Only Editors can manage recipes.
+      allow create: if isEditor() && isValidRecipe(request.resource.data);
+      allow update: if isEditor() && isValidRecipe(request.resource.data);
+      allow delete: if isEditor();
+
+      match /recipeComponents/{componentId} {
+        allow read: if isAuthenticated();
+        allow create: if isEditor() && isValidRecipeComponent(request.resource.data);
+        allow update: if isEditor() && isValidRecipeComponent(request.resource.data);
+        allow delete: if isEditor();
+      }
+    }
+
+    match /menuItems/{menuItemId} {
+      // READ: Any authenticated user can read the menu.
+      allow read: if isAuthenticated();
+
+      // WRITE: Only Editors can manage menu items.
+      allow create: if isEditor() && isValidMenuItem(request.resource.data);
+      allow update: if isEditor() && isValidMenuItem(request.resource.data);
+      allow delete: if isEditor();
+    }
+
+    match /vendors/{vendorId} {
+      // READ: Any authenticated user can read vendor info.
+      allow read: if isAuthenticated();
+
+      // WRITE: Only Editors can manage vendors.
+      allow create: if isEditor() && isValidVendor(request.resource.data);
+      allow update: if isEditor() && isValidVendor(request.resource.data);
+      allow delete: if isEditor();
     }
   }
 }
