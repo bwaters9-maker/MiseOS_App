@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { PrepItem } from './types';
 
 interface PrepChecklistProps {
   prepItems: PrepItem[];
 }
 
-export const PrepChecklist: React.FC<PrepChecklistProps> = ({ prepItems }) => {
+const PrepChecklistBase: React.FC<PrepChecklistProps> = ({ prepItems }) => {
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 bg-zinc-950 text-zinc-100 font-mono tracking-tight">
@@ -58,3 +58,6 @@ export const PrepChecklist: React.FC<PrepChecklistProps> = ({ prepItems }) => {
     </div>
   );
 };
+
+export const PrepChecklist = memo(PrepChecklistBase);
+PrepChecklist.displayName = 'PrepChecklist';

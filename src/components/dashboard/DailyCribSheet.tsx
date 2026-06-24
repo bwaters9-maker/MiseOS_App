@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, memo } from 'react';
 import { AlertTriangle, ListTodo, Ban, PlusCircle, XCircle, TrendingUp, ClipboardCheck, CheckCircle } from 'lucide-react';
-import { ProductionRun, HandoverLog, Item86Entry, PrepStation, TrendReport } from '@/types';
+import { ProductionRun, HandoverLog, Item86Entry, PrepStation, TrendReport } from '../../types';
 import { Section } from '../CribComponents';
 import { useStationPresets } from '../../hooks/useStationPresets';
 
@@ -12,7 +12,7 @@ interface DailyCribSheetProps {
   onUpdateItems86: (items86: Item86Entry[]) => void;
 }
 
-const DailyCribSheet: React.FC<DailyCribSheetProps> = ({ 
+const DailyCribSheetBase: React.FC<DailyCribSheetProps> = ({
   prepRuns = [], 
   handovers = [], 
   items86 = [],
@@ -42,6 +42,8 @@ const DailyCribSheet: React.FC<DailyCribSheetProps> = ({
       id: `86-${Date.now()}`,
       name: newItemName.trim(),
       station: newItemStation,
+      status: 'out',
+      timestamp: new Date().toISOString(),
       blockedAt: new Date().toISOString()
     };
     onUpdateItems86([...items86, entry]);
@@ -144,7 +146,7 @@ const DailyCribSheet: React.FC<DailyCribSheetProps> = ({
       <div>
         {Object.entries(groupedPrep).map(([station, runs]) => (
           <Section key={station} title={station} icon={<ListTodo className="w-4 h-4" />}>
-            {(runs || []).map(run => {
+            {(runs as ProductionRun[] || []).map(run => {
               // Production-grade guard: Don't render if the run item is invalid.
               if (!run || !run.id) {
                 return null;
@@ -182,5 +184,8 @@ const DailyCribSheet: React.FC<DailyCribSheetProps> = ({
     </div>
   );
 };
+
+const DailyCribSheet = memo(DailyCribSheetBase);
+DailyCribSheet.displayName = 'DailyCribSheet';
 
 export default DailyCribSheet;
