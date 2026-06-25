@@ -1,0 +1,3 @@
+## 2025-05-15 - [Centralized State Management & Compatibility]
+**Learning:** Transitioning multi-component Firestore hooks to React Context significantly reduces redundant network listeners but introduces critical integration points. Failure to wrap the app root with the new Provider causes runtime crashes. Additionally, maintaining backward compatibility for hook property names (e.g., `handoverLogs` vs `handovers`) is essential when refactoring shared hooks to prevent uncoordinated breakages across the view layer.
+**Action:** Always verify the Provider wrapper is active in `App.tsx` and check all consumer call-sites for property name dependencies before finalizing hook refactors.

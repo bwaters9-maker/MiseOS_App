@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebaseConfig';
-import { collection, query, orderBy, onSnapshot, QuerySnapshot, QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, type QuerySnapshot, type QueryDocumentSnapshot } from 'firebase/firestore';
 import { PrepStation } from '../types';
 
 export function useStationPresets() {
@@ -29,5 +29,5 @@ export function useStationPresets() {
     return () => unsubscribe();
   }, []);
 
-  return { presets, error };
+  return useMemo(() => ({ presets, error }), [presets, error]);
 }
