@@ -1,7 +1,7 @@
 import React, { Suspense, useState, useEffect } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AppHeader } from './components/AppHeader';
-import { KitchenStateProvider } from './context/KitchenStateContext';
+import { KitchenStateProvider } from './components/KitchenStateContext';
 
 // --- LAZY-LOADING STRUCTURE ---
 const Dashboard = React.lazy(() => import('./components/dashboard/DailyCribSheet'));

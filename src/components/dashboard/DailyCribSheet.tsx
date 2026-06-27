@@ -50,8 +50,9 @@ const DailyCribSheet: React.FC<DailyCribSheetProps> = ({
   };
 
   const groupedPrep = useMemo(() => {
-    // Guard against prepRuns being null/undefined and ensure it's an array.
-    return (prepRuns || []).reduce((acc, run) => {
+    // The `prepRuns` prop is guaranteed to be an array via default props,
+    // so we can safely reduce it without a null check.
+    return prepRuns.reduce((acc, run) => {
       // In production, an item in the array could be null.
       if (!run) {
         return acc;

@@ -60,8 +60,22 @@ async function startServer() {
   }
 
   const isProd = process.env.NODE_ENV === 'production';
-  if (!isProd) {
-    // Dynamically require Vite in development to bind its middleware
+
+  // --- Dynamic Environment Routing ---
+  if (isProd) {
+    // PRODUCTION: Serve the pre-built, static menu from the 'dist' folder.
+    // This is the equivalent of a locked-down, high-performance service line.
+    app.use(express.static(path.resolve(__dirname, 'dist')));
+    app.get('*', (req, res) => {
+      res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
+    });
+    console.log('MiseOS is in PRODUCTION mode. Serving static assets from ./dist');
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Production server running on http://localhost:${PORT}`);
+    });
+  } else {
+    // DEVELOPMENT: Use Vite as a middleware for a dynamic, hot-reloading test kitchen.
+    // This allows for real-time recipe development without full rebuilds.
     const server = http.createServer(app);
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
@@ -72,20 +86,10 @@ async function startServer() {
       appType: 'spa'
     });
     app.use(vite.middlewares);
-    console.log('Integrated Vite HMR middleware client.');
+    console.log('MiseOS is in DEVELOPMENT mode. Integrating Vite middleware for HMR.');
 
     server.listen(PORT, '0.0.0.0', () => {
-      console.log(`MiseOS full-stack server running strictly on http://localhost:${PORT}`);
-    });
-  } else {
-    // Serve production static assets compiled to 'dist'
-    app.use(express.static(path.resolve(__dirname, 'dist')));
-    app.get('*', (req, res) => {
-      res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
-    });
-    console.log('Serving production-ready precompiled static bundles.');
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`MiseOS full-stack server running strictly on http://localhost:${PORT}`);
+      console.log(`Development server running on http://localhost:${PORT}`);
     });
   }
 }

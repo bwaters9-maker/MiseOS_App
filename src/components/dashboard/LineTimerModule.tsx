@@ -38,9 +38,7 @@ export const LineTimerModule: React.FC<LineTimerModuleProps> = ({ timers }) => {
   };
 
   return (
-    <div className="border-4 border-blue-500 p-4">
-      <h1>DEBUG: TIMER</h1>
-      <div className="bg-zinc-950/40 border border-zinc-800 rounded-xl p-5 space-y-4 shadow-lg">
+    <div className="bg-zinc-950/40 border border-zinc-800 rounded-xl p-5 space-y-4 shadow-lg">
         <h3 className="text-sm font-extrabold uppercase tracking-wider text-zinc-400 border-b border-zinc-900 pb-2">
           Active Countdown Timers
         </h3>
@@ -84,7 +82,6 @@ export const LineTimerModule: React.FC<LineTimerModuleProps> = ({ timers }) => {
               <p className="text-center text-xs text-zinc-600 uppercase py-8 tracking-widest">No Active Timers</p>
           )}
         </div>
-      </div>
     </div>
   );
 };
