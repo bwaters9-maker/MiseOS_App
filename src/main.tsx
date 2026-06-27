@@ -23,7 +23,7 @@ console.log('MiseOS: Pre-flight deep clean complete. All caches purged.');
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './components/App.jsx'; // Importing the clean, isolated App component for testing.
+import App from "./App.tsx"; // Importing the clean, isolated App component for testing.
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
