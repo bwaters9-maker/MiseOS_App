@@ -9,12 +9,8 @@
     "target": "es2020",
     "moduleResolution": "node",
     "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"]
-    },
+    "paths": { "@/*": ["./src/*"] },
     "rootDir": "./src"
   },
-  "include": [
-    "src"
-  ]
+  "include": ["src"]
 }
