@@ -1,0 +1,91 @@
+{
+  "meta": {
+    "description": "MiseOS Fibonacci-based design token system",
+    "base-unit": "px",
+    "golden-ratio": 1.618,
+    "fibonacci-sequence": [1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144]
+  },
+  "spacing": {
+    "1":  "1px",
+    "2":  "2px",
+    "3":  "3px",
+    "5":  "5px",
+    "8":  "8px",
+    "13": "13px",
+    "21": "21px",
+    "34": "34px",
+    "55": "55px",
+    "89": "89px",
+    "144": "144px"
+  },
+  "typography": {
+    "scale-ratio": 1.618,
+    "sizes": {
+      "xs":      "8px",
+      "sm":      "13px",
+      "base":    "16px",
+      "md":      "21px",
+      "lg":      "34px",
+      "xl":      "55px",
+      "display": "89px"
+    },
+    "line-height": {
+      "tight":  1.272,
+      "base":   1.618,
+      "loose":  2.058
+    },
+    "fonts": {
+      "primary": "system-ui, sans-serif",
+      "secondary": "Inter, system-ui, sans-serif"
+    }
+  },
+  "layout": {
+    "golden-split": {
+      "primary":   "61.8%",
+      "secondary": "38.2%"
+    },
+    "widths": {
+      "sidebar":     "233px",
+      "panel":       "377px",
+      "content":     "610px",
+      "wide":        "987px",
+      "max":         "1597px"
+    },
+    "breakpoints": {
+      "sm":  "377px",
+      "md":  "610px",
+      "lg":  "987px",
+      "xl":  "1597px"
+    }
+  },
+  "border-radius": {
+    "sm": "3px",
+    "md": "5px",
+    "lg": "8px",
+    "xl": "13px"
+  },
+  "borders": {
+    "thin":   "1px",
+    "base":   "2px",
+    "thick":  "3px"
+  },
+  "animation": {
+    "duration": {
+      "fast":   "144ms",
+      "base":   "233ms",
+      "slow":   "377ms",
+      "slower": "610ms"
+    },
+    "easing": {
+      "default": "cubic-bezier(0.618, 0, 0.382, 1)"
+    }
+  },
+  "kitchen": {
+    "station-gap":     "21px",
+    "prep-list-gap":   "13px",
+    "ticket-padding":  "8px",
+    "rail-height":     "55px",
+    "crib-sheet-gap":  "34px",
+    "insight-padding": "13px"
+  }
+}
