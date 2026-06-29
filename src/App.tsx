@@ -8,8 +8,6 @@ const Dashboard = React.lazy(() => import('./components/dashboard/DailyCribSheet
 const TestKitchenHub = React.lazy(() => import('./TestKitchenHub'));
 const PrepChecklist = React.lazy(() => import('./PrepChecklist').then(m => ({ default: m.PrepChecklist })));
 const KitchenTimers = React.lazy(() => import('./KitchenTimers').then(m => ({ default: m.KitchenTimers })));
-const ShiftHandoverLog = React.lazy(() => import('./ShiftHandoverLog').then(m => ({ default: m.ShiftHandoverLog })));
-const HandoverLogForm = React.lazy(() => import('./HandoverLog').then(m => ({ default: m.HandoverLogForm })));
 const Settings = React.lazy(() => import('./Settings').then(m => ({ default: m.Settings })));
 
 // --- VIEW MAPPING ---
@@ -17,8 +15,6 @@ const viewMap: { [key: string]: React.LazyExoticComponent<React.ComponentType<an
   dashboard: Dashboard,
   prep: PrepChecklist,
   timers: KitchenTimers,
-  handover: ShiftHandoverLog,
-  'new-handover': HandoverLogForm,
   'test-kitchen': TestKitchenHub,
   settings: Settings,
 };

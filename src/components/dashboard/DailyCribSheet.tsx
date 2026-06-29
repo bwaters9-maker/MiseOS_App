@@ -1,20 +1,18 @@
 import React, { useState, useMemo } from 'react';
-import { AlertTriangle, ListTodo, Ban, PlusCircle, XCircle, TrendingUp, ClipboardCheck, CheckCircle } from 'lucide-react';
-import { ProductionRun, HandoverLog, Item86Entry, PrepStation, TrendReport } from '@/types';
+import { ListTodo, Ban, PlusCircle, XCircle, TrendingUp, ClipboardCheck } from 'lucide-react';
+import { ProductionRun, Item86Entry, PrepStation, TrendReport } from '@/types';
 import { Section } from '../CribComponents';
 import { useStationPresets } from '../../hooks/useStationPresets';
 
 interface DailyCribSheetProps {
   prepRuns?: ProductionRun[];
-  handovers?: HandoverLog[];
   items86?: Item86Entry[];
   latestReport: TrendReport | null;
   onUpdateItems86: (items86: Item86Entry[]) => void;
 }
 
-const DailyCribSheet: React.FC<DailyCribSheetProps> = ({ 
-  prepRuns = [], 
-  handovers = [], 
+const DailyCribSheet: React.FC<DailyCribSheetProps> = ({
+  prepRuns = [],
   items86 = [],
   latestReport,
   onUpdateItems86 
@@ -23,18 +21,6 @@ const DailyCribSheet: React.FC<DailyCribSheetProps> = ({
   const stationPresets = useMemo(() => ['All', ...rawPresets], [rawPresets]);
   const [newItemName, setNewItemName] = useState('');
   const [newItemStation, setNewItemStation] = useState<PrepStation | 'All'>('All');
-
-  const STATUS_STYLES: Record<string, string> = {
-    pass: 'text-green-400 border-green-800',
-    fail: 'text-red-400 border-red-800',
-    incomplete: 'text-amber-400 border-amber-800',
-  };
-
-  const STATUS_ICONS: Record<string, React.ReactNode> = {
-    pass: <CheckCircle className="w-3 h-3" />,
-    fail: <XCircle className="w-3 h-3" />,
-    incomplete: <AlertTriangle className="w-3 h-3" />,
-  };
 
   const handleAddItem86 = () => {
     if (!newItemName.trim()) return;
@@ -103,43 +89,6 @@ const DailyCribSheet: React.FC<DailyCribSheetProps> = ({
             <PlusCircle className="w-4 h-4" />
           </button>
         </div>
-      </div>
-
-      <div>
-        <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-400 mb-2">
-          <AlertTriangle className="w-4 h-4" />
-          <span>Handovers</span>
-        </h4>
-        <ul className="space-y-2 text-xs text-zinc-400 list-none mb-3">
-          {handovers.length > 0 ? handovers.map(log => {
-            const status = log.status || 'pass';
-            return (
-              <li key={log.id} className="bg-zinc-950/30 p-2.5 rounded border border-zinc-800/50">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-semibold text-zinc-300">{log.notes || <span className="italic text-zinc-500">No notes.</span>}</p>
-                    {log.items86 && log.items86.length > 0 && (
-                      <div className="mt-1.5 text-[10px]">
-                        <span className="font-bold text-red-400/80">86'd: </span>
-                        <span className="text-red-400/70">{log.items86.join(', ')}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className={`flex items-center gap-1.5 text-[10px] font-bold uppercase border px-1.5 py-0.5 rounded-full ${STATUS_STYLES[status] || STATUS_STYLES.pass}`}>
-                    {STATUS_ICONS[status] || STATUS_ICONS.pass}
-                    <span>{status}</span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center mt-2 pt-1.5 border-t border-zinc-800/50">
-                  <p className="text-zinc-500 text-[10px] uppercase tracking-wider">From: {log.submitted_by} @ <span className="font-mono">{new Date(log.timestamp).toLocaleTimeString()}</span></p>
-                  <p className="text-zinc-500 text-[10px] uppercase font-bold">{log.station}</p>
-                </div>
-              </li>
-            );
-          }) : (
-             <p className="text-xs text-zinc-500 italic">No handovers.</p>
-          )}
-        </ul>
       </div>
 
       <div>

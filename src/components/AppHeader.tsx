@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, ClipboardList, Clock, BookOpen, Send, History, Sparkles, Settings, Menu, X } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Clock, History, Sparkles, Settings, Menu, X } from 'lucide-react';
 
 interface AppHeaderProps {
   activeView: string;
@@ -10,9 +10,7 @@ const navItems = [
   { view: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { view: 'prep', label: 'Prep Checklist', icon: ClipboardList },
   { view: 'timers', label: 'Kitchen Timers', icon: Clock },
-  { view: 'handover', label: 'Handover Log', icon: BookOpen },
   { view: 'alert-history', label: 'Alert History', icon: History },
-  { view: 'new-handover', label: 'New Handover', icon: Send },
   { view: 'test-kitchen', label: 'Test Kitchen', icon: Sparkles },
   { view: 'settings', label: 'Settings', icon: Settings },
 ];
