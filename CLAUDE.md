@@ -151,3 +151,123 @@ Calls `https://api.anthropic.com/v1/messages` directly from the browser using `a
 - **`src/Dashboard.tsx`** — a `DashboardView` component that is never imported. `App.tsx` loads `DailyCribSheet` directly as the dashboard view. This file is dead code.
 - **`useKitchenState.ts`** — still subscribes to the `handovers` Firestore collection and returns `handoverLogs`, but nothing consumes it since the Handover Log feature was removed. The listener runs but is harmless.
 - **`src/types.ts`** still exports `HandoverLog` interface — leftover from the removed feature, harmless.
+---
+
+## Product Vision & Standards
+
+### What MiseOS Is
+A refined, secure, minimalist rebuild of Kitchen Cost Pro (Base44).
+The Base44 version proved the concept. This is the professional
+engineering of that concept.
+
+Target user: Executive chef at maximum cognitive capacity during
+long, high-stress service. The interface reflects that mindset —
+zero cognitive overhead, everything where expected, no surprises.
+
+### Quality Standard — Non-Negotiable
+Every feature must pass: "Would a chef in the middle of a Friday
+dinner service use this, exactly as built, without frustration?"
+
+Ship nothing incomplete. Ship nothing imprecise. If a feature only
+kind of makes sense, cut it immediately. A smaller app that works
+perfectly beats a large app that almost works.
+
+Every feature earns its place or it doesn't ship.
+
+### Communication Standard
+Culinary verbiage means precision and directness — not cooking
+metaphors injected into technical explanations.
+
+A build error is a build error. Describe it plainly.
+Brian has 20+ years of professional experience. No performance.
+
+Wrong: "Look down at the pass — the oven tried to fire up."
+Right: "Vite can't find your Firebase config file. Fix the import
+path in BrainDumpModule.jsx."
+
+### Approved Feature Map
+
+DAILY OPERATIONS
+- Dashboard (86'd items, features tonight, events snapshot)
+- Daily Crib Sheet (print-optimized — morning review + printable)
+- Kitchen Timers (multi-station)
+- Alert History
+
+FEATURES (Specials)
+- Build nightly specials with course, description, cost, price
+- Active date range — 86 mid-service auto-updates Dashboard
+
+RECIPE SYSTEM
+- Recipe Builder with [Suggest Ingredients] and [Write Method] AI
+- Live Cost Analysis (right panel — cost, FC%, suggested price)
+- FDA Nutrition Label (auto-calculated, lives inside recipe)
+- Recipe Collections (seasonal groupings, one active at a time)
+- Recipe Sharing (read-only link)
+
+INGREDIENTS — MASTER PANTRY
+- Static, human-verified only
+- Purchase unit, yield %, cost per usable unit (calculated)
+- Nutritional data per 100g, allergen flags, vendor links
+
+MENU
+- Active recipes by category with food cost % color coding
+
+CATERING
+- Events, client info, menu selection, cost + quote generation
+- Feeds Event Calendar → feeds Crib Sheet
+
+STAFF (lightweight)
+- Name, role, station, clock-in time for today
+- Feeds Crib Sheet only
+
+EVENT CALENDAR
+- Private dining, buyouts, special events
+- Feeds Crib Sheet
+
+VENDOR MANAGEMENT
+- Supplier contacts, lead times, linked to Master Pantry
+
+SETTINGS — RESTAURANT PROFILE
+- Identity: name, logo, chef name, brand color
+- Kitchen Context: cuisine style, price point, target FC%
+- Regional Intelligence: city/state, local ingredients and
+  traditions (free text) — injected into every AI prompt
+  A chef in Buffalo has a different conversation than Napa.
+  The AI knows this without being told each time.
+
+AI LAYER
+- Test Kitchen / Dish Optimizer (exists — Anthropic API)
+- Sous (BOH culinary advisor — direct, practical, no mascot)
+- Ingredient Advisor (web-search enabled, region-aware)
+
+### Permanently Purged — Never Rebuild
+- Handover Log
+- Live POS Sync
+- Automatic Reservation Sync
+- Financial Smoke Detector
+- Invoice Scanning
+- Market Volatility Tracking
+- Training Dashboard
+- Hostess Chat
+- Staff shift scheduling system
+
+### Master Pantry Mandate
+All ingredient data is static and human-verified.
+No invoice scanning. No live syncing. No external data. Ever.
+
+### Build Order
+1. Remove Handover Log remnants from useKitchenState.ts and types.ts
+2. Daily Crib Sheet (print-optimized)
+3. Features Module
+4. Staff (lightweight)
+5. Event Calendar
+6. Ingredients Master Library
+7. Recipe Builder + Cost Engine
+8. Menu View
+9. Catering Module
+10. Vendor Management
+11. Sous (Chef Chat)
+12. Ingredient Advisor
+13. FDA Label (inside Recipe)
+14. Restaurant Profile / Regional Intelligence
+15. Recipe Collections + Sharing
