@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { ChefHat, Plus, Trash2, X, Check, Search, Layers, UtensilsCrossed, AlertTriangle } from 'lucide-react';
+import { ChefHat, Plus, Trash2, X, Check, Search, Layers, UtensilsCrossed, AlertTriangle, Sparkles, Loader2 } from 'lucide-react';
 import { db } from './firebaseConfig';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { useKitchenSelector } from './components/KitchenStateContext';
 import { useRecipeCategories } from './hooks/useRecipeCategories';
+import { AlertDialog } from './components/AlertDialog';
 import {
   recipeCost, costPerPortion, fcPercent, suggestedPrice, wouldCreateCycle,
 } from './lib/costEngine';
@@ -21,6 +22,67 @@ const BADGE = 'px-[8px] py-[3px] rounded-[5px] text-[10px] font-bold uppercase t
 
 const fcColor = (fc: number, target: number): string =>
   fc <= target ? 'text-emerald-400' : fc <= target + 5 ? 'text-amber-400' : 'text-red-400';
+
+const pantrySystemPrompt = (unitSystem: UnitSystem): string => `You are a professional chef proposing ingredients for a dish from a specific restaurant's Master Pantry inventory. You will receive the recipe's name, category, recipe type, and the pantry as a JSON list of { id, name }.
+
+Respond with ONLY valid JSON, no markdown, no commentary, in exactly this shape:
+{"suggestions":[{"ingredientId":"...","qty":0,"unit":"...","why":"..."}],"notInPantry":["..."]}
+
+Rules:
+- Every "ingredientId" must be copied exactly from the provided pantry list. Never invent an ingredient or an id that is not in the list.
+- Only suggest ingredients that genuinely belong in this dish.
+- "qty" is the amount of that ingredient needed for one batch of this recipe, as a plain number.
+- "unit" must be one of: ${unitSystem === 'imperial' ? '"oz", "lb", "fl oz", "qt", "each"' : '"g", "kg", "ml", "L", "each"'} — use weight units for solids, volume units for liquids, and "each" for countable items like whole shallots, eggs, or lemons.
+- "why" is one short phrase (under 8 words) naming the ingredient's role in the dish.
+- "notInPantry" lists ingredient names this dish would typically need that are not in the provided pantry list. Informational only — never invent a matching id for these.
+- If nothing in the pantry fits, return empty arrays for both fields.`;
+
+const METHOD_SYSTEM_PROMPT = `You are a professional chef writing a kitchen method (procedure) for a restaurant back-of-house team. You will receive the recipe's name, recipe type, batch yield, and its current ingredient lines with quantities.
+
+Respond with ONLY valid JSON, no markdown, no commentary, in exactly this shape:
+{"steps":["...","..."]}
+
+Rules:
+- Each entry in "steps" is one procedural step, written in plain professional kitchen prose.
+- Do not include markdown, numbering, or bullet characters in the step text — the UI numbers steps itself.
+- Be direct and specific: state temperatures, times, and techniques where relevant.
+- Cover the full batch from mise en place through finish.
+- If there are no ingredient lines yet, write general best-practice steps for a dish with this name.`;
+
+const callAi = async (system: string, userContent: string, maxTokens: number): Promise<string> => {
+  const response = await fetch('/api/ai', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      max_tokens: maxTokens,
+      system,
+      messages: [{ role: 'user', content: userContent }],
+    }),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.error?.message || `AI request failed (${response.status}).`);
+  }
+  const text = data?.content?.[0]?.text;
+  if (typeof text !== 'string' || !text.trim()) {
+    throw new Error('The AI returned an empty response.');
+  }
+  return text;
+};
+
+const parseAiJson = (text: string): any => {
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  return JSON.parse(fenced ? fenced[1] : trimmed);
+};
+
+interface PantrySuggestion {
+  key: string;
+  ingredientId: string;
+  qtyDisplay: string;
+  aiUnit: string;
+  why: string;
+}
 
 const categoryLabel = (r: Recipe, categories: RecipeCategory[]): string => {
   const cat = categories.find(c => c.id === r.categoryId);
@@ -322,6 +384,114 @@ const RecipeEditor: React.FC<{
 
   const batchYieldUnits = displayUnitsFor(form.batchYieldMeasureType, unitSystem);
 
+  const suggestionCounter = useRef(0);
+  const [pantryLoading, setPantryLoading] = useState(false);
+  const [pantryError, setPantryError] = useState<string | null>(null);
+  const [pantrySuggestions, setPantrySuggestions] = useState<PantrySuggestion[]>([]);
+  const [notInPantry, setNotInPantry] = useState<string[]>([]);
+
+  const handleBuildFromPantry = async () => {
+    setPantryLoading(true);
+    setPantryError(null);
+    try {
+      const categoryName = categories.find(c => c.id === form.categoryId)?.name || form.course.trim() || '(uncategorized)';
+      const userContent = JSON.stringify({
+        recipeName: form.name.trim() || '(untitled)',
+        category: categoryName,
+        recipeType: form.recipeType,
+        pantry: ingredients.map(i => ({ id: i.id, name: i.name })),
+      });
+      const raw = await callAi(pantrySystemPrompt(unitSystem), userContent, 1536);
+      let parsed: any;
+      try {
+        parsed = parseAiJson(raw);
+      } catch {
+        throw new Error('The AI response could not be read. Try again.');
+      }
+      const validIds = new Set(ingredients.map(i => i.id));
+      const alreadyOnRecipe = new Set(form.lines.filter(l => l.type === 'ingredient').map(l => l.refId));
+      const suggestions: PantrySuggestion[] = (Array.isArray(parsed.suggestions) ? parsed.suggestions : [])
+        .filter((s: any) => s && typeof s.ingredientId === 'string' && validIds.has(s.ingredientId) && !alreadyOnRecipe.has(s.ingredientId))
+        .map((s: any, idx: number) => ({
+          key: `${s.ingredientId}-${idx}`,
+          ingredientId: s.ingredientId as string,
+          qtyDisplay: String(s.qty ?? ''),
+          aiUnit: typeof s.unit === 'string' ? s.unit : '',
+          why: typeof s.why === 'string' ? s.why : '',
+        }));
+      setPantrySuggestions(suggestions);
+      setNotInPantry(Array.isArray(parsed.notInPantry) ? parsed.notInPantry.filter((x: any) => typeof x === 'string') : []);
+    } catch (e: any) {
+      setPantryError(e?.message || 'Could not reach the AI service.');
+    } finally {
+      setPantryLoading(false);
+    }
+  };
+
+  const acceptSuggestion = (s: PantrySuggestion) => {
+    const ing = ingredients.find(i => i.id === s.ingredientId);
+    if (!ing) return;
+    const validUnits = displayUnitsFor(ing.measureType, unitSystem) as string[];
+    const unit = (validUnits.includes(s.aiUnit) ? s.aiUnit : defaultDisplayUnit(ing.measureType, unitSystem)) as DisplayUnit;
+    suggestionCounter.current += 1;
+    addLine({
+      key: `ingredient:${s.ingredientId}:sugg-${suggestionCounter.current}`,
+      type: 'ingredient',
+      refId: s.ingredientId,
+      qtyDisplay: s.qtyDisplay,
+      qtyUnit: unit,
+      note: '',
+    });
+    setPantrySuggestions(prev => prev.filter(x => x.key !== s.key));
+  };
+
+  const dismissSuggestion = (key: string) => setPantrySuggestions(prev => prev.filter(x => x.key !== key));
+
+  const [methodLoading, setMethodLoading] = useState(false);
+  const [methodError, setMethodError] = useState<string | null>(null);
+  const [confirmReplaceMethod, setConfirmReplaceMethod] = useState(false);
+
+  const runDraftMethod = async () => {
+    setConfirmReplaceMethod(false);
+    setMethodLoading(true);
+    setMethodError(null);
+    try {
+      const lineSummaries = form.lines.map(l => {
+        const ref = l.type === 'ingredient' ? ingredients.find(i => i.id === l.refId) : recipes.find(r => r.id === l.refId);
+        return { name: ref?.name ?? 'unknown ingredient', qty: l.qtyDisplay, unit: l.qtyUnit };
+      });
+      const userContent = JSON.stringify({
+        recipeName: form.name.trim() || '(untitled)',
+        recipeType: form.recipeType,
+        batchYield: { qty: form.batchYieldQtyDisplay, unit: form.batchYieldUnit },
+        ingredients: lineSummaries,
+      });
+      const raw = await callAi(METHOD_SYSTEM_PROMPT, userContent, 1024);
+      let parsed: any;
+      try {
+        parsed = parseAiJson(raw);
+      } catch {
+        throw new Error('The AI response could not be read. Try again.');
+      }
+      const steps = Array.isArray(parsed.steps) ? parsed.steps.filter((s: any) => typeof s === 'string' && s.trim().length > 0) : [];
+      if (steps.length === 0) throw new Error('The AI did not return any method steps.');
+      setForm({ ...form, methodSteps: steps });
+    } catch (e: any) {
+      setMethodError(e?.message || 'Could not reach the AI service.');
+    } finally {
+      setMethodLoading(false);
+    }
+  };
+
+  const handleDraftMethodClick = () => {
+    const hasExisting = form.methodSteps.some(s => s.trim().length > 0);
+    if (hasExisting) {
+      setConfirmReplaceMethod(true);
+    } else {
+      runDraftMethod();
+    }
+  };
+
   return (
     <div className="bg-zinc-950 border border-zinc-800 rounded-[13px] p-[21px] space-y-[21px]">
       <div className="flex items-center gap-[8px] bg-zinc-900/60 border border-zinc-800 rounded-[8px] p-[5px] w-fit">
@@ -392,7 +562,24 @@ const RecipeEditor: React.FC<{
       </div>
 
       <div className="space-y-[8px]">
-        <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Ingredients & Sub-Recipes</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Ingredients & Sub-Recipes</h3>
+          <button
+            type="button"
+            onClick={handleBuildFromPantry}
+            disabled={pantryLoading}
+            className={`${BTN_GHOST} flex items-center gap-[5px] disabled:opacity-40 disabled:cursor-not-allowed`}
+          >
+            {pantryLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+            {pantryLoading ? 'Consulting pantry…' : 'Build From Pantry'}
+          </button>
+        </div>
+        {pantryError && (
+          <div className="bg-red-950/30 border border-red-900 rounded-[8px] p-[8px] flex items-start gap-[8px]">
+            <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0 mt-[1px]" />
+            <p className="text-[11px] text-red-300">{pantryError}</p>
+          </div>
+        )}
         <div className="space-y-[5px]">
           {form.lines.map(line => {
             const mt = lineMeasureType(line, ingredients, recipes);
@@ -435,6 +622,35 @@ const RecipeEditor: React.FC<{
             );
           })}
         </div>
+
+        {pantrySuggestions.length > 0 && (
+          <div className="space-y-[5px] bg-purple-950/10 border border-purple-900/50 rounded-[8px] p-[8px]">
+            <p className="text-[9px] font-black uppercase tracking-wider text-purple-400">AI Suggestions — Review</p>
+            {pantrySuggestions.map(s => {
+              const ing = ingredients.find(i => i.id === s.ingredientId);
+              return (
+                <div key={s.key} className="flex items-center gap-[8px] bg-zinc-900/40 border border-zinc-800 rounded-[8px] p-[8px]">
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-xs font-bold text-zinc-200 truncate">{ing?.name ?? s.ingredientId}</span>
+                    {s.why && <span className="block text-[10px] text-zinc-500 truncate">{s.why}</span>}
+                  </span>
+                  <span className="text-xs text-zinc-400 tabular-nums shrink-0">{s.qtyDisplay} {s.aiUnit}</span>
+                  <button onClick={() => acceptSuggestion(s)} className="p-[5px] text-emerald-500 hover:text-emerald-300 transition-colors duration-[144ms]" title="Accept">
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={() => dismissSuggestion(s.key)} className="p-[5px] text-zinc-600 hover:text-red-400 transition-colors duration-[144ms]" title="Dismiss">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {notInPantry.length > 0 && (
+          <p className="text-[10px] text-zinc-500 italic">Not in your pantry: {notInPantry.join(', ')}</p>
+        )}
+
         <LineSearchBox
           currentRecipeId={currentRecipeId}
           ingredients={ingredients}
@@ -446,7 +662,24 @@ const RecipeEditor: React.FC<{
       </div>
 
       <div className="space-y-[8px]">
-        <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Method</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Method</h3>
+          <button
+            type="button"
+            onClick={handleDraftMethodClick}
+            disabled={methodLoading}
+            className={`${BTN_GHOST} flex items-center gap-[5px] disabled:opacity-40 disabled:cursor-not-allowed`}
+          >
+            {methodLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+            {methodLoading ? 'Drafting…' : 'Draft Method'}
+          </button>
+        </div>
+        {methodError && (
+          <div className="bg-red-950/30 border border-red-900 rounded-[8px] p-[8px] flex items-start gap-[8px]">
+            <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0 mt-[1px]" />
+            <p className="text-[11px] text-red-300">{methodError}</p>
+          </div>
+        )}
         <div className="space-y-[5px]">
           {form.methodSteps.map((step, idx) => (
             <div key={idx} className="flex items-start gap-[8px]">
@@ -468,6 +701,16 @@ const RecipeEditor: React.FC<{
           <Plus className="w-3 h-3" /> Add Step
         </button>
       </div>
+
+      <AlertDialog
+        isOpen={confirmReplaceMethod}
+        onClose={() => setConfirmReplaceMethod(false)}
+        onConfirm={runDraftMethod}
+        title="Replace Method?"
+        confirmText="Replace"
+      >
+        This recipe already has method steps. Drafting a new method will replace them.
+      </AlertDialog>
     </div>
   );
 };

@@ -10,7 +10,9 @@ const MarkdownContent = ({ content }: { content: string }) => (
   <div className="text-xs whitespace-pre-wrap font-mono">{content}</div>
 );
 
-const SYSTEM_PROMPT = `You are a world-class executive chef and culinary director for an upscale, modern restaurant. Your expertise lies in menu engineering, flavor pairing, and innovative dish creation. You operate within the MiseOS kitchen management system, which follows a Prep-Heavy, Service-Light philosophy. Provide detailed recipes, costing analysis, or conceptual feedback as requested. Keep responses focused and actionable for a professional kitchen environment.`;
+const SYSTEM_PROMPT = `You are a professional executive chef and culinary director advising kitchen staff inside the MiseOS back-of-house system. Your expertise is menu engineering, flavor pairing, and dish development. Give direct, practical, actionable guidance.
+
+Respond in plain text only. No markdown formatting of any kind: no headers, no tables, no asterisks, no bullet or numbered-list characters. Write in plain sentences and short paragraphs — a plain-text list with each item on its own line is fine if a list is genuinely needed. Be short and direct, the way a chef talks mid-service. No flowery language, no filler.`;
 
 const TREND_CARDS = [
   { img: 'photo-1544025162-d76694265947', label: 'Protein Component', title: 'Regenerative Agriculture Proteins' },
