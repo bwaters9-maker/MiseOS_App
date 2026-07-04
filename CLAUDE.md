@@ -19,7 +19,7 @@ NODE_ENV must be set to `development` or `production` — the server throws on s
 - **Frontend:** React 19, TypeScript, Tailwind CSS v4, Vite 6
 - **Backend:** Express 4 (serves the SPA and API routes)
 - **Database:** Firebase Firestore (live `onSnapshot` listeners throughout)
-- **AI:** Anthropic API called directly from the browser in `TestKitchenHub.tsx` using `VITE_ANTHROPIC_API_KEY`
+- **AI:** Anthropic API called server-side from `server.ts` (`POST /api/ai`), proxied to by `TestKitchenHub.tsx`. The browser never sees `ANTHROPIC_API_KEY`.
 - **Animation:** Motion (Framer Motion v12)
 - **Icons:** Lucide React
 
@@ -35,10 +35,12 @@ VITE_FIREBASE_PROJECT_ID
 VITE_FIREBASE_STORAGE_BUCKET
 VITE_FIREBASE_MESSAGING_SENDER_ID
 VITE_FIREBASE_APP_ID
-VITE_ANTHROPIC_API_KEY
+ANTHROPIC_API_KEY
 ```
 
 Firebase config also accepts non-prefixed `FIREBASE_*` keys (see `src/firebaseConfig.ts`).
+
+`ANTHROPIC_API_KEY` must never carry a `VITE_` prefix — Vite embeds `VITE_*` vars into the client bundle, which would ship the key to the browser. It is read only by `server.ts`, never imported in `src/`.
 
 ## Project structure
 
@@ -58,7 +60,7 @@ src/
   EventCalendar.tsx              Event CRUD — grouped by date, upcoming/past split, feeds Crib Sheet
   PrepChecklist.tsx              Par-level deficit tracking table
   KitchenTimers.tsx              Multi-station countdown timers (Firestore-backed)
-  TestKitchenHub.tsx             AI dish optimizer (calls Anthropic API directly)
+  TestKitchenHub.tsx             AI dish optimizer (calls server-side /api/ai proxy)
   Settings.tsx                   Theme toggle + station preset CRUD
   HistoricalAlerts.tsx           Alert History view (all alerts, read-only)
   IngredientsTable.tsx           Master Pantry — static human-verified ingredient CRUD, unit conversion
@@ -162,7 +164,9 @@ Note: `useKitchenState.ts` also defines `PrepItem`, `Recipe`, and `Item86` local
 
 ## AI feature (TestKitchenHub)
 
-Calls `https://api.anthropic.com/v1/messages` directly from the browser using `anthropic-dangerous-direct-browser-calls: true`. Model is `claude-sonnet-4-6`, max 1024 tokens. The API key is `VITE_ANTHROPIC_API_KEY` — never commit it.
+The browser never talks to Anthropic directly. `TestKitchenHub.tsx` posts `{ system, messages, max_tokens }` to `POST /api/ai` on the Express server; `server.ts` calls `https://api.anthropic.com/v1/messages` server-side with `ANTHROPIC_API_KEY` (read from `process.env`, never a `VITE_` var) and relays Anthropic's JSON response back verbatim, including its `{ error: { message } }` shape on failure. Model is `claude-sonnet-4-6`, default max 1024 tokens.
+
+Any future AI feature must follow this same proxy pattern — no `fetch` to `api.anthropic.com` from `src/`, no Anthropic key in a `VITE_*` env var.
 
 ## Known pre-existing TypeScript errors
 

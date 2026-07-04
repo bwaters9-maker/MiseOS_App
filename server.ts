@@ -17,6 +17,47 @@ app.use(express.json());
 
 const PORT = 3001;
 
+const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
+
+app.post('/api/ai', async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    res.status(500).json({ error: { message: 'ANTHROPIC_API_KEY is not configured on the server.' } });
+    return;
+  }
+
+  const { system, messages, max_tokens } = req.body ?? {};
+  if (!Array.isArray(messages)) {
+    res.status(400).json({ error: { message: 'Request body must include a "messages" array.' } });
+    return;
+  }
+
+  try {
+    const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: ANTHROPIC_MODEL,
+        max_tokens: max_tokens ?? 1024,
+        ...(system ? { system } : {}),
+        messages,
+      }),
+    });
+
+    const data = await anthropicResponse.json();
+
+    // Anthropic's own error body is already { error: { message } } — forward it as-is.
+    res.status(anthropicResponse.status).json(data);
+  } catch (err) {
+    console.error('Anthropic proxy request failed:', err);
+    res.status(502).json({ error: { message: 'Failed to reach Anthropic API.' } });
+  }
+});
+
 async function startServer() {
   // Startup validation for NODE_ENV to prevent misconfiguration.
   if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'development') {
