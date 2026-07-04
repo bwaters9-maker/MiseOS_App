@@ -64,7 +64,7 @@ src/
   Settings.tsx                   Theme toggle + station preset CRUD
   HistoricalAlerts.tsx           Alert History view (all alerts, read-only)
   IngredientsTable.tsx           Master Pantry — static human-verified ingredient CRUD, unit conversion
-  RecipeSpecSheet.tsx
+  Recipes.tsx                    Recipe Builder — list (Menu Recipes / Sub-Recipes) + editor + Live Cost Analysis
 
   components/
     AppHeader.tsx                Nav bar — edit navItems[] to add/remove tabs
@@ -72,29 +72,20 @@ src/
     ErrorBoundary.tsx
     AlertDialog.tsx
     CribComponents.tsx           Shared Section wrapper
-    RecipeParser.tsx
     StationPassHeader.tsx
 
     dashboard/
       LineTimerModule.tsx
       MetricsHUD.tsx
       PrepRegistrationForm.tsx
-      RecipeBuilder.tsx
       TrendSidebar.tsx
-
-    recipes/
-      RecipeCostSummary.tsx
-      RecipeDetail.tsx
-      RecipeHeader.tsx
-      RecipeIngredientLines.tsx
-      RecipeTrendCard.tsx
 
   hooks/
     useKitchenState.ts           Firestore listeners for all collections
     useStationPresets.ts         Firestore listener for station_presets collection
 
   lib/
-    costEngine.ts                Recipe cost calculation logic + computeCostPerBaseUnit
+    costEngine.ts                recipeCost / costPerPortion / fcPercent / suggestedPrice / wouldCreateCycle + computeCostPerBaseUnit
     units.ts                     Canonical unit conversion (g/ml/each base; imperial/metric display)
 ```
 
@@ -106,14 +97,14 @@ There is no router library. Navigation is a `useState` string in `App.tsx`. The 
 2. Add an entry to `viewMap` in `App.tsx`
 3. Add a `navItems` entry in `src/components/AppHeader.tsx`
 
-Current nav tabs (in order): Crib Sheet · Features · Staff · Events · Ingredients · Prep Checklist · Kitchen Timers · Alert History · Test Kitchen · Settings
+Current nav tabs (in order): Crib Sheet · Features · Staff · Events · Ingredients · Recipes · Prep Checklist · Kitchen Timers · Alert History · Test Kitchen · Settings
 
 ## Firestore collections
 
 | Collection | Used by |
 |---|---|
 | `prepItems` | `useKitchenState`, `PrepChecklist` |
-| `recipes` | `useKitchenState`, `RecipeBuilder` |
+| `recipes` | `useKitchenState`, `Recipes.tsx` |
 | `items86` | `useKitchenState` |
 | `features` | `useKitchenState`, `Features`, `DailyCribSheet` |
 | `staff` | `useKitchenState`, `Staff`, `DailyCribSheet` |
@@ -131,7 +122,8 @@ Current nav tabs (in order): Crib Sheet · Features · Staff · Events · Ingred
 | Type | Description |
 |---|---|
 | `PrepItem` / `ProductionRun` | Prep checklist task |
-| `Recipe` | Recipe with scaling and cost |
+| `Recipe` | id, name, recipeType ('sub' \| 'menu'), course, batchYield { qty, measureType }, portions, lines: RecipeLine[], methodSteps, menuPrice?, updatedAt |
+| `RecipeLine` | A recipe component: `{ type: 'ingredient' \| 'recipe', refId, qty, note? }`. `qty` is always canonical base units. Only `recipeType: 'sub'` recipes may be referenced as a line — menu recipes never nest |
 | `Item86` / `Item86Entry` | 86'd item |
 | `PrepStation` | `'Sauté' \| 'Grill' \| 'Garde Manger' \| 'Pastry'` |
 | `Feature` | Nightly special (course, name, description, price, cost, activeFrom, activeTo, is86d) |
@@ -148,7 +140,7 @@ Current nav tabs (in order): Crib Sheet · Features · Staff · Events · Ingred
 | `Allergen` | FDA Big-9: `'milk' \| 'eggs' \| 'fish' \| 'shellfish' \| 'treeNuts' \| 'peanuts' \| 'wheat' \| 'soybeans' \| 'sesame'` |
 | `NutritionPer100g` | Optional nutrition facts stored per 100g on each Ingredient |
 
-Note: `useKitchenState.ts` also defines `PrepItem`, `Recipe`, and `Item86` locally (pre-existing duplication). The canonical definitions are in `src/types.ts`. New types belong in `src/types.ts` only.
+Note: `useKitchenState.ts` also defines `PrepItem` and `Item86` locally (pre-existing duplication). `Recipe` was de-duplicated — `useKitchenState.ts` now imports the canonical type from `src/types.ts` directly. New types belong in `src/types.ts` only.
 
 ## Design system
 
@@ -162,6 +154,17 @@ Note: `useKitchenState.ts` also defines `PrepItem`, `Recipe`, and `Item86` local
 - **Spacing:** Fibonacci-based tokens from `design-tokens.json` — use as Tailwind arbitrary values (`p-[21px]`, `gap-[34px]`, etc.)
 - No emojis. No comments explaining what code does.
 
+## Recipe Builder (Recipes.tsx)
+
+Left panel lists recipes grouped by `recipeType` first (Menu Recipes, then Sub-Recipes), and within Menu Recipes, sub-grouped by `course`. Selecting or creating a recipe opens the editor on the golden split from `design-tokens.json` (61.8% editor / 38.2% Live Cost Analysis panel).
+
+- **Menu recipes** (`recipeType: 'menu'`) are finished, sellable plates — the cost panel shows batch cost, cost/portion, an editable menu price, and FC% (color-coded against the `targetFcPercent` Settings value: emerald ≤ target, amber ≤ target+5, red above) plus a suggested price at target FC%.
+- **Sub-recipes** (`recipeType: 'sub'`) are component preparations (stocks, sauces, prep) — no menu price or FC%; the cost panel shows only batch cost and cost per canonical base unit of the batch yield.
+- Only `recipeType: 'sub'` recipes are selectable as a `RecipeLine` inside another recipe's ingredient list — menu recipes never nest. The line search box still shows a blocked candidate (self-reference or one that would create a cycle) disabled with a "Circular reference" badge, rather than hiding it.
+- Cost math lives in `src/lib/costEngine.ts`: `recipeCost` recurses through sub-recipe lines with cycle detection (throws a descriptive error if a cycle is ever hit despite the UI block), `costPerPortion`, `fcPercent`, and `suggestedPrice` are pure functions built on top of it.
+- The batch scale control (×0.5 / ×2 / custom) only scales the numbers displayed in the cost panel — it never mutates the stored recipe.
+- `targetFcPercent` (default 30) is a global setting stored the same way as `unitSystem` (React state in `App.tsx`, persisted to `localStorage`), editable in Settings under "Recipe Costing".
+
 ## AI feature (TestKitchenHub)
 
 The browser never talks to Anthropic directly. `TestKitchenHub.tsx` posts `{ system, messages, max_tokens }` to `POST /api/ai` on the Express server; `server.ts` calls `https://api.anthropic.com/v1/messages` server-side with `ANTHROPIC_API_KEY` (read from `process.env`, never a `VITE_` var) and relays Anthropic's JSON response back verbatim, including its `{ error: { message } }` shape on failure. Model is `claude-sonnet-4-6`, default max 1024 tokens.
@@ -173,12 +176,10 @@ Any future AI feature must follow this same proxy pattern — no `fetch` to `api
 `npm run lint` reports ~60 errors that predate this project. Do not fix them unless that is the stated task. Key categories:
 
 - `useKitchenState.ts` — Firestore namespace types (`FirestoreError`, `QuerySnapshot`, etc.) used as value types; should be type-only imports from `firebase/firestore`. All listeners (old and new) carry this error.
-- `RecipeBuilder.tsx` — references fields (`costPerUnit`, `name`, `unit`, `totalCost`) missing from `RecipeIngredient` and `Recipe` types
 - `PrepRegistrationForm.tsx` — `PrepItem.quantity` is `number` in `src/types.ts` but `string` in `useKitchenState.ts` (local duplicate interface mismatch)
-- `data.ts` — seed data doesn't match current type shapes
-- `utils.ts` — imports `Ingredient` which is not exported from `src/types.ts`
+- `data.ts` — seed data doesn't match current type shapes (unused/orphaned file — nothing imports its exports)
 - `main.tsx` — `document.getElementById` can return `null`
-- `@/types` path alias unresolved in several files (tsconfig path mapping issue)
+- `@/types` / `@/lib/utils` path alias unresolved in a few files (tsconfig path mapping issue) — `LineTimerModule.tsx`, `MetricsHUD.tsx`, `TrendSidebar.tsx`, `StationPassHeader.tsx`
 
 ## Orphaned / notable files
 
@@ -294,7 +295,7 @@ No invoice scanning. No live syncing. No external data. Ever.
 4. ~~Staff (lightweight)~~ ✓
 5. ~~Event Calendar~~ ✓
 6. ~~Ingredients Master Library~~ ✓
-7. Recipe Builder + Cost Engine
+7. ~~Recipe Builder + Cost Engine~~ ✓ (AI buttons — [Suggest Ingredients] / [Write Method] — still pending, land via `/api/ai`)
 8. Menu View
 9. Catering Module
 10. Vendor Management

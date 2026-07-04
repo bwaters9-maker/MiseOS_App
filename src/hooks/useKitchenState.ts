@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, onSnapshot, DocumentData, QuerySnapshot, QueryDocumentSnapshot, FirestoreError } from 'firebase/firestore';
-import type { Feature, StaffMember, KitchenEvent, KitchenAlert, CribNote, Ingredient } from '../types';
+import type { Feature, StaffMember, KitchenEvent, KitchenAlert, CribNote, Ingredient, Recipe } from '../types';
 
 // Based on firebase-blueprint.json
 export interface PrepItem {
@@ -15,17 +15,6 @@ export interface PrepItem {
   notes?: string;
   lastModified?: string;
   recipe_id: string;
-}
-
-export interface Recipe {
-  id: string;
-  name: string;
-  originalCovers: number;
-  targetCovers: number;
-  station: 'Sauté' | 'Grill' | 'Garde Manger' | 'Pastry';
-  ingredients: any[];
-  steps: any[];
-  salePrice?: number;
 }
 
 export interface Item86 {

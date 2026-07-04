@@ -1,75 +1,84 @@
 /**
  * src/lib/costEngine.ts
- * Backend logic framework for assessing real-time food cost metrics, yield expenses,
- * and market vector alerts (Seasonal data, pricing trends, and volume forecasts).
+ * Recipe and ingredient cost calculations. Pure functions, no React.
  */
 
-export type MarketTrendStatus = 'Trending' | 'Consistent' | 'Cold';
-export type PriceTrend = 'Skyrocketing' | 'Stable' | 'Dropping';
-export type Seasonality = 'Out of Season' | 'In Season';
+import { Recipe, Ingredient } from '../types';
 
-export interface MarketTrendInsight {
-  status: MarketTrendStatus;
-  priceTrend: PriceTrend;
-  seasonality: Seasonality;
-  notes: string;
-  priceBadgeStyle: string;
-  seasonBadgeStyle: string;
-}
+/**
+ * Total cost of one batch of `recipe`, recursing through sub-recipe lines.
+ * `visited` tracks the ancestor chain of the current recursion so a cycle
+ * (a recipe depending on itself, directly or through other recipes) throws
+ * instead of recursing forever.
+ */
+export const recipeCost = (
+  recipe: Recipe,
+  ingredients: Ingredient[],
+  recipes: Recipe[],
+  visited: Set<string> = new Set(),
+): number => {
+  if (visited.has(recipe.id)) {
+    throw new Error(`Circular reference detected: "${recipe.name}" includes itself as a sub-recipe, directly or through another recipe.`);
+  }
+  const nextVisited = new Set(visited);
+  nextVisited.add(recipe.id);
 
-export interface RecipeIngredientLine {
-  id?: string;
-  name: string;
-  quantity: number;
-  unit: string;
-  costPerUnit?: number;
-  purchaseUnit?: string;
-  yieldPercent?: number;
-}
+  return recipe.lines.reduce((total, line) => {
+    if (line.type === 'ingredient') {
+      const ingredient = ingredients.find(i => i.id === line.refId);
+      if (!ingredient) return total;
+      const costPerBaseUnit = computeCostPerBaseUnit(ingredient.purchaseCost, ingredient.purchaseQty, ingredient.yieldPercent);
+      return total + costPerBaseUnit * line.qty;
+    }
+    const subRecipe = recipes.find(r => r.id === line.refId);
+    if (!subRecipe) return total;
+    const subBatchCost = recipeCost(subRecipe, ingredients, recipes, nextVisited);
+    const subCostPerBaseUnit = subRecipe.batchYield.qty > 0 ? subBatchCost / subRecipe.batchYield.qty : 0;
+    return total + subCostPerBaseUnit * line.qty;
+  }, 0);
+};
 
-import { Recipe } from '../types';
+export const costPerPortion = (
+  recipe: Recipe,
+  ingredients: Ingredient[],
+  recipes: Recipe[],
+): number => {
+  const total = recipeCost(recipe, ingredients, recipes);
+  return recipe.portions > 0 ? total / recipe.portions : total;
+};
 
-export interface CostCalculationRecipe extends Omit<Recipe, 'ingredients'> {
-  ingredients?: RecipeIngredientLine[];
-  yield_quantity?: number | string;
-  menu_price?: string | number;
-  target_food_cost_percent?: string | number;
-  total_cost?: number;
-  cost_per_portion?: number;
-  food_cost_percent?: number;
-}
+export const fcPercent = (costPerPortionValue: number, menuPrice: number): number =>
+  menuPrice > 0 ? (costPerPortionValue / menuPrice) * 100 : 0;
 
-export const calculateRecipeCosts = (
-  recipe: CostCalculationRecipe,
-  ingMap: Record<string, { cost_per_usable_unit?: number }> = {}
-): CostCalculationRecipe => {
-  let totalCost = 0;
+export const suggestedPrice = (costPerPortionValue: number, targetFcPercent: number): number =>
+  targetFcPercent > 0 ? costPerPortionValue / (targetFcPercent / 100) : 0;
 
-  const ingredients = recipe.ingredients || [];
-  ingredients.forEach((ing) => {
-    const mapped = ing.id ? (ingMap[ing.id] || ingMap[`recipe:${ing.id}`]) : null;
-    const costPerUnit = mapped?.cost_per_usable_unit ?? ing.costPerUnit ?? 0;
-    const yieldPercent = ing.yieldPercent ?? 100;
+/**
+ * True if adding a line referencing `candidateSubRecipeId` inside recipe
+ * `targetRecipeId` would create a cycle — either a direct self-reference,
+ * or the candidate already depends (transitively) on the target.
+ */
+export const wouldCreateCycle = (
+  targetRecipeId: string,
+  candidateSubRecipeId: string,
+  recipes: Recipe[],
+): boolean => {
+  if (targetRecipeId === candidateSubRecipeId) return true;
+  return recipeDependsOn(candidateSubRecipeId, targetRecipeId, recipes);
+};
 
-    const yieldFactor = yieldPercent / 100;
-    const rawQty = yieldFactor > 0 ? ing.quantity / yieldFactor : ing.quantity;
-    const lineCost = rawQty * costPerUnit;
-    
-    totalCost += lineCost;
-  });
-
-  const yieldQty = Number(recipe.yield_quantity) || 1;
-  const costPerPortion = yieldQty > 0 ? totalCost / yieldQty : totalCost;
-
-  const menuPrice = Number(recipe.menu_price) || 0;
-  const foodCostPercent = menuPrice > 0 ? (costPerPortion / menuPrice) * 100 : 0;
-
-  return {
-    ...recipe,
-    total_cost: totalCost,
-    cost_per_portion: costPerPortion,
-    food_cost_percent: foodCostPercent
-  };
+const recipeDependsOn = (
+  recipeId: string,
+  targetId: string,
+  recipes: Recipe[],
+  seen: Set<string> = new Set(),
+): boolean => {
+  if (recipeId === targetId) return true;
+  if (seen.has(recipeId)) return false;
+  seen.add(recipeId);
+  const recipe = recipes.find(r => r.id === recipeId);
+  if (!recipe) return false;
+  return recipe.lines.some(line => line.type === 'recipe' && recipeDependsOn(line.refId, targetId, recipes, seen));
 };
 
 export const computeCostPerBaseUnit = (
@@ -84,53 +93,4 @@ export const computeCostPerBaseUnit = (
 export const calculateTrueCost = (apCost: number, yieldPercent: number): number => {
   if (!yieldPercent || yieldPercent <= 0) return apCost;
   return apCost / (yieldPercent / 100);
-};
-
-export const getMarketTrendInsight = (ingredientName: string): MarketTrendInsight => {
-  // Normalize checking keys
-  const name = ingredientName?.toLowerCase() || '';
-
-  // Seeded mock parameters reflecting real-world agricultural market shifts
-  if (name.includes('salmon') || name.includes('fish') || name.includes('seafood')) {
-    return {
-      status: 'Trending',
-      priceTrend: 'Skyrocketing',
-      seasonality: 'Out of Season',
-      notes: "Fuel surcharges and tight global logistics are driving cold-water freight costs up. Lock in distributor contracts now.",
-      priceBadgeStyle: 'bg-red-950 text-red-400 border-red-900',
-      seasonBadgeStyle: 'bg-amber-950 text-amber-400 border-amber-900'
-    };
-  }
-
-  if (name.includes('beef') || name.includes('ribeye') || name.includes('steak')) {
-    return {
-      status: 'Consistent',
-      priceTrend: 'Stable',
-      seasonality: 'In Season',
-      notes: "Domestic production indices are holding steady. Feed costs are flat, stabilizing current primal cut pricing.",
-      priceBadgeStyle: 'bg-zinc-900 text-zinc-400 border-zinc-800',
-      seasonBadgeStyle: 'bg-emerald-950 text-emerald-400 border-emerald-900'
-    };
-  }
-
-  if (name.includes('butter') || name.includes('dairy') || name.includes('cream')) {
-    return {
-      status: 'Cold',
-      priceTrend: 'Dropping',
-      seasonality: 'In Season',
-      notes: "Spring flush milk volumes have created a domestic surplus. Anticipate spot-market prices to lower over the next 30 days.",
-      priceBadgeStyle: 'bg-emerald-950 text-emerald-400 border-emerald-900',
-      seasonBadgeStyle: 'bg-emerald-950 text-emerald-400 border-emerald-900'
-    };
-  }
-
-  // Base Fallback for items
-  return {
-    status: 'Consistent',
-    priceTrend: 'Stable',
-    seasonality: 'In Season',
-    notes: "Market pricing tracking within historical baselines across regional distribution sheets.",
-    priceBadgeStyle: 'bg-zinc-900 text-zinc-400 border-zinc-800',
-    seasonBadgeStyle: 'bg-zinc-900 text-zinc-400 border-zinc-800'
-  };
 };

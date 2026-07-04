@@ -10,6 +10,8 @@ interface SettingsProps {
   setTheme: (theme: 'light' | 'dark') => void;
   unitSystem?: UnitSystem;
   setUnitSystem?: (u: UnitSystem) => void;
+  targetFcPercent?: number;
+  setTargetFcPercent?: (v: number) => void;
 }
 
 interface StationPreset {
@@ -17,7 +19,7 @@ interface StationPreset {
   name: string;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem = 'imperial', setUnitSystem }) => {
+export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem = 'imperial', setUnitSystem, targetFcPercent = 30, setTargetFcPercent }) => {
   const [stations, setStations] = useState<StationPreset[]>([]);
   const [newStationName, setNewStationName] = useState('');
   const [stationToDelete, setStationToDelete] = useState<StationPreset | null>(null);
@@ -133,6 +135,25 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
           >
             Metric (g · kg · ml · L)
           </button>
+        </div>
+      </div>
+
+      <div className="mt-6 bg-zinc-900/40 p-5 rounded-xl border border-zinc-800/60 shadow-md">
+        <h3 className="text-sm font-bold tracking-widest text-zinc-400 uppercase border-b border-zinc-800/80 pb-3 mb-4">
+          Recipe Costing
+        </h3>
+        <p className="text-[10px] text-zinc-600 mb-3 uppercase tracking-wider">Target food cost % used for the Recipes cost panel and suggested pricing</p>
+        <div className="flex items-center gap-3">
+          <input
+            type="number"
+            value={targetFcPercent}
+            onChange={(e) => setTargetFcPercent?.(parseFloat(e.target.value) || 0)}
+            min={1}
+            max={100}
+            step="0.5"
+            className="w-32 bg-zinc-900 border border-zinc-700 text-zinc-200 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500"
+          />
+          <span className="text-xs text-zinc-500 font-bold uppercase tracking-wider">% Target Food Cost</span>
         </div>
       </div>
 

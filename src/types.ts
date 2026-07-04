@@ -19,17 +19,38 @@ export interface PrepItem {
 }
 
 /**
+ * A single component line within a recipe — either a Master Pantry ingredient
+ * or another recipe used as a sub-recipe. `qty` is always in canonical base
+ * units (g/ml/each) matching the referenced item's measureType.
+ */
+export interface RecipeLine {
+  type: 'ingredient' | 'recipe';
+  refId: string;
+  qty: number;
+  note?: string;
+}
+
+/**
  * Represents a culinary recipe with dynamic scaling and cost analysis.
+ * Sub-recipes are first-class: a line with type 'recipe' costs at that
+ * recipe's cost per canonical base unit of its own batchYield.
+ *
+ * recipeType 'menu' is a finished, sellable plate (has menuPrice, full FC%
+ * analysis). recipeType 'sub' is a component preparation (stock, sauce,
+ * prep) — no menuPrice, and only 'sub' recipes may be referenced as a
+ * RecipeLine inside another recipe. Menu recipes never nest.
  */
 export interface Recipe {
   id: string;
   name: string;
-  originalCovers: number;
-  targetCovers: number;
-  station: 'Sauté' | 'Grill' | 'Garde Manger' | 'Pastry';
-  ingredients: any[]; // Consider defining a more specific Ingredient type
-  steps: any[]; // Consider defining a more specific Step type
-  salePrice?: number;
+  recipeType: 'sub' | 'menu';
+  course: string;
+  batchYield: { qty: number; measureType: MeasureType };
+  portions: number;
+  lines: RecipeLine[];
+  methodSteps: string[];
+  menuPrice?: number;
+  updatedAt: string;
 }
 
 /**
