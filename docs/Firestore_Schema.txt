@@ -1,4 +1,5 @@
-﻿﻿Collection: users
+﻿﻿ARCHIVED — superseded by /CLAUDE.md v3.0. Do not use as current project context.
+Collection: users
 - name (string)
 - role (string)
 - permissions (string) # Admin, Sous, Line

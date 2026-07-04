@@ -1,8 +1,0 @@
-{
-  "name": "MiseOS - The Pass",
-  "description": "An elite AI-powered back-of-house kitchen coordination console, plate costing analyzer, and real-time station pass tracker.",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
-}
