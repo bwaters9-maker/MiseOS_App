@@ -9,12 +9,14 @@ const TestKitchenHub = React.lazy(() => import('./TestKitchenHub'));
 const PrepChecklist = React.lazy(() => import('./PrepChecklist').then(m => ({ default: m.PrepChecklist })));
 const KitchenTimers = React.lazy(() => import('./KitchenTimers').then(m => ({ default: m.KitchenTimers })));
 const Settings = React.lazy(() => import('./Settings').then(m => ({ default: m.Settings })));
+const AlertHistory = React.lazy(() => import('./HistoricalAlerts').then(m => ({ default: m.HistoricalAlerts })));
 
 // --- VIEW MAPPING ---
 const viewMap: { [key: string]: React.LazyExoticComponent<React.ComponentType<any>> } = {
   dashboard: Dashboard,
   prep: PrepChecklist,
   timers: KitchenTimers,
+  'alert-history': AlertHistory,
   'test-kitchen': TestKitchenHub,
   settings: Settings,
 };

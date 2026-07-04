@@ -33,23 +33,6 @@ export interface Recipe {
 }
 
 /**
- * Represents an end-of-shift coordinating safety note.
- */
-export interface HandoverLog {
-  id: string;
-  sender: string;
-  submitted_by?: string;
-  station: string;
-  severity: 'info' | 'warning' | 'critical';
-  status?: 'pass' | 'fail' | 'incomplete';
-  message: string;
-  notes?: string;
-  items86?: string[];
-  timestamp: string;
-  resolved: boolean;
-}
-
-/**
  * Represents an 86'd (out-of-stock) item.
  */
 export interface Item86 {

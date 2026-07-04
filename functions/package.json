@@ -24,7 +24,6 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "@google/genai",
       "esbuild",
       "protobufjs"
     ]

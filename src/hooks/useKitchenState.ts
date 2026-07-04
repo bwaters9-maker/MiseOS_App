@@ -27,16 +27,6 @@ export interface Recipe {
   salePrice?: number;
 }
 
-export interface HandoverLog {
-  id: string;
-  sender: string;
-  station: string;
-  severity: 'info' | 'warning' | 'critical';
-  message: string;
-  timestamp: string;
-  resolved: boolean;
-}
-
 export interface Item86 {
   id: string;
   name: string;
@@ -48,7 +38,6 @@ export interface Item86 {
 export const useKitchenState = () => {
   const [prepItems, setPrepItems] = useState<PrepItem[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [handoverLogs, setHandoverLogs] = useState<HandoverLog[]>([]);
   const [items86, setItems86] = useState<Item86[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<FirestoreError | null>(null);
@@ -78,17 +67,6 @@ export const useKitchenState = () => {
       }
     );
 
-    const unsubHandovers = onSnapshot(
-      collection(db, 'handovers'),
-      (snapshot: QuerySnapshot<DocumentData>) => {
-        const logs = snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as HandoverLog));
-        setHandoverLogs(logs);
-      },
-      (error: FirestoreError) => {
-        setError(error);
-      }
-    );
-
     const unsub86 = onSnapshot(
       collection(db, 'items86'),
       (snapshot: QuerySnapshot<DocumentData>) => {
@@ -103,10 +81,9 @@ export const useKitchenState = () => {
     return () => {
       unsubPrep();
       unsubRecipes();
-      unsubHandovers();
       unsub86();
     };
   }, []);
 
-  return { prepItems, setPrepItems, recipes, setRecipes, handoverLogs, items86, loading, error };
+  return { prepItems, setPrepItems, recipes, setRecipes, items86, loading, error };
 };

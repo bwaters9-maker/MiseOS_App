@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { PrepItem, KitchenTimer, Recipe, HandoverLog, Item86, SubRecipe } from './types';
+import { PrepItem, KitchenTimer, Recipe, Item86, SubRecipe } from './types';
 
 export const INITIAL_PREP_ITEMS: PrepItem[] = [
   {
@@ -164,27 +164,6 @@ export const INITIAL_RECIPES: Recipe[] = [
       'Top with compound herb butter coin and serve on warmed dinner plate.'
     ],
     salePrice: 45.00
-  }
-];
-
-export const INITIAL_HANDOVERS: HandoverLog[] = [
-  {
-    id: 'h-1',
-    sender: 'Sous Chef Marco',
-    station: 'All',
-    severity: 'warning',
-    message: 'Health inspector visiting tomorrow early morning. Scrub all lowboy seals and check thermometers are calibrated.',
-    timestamp: '09:30 PM',
-    resolved: false
-  },
-  {
-    id: 'h-2',
-    sender: 'Chef de Partie Sarah',
-    station: 'Sauté',
-    severity: 'critical',
-    message: 'The Sauté induction burner #2 thermostat is overheating. Do not use for high sear, keep it for low simmers only until technician arrives Thursday!',
-    timestamp: '10:00 PM',
-    resolved: false
   }
 ];
 
