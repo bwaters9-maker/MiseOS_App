@@ -4,7 +4,7 @@ import { AppHeader } from './components/AppHeader';
 import { KitchenStateProvider } from './components/KitchenStateContext';
 
 // --- LAZY-LOADING STRUCTURE ---
-const Dashboard = React.lazy(() => import('./components/dashboard/DailyCribSheet'));
+const Dashboard = React.lazy(() => import('./DailyCribSheet'));
 const TestKitchenHub = React.lazy(() => import('./TestKitchenHub'));
 const PrepChecklist = React.lazy(() => import('./PrepChecklist').then(m => ({ default: m.PrepChecklist })));
 const KitchenTimers = React.lazy(() => import('./KitchenTimers').then(m => ({ default: m.KitchenTimers })));

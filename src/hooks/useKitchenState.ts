@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, onSnapshot, DocumentData, QuerySnapshot, QueryDocumentSnapshot, FirestoreError } from 'firebase/firestore';
+import type { Feature, StaffMember, KitchenEvent, KitchenAlert, CribNote } from '../types';
 
 // Based on firebase-blueprint.json
 export interface PrepItem {
@@ -39,6 +40,11 @@ export const useKitchenState = () => {
   const [prepItems, setPrepItems] = useState<PrepItem[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [items86, setItems86] = useState<Item86[]>([]);
+  const [features, setFeatures] = useState<Feature[]>([]);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [events, setEvents] = useState<KitchenEvent[]>([]);
+  const [alerts, setAlerts] = useState<KitchenAlert[]>([]);
+  const [cribNotes, setCribNotes] = useState<CribNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<FirestoreError | null>(null);
 
@@ -78,12 +84,57 @@ export const useKitchenState = () => {
       }
     );
 
+    const unsubFeatures = onSnapshot(
+      collection(db, 'features'),
+      (snapshot: QuerySnapshot<DocumentData>) => {
+        setFeatures(snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as Feature)));
+      },
+      (err: FirestoreError) => { setError(err); }
+    );
+
+    const unsubStaff = onSnapshot(
+      collection(db, 'staff'),
+      (snapshot: QuerySnapshot<DocumentData>) => {
+        setStaff(snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as StaffMember)));
+      },
+      (err: FirestoreError) => { setError(err); }
+    );
+
+    const unsubEvents = onSnapshot(
+      collection(db, 'events'),
+      (snapshot: QuerySnapshot<DocumentData>) => {
+        setEvents(snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as KitchenEvent)));
+      },
+      (err: FirestoreError) => { setError(err); }
+    );
+
+    const unsubAlerts = onSnapshot(
+      collection(db, 'alerts'),
+      (snapshot: QuerySnapshot<DocumentData>) => {
+        setAlerts(snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as KitchenAlert)));
+      },
+      (err: FirestoreError) => { setError(err); }
+    );
+
+    const unsubCribNotes = onSnapshot(
+      collection(db, 'crib_notes'),
+      (snapshot: QuerySnapshot<DocumentData>) => {
+        setCribNotes(snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as CribNote)));
+      },
+      (err: FirestoreError) => { setError(err); }
+    );
+
     return () => {
       unsubPrep();
       unsubRecipes();
       unsub86();
+      unsubFeatures();
+      unsubStaff();
+      unsubEvents();
+      unsubAlerts();
+      unsubCribNotes();
     };
   }, []);
 
-  return { prepItems, setPrepItems, recipes, setRecipes, items86, loading, error };
+  return { prepItems, setPrepItems, recipes, setRecipes, items86, features, staff, events, alerts, cribNotes, loading, error };
 };

@@ -7,7 +7,7 @@ interface AppHeaderProps {
 }
 
 const navItems = [
-  { view: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { view: 'dashboard', label: 'Crib Sheet', icon: LayoutDashboard },
   { view: 'prep', label: 'Prep Checklist', icon: ClipboardList },
   { view: 'timers', label: 'Kitchen Timers', icon: Clock },
   { view: 'alert-history', label: 'Alert History', icon: History },

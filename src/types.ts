@@ -60,6 +60,48 @@ export interface TrendReport {
   // Other potential properties for TrendReport
 }
 
+export interface Feature {
+  id: string;
+  course: string;
+  name: string;
+  description?: string;
+  price?: number;
+  cost?: number;
+}
+
+export interface StaffMember {
+  id: string;
+  name: string;
+  role: string;
+  station?: string;
+  clockIn?: string;
+}
+
+export interface KitchenEvent {
+  id: string;
+  title: string;
+  time?: string;
+  covers?: number;
+  notes?: string;
+  type?: string;
+}
+
+export interface KitchenAlert {
+  id: string;
+  message: string;
+  severity: 'info' | 'warning' | 'critical';
+  resolved: boolean;
+  timestamp: string;
+  station?: string;
+}
+
+export interface CribNote {
+  id: string;
+  date: string;
+  content: string;
+  author?: string;
+}
+
 /**
  * Represents an active countdown timer in the kitchen.
  */
