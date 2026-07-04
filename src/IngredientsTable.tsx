@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Package, Plus, Pencil, Trash2, X, Check, ChevronDown, ChevronUp, Search, ChevronsUpDown, AlertTriangle } from 'lucide-react';
+import { Package, Plus, Pencil, Trash2, X, Check, ChevronDown, ChevronUp, Search, ChevronsUpDown, AlertTriangle, Receipt } from 'lucide-react';
 import { db } from './firebaseConfig';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { useKitchenSelector } from './components/KitchenStateContext';
@@ -7,6 +7,7 @@ import { computeCostPerBaseUnit } from './lib/costEngine';
 import {
   toBase, fromBase, displayUnitsFor, defaultDisplayUnit, smartUnit, costPerDisplayUnit,
 } from './lib/units';
+import { InvoicePriceUpdate } from './components/ingredients/InvoicePriceUpdate';
 import type { Ingredient, IngredientCategory, MeasureType, Allergen, NutritionPer100g } from './types';
 import type { UnitSystem, DisplayUnit } from './lib/units';
 
@@ -403,6 +404,7 @@ const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) =>
   const [editForm, setEditForm] = useState<FormState>(BLANK(unitSystem));
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showInvoiceUpdate, setShowInvoiceUpdate] = useState(false);
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -501,6 +503,13 @@ const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) =>
               className="bg-zinc-900 border border-zinc-700 rounded-[8px] pl-[26px] pr-[8px] py-[8px] text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-500 placeholder-zinc-600 w-[200px]"
             />
           </div>
+          <button
+            onClick={() => setShowInvoiceUpdate(true)}
+            className={`${BTN_GHOST} flex items-center gap-[8px] whitespace-nowrap`}
+          >
+            <Receipt className="w-3.5 h-3.5" />
+            Update Prices from Invoice
+          </button>
           {!showAdd && (
             <button
               onClick={() => { setShowAdd(true); setAddForm(BLANK(unitSystem)); setEditId(null); }}
@@ -512,6 +521,12 @@ const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) =>
           )}
         </div>
       </div>
+
+      <InvoicePriceUpdate
+        isOpen={showInvoiceUpdate}
+        onClose={() => setShowInvoiceUpdate(false)}
+        ingredients={allIngredients}
+      />
 
       {hasRegionalEstimate && (
         <div className="flex items-start gap-[8px] bg-amber-950/20 border border-amber-900 rounded-[8px] px-[13px] py-[8px] mb-[21px]">

@@ -11,6 +11,7 @@ import {
 import {
   toBase, displayUnitsFor, defaultDisplayUnit, smartUnit, costPerDisplayUnit,
 } from './lib/units';
+import { callAi, parseAiJson } from './lib/ai';
 import type { Ingredient, Recipe, RecipeLine, MeasureType, RecipeCategory } from './types';
 import type { UnitSystem, DisplayUnit } from './lib/units';
 
@@ -48,33 +49,6 @@ Rules:
 - Be direct and specific: state temperatures, times, and techniques where relevant.
 - Cover the full batch from mise en place through finish.
 - If there are no ingredient lines yet, write general best-practice steps for a dish with this name.`;
-
-const callAi = async (system: string, userContent: string, maxTokens: number): Promise<string> => {
-  const response = await fetch('/api/ai', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      max_tokens: maxTokens,
-      system,
-      messages: [{ role: 'user', content: userContent }],
-    }),
-  });
-  const data = await response.json().catch(() => null);
-  if (!response.ok) {
-    throw new Error(data?.error?.message || `AI request failed (${response.status}).`);
-  }
-  const text = data?.content?.[0]?.text;
-  if (typeof text !== 'string' || !text.trim()) {
-    throw new Error('The AI returned an empty response.');
-  }
-  return text;
-};
-
-const parseAiJson = (text: string): any => {
-  const trimmed = text.trim();
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-  return JSON.parse(fenced ? fenced[1] : trimmed);
-};
 
 interface PantrySuggestion {
   key: string;
@@ -401,7 +375,7 @@ const RecipeEditor: React.FC<{
         recipeType: form.recipeType,
         pantry: ingredients.map(i => ({ id: i.id, name: i.name })),
       });
-      const raw = await callAi(pantrySystemPrompt(unitSystem), userContent, 1536);
+      const raw = await callAi(pantrySystemPrompt(unitSystem), userContent, 2048);
       let parsed: any;
       try {
         parsed = parseAiJson(raw);
@@ -466,7 +440,7 @@ const RecipeEditor: React.FC<{
         batchYield: { qty: form.batchYieldQtyDisplay, unit: form.batchYieldUnit },
         ingredients: lineSummaries,
       });
-      const raw = await callAi(METHOD_SYSTEM_PROMPT, userContent, 1024);
+      const raw = await callAi(METHOD_SYSTEM_PROMPT, userContent, 2048);
       let parsed: any;
       try {
         parsed = parseAiJson(raw);

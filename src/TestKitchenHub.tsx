@@ -58,7 +58,7 @@ export default function TestKitchenHub() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          max_tokens: 1024,
+          max_tokens: 2048,
           system: SYSTEM_PROMPT,
           messages: updatedMessages.map(msg => ({
             role: msg.role === 'model' ? 'assistant' : 'user',
