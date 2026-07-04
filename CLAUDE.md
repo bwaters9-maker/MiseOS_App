@@ -52,17 +52,25 @@ src/
   data.ts                        Static seed/mock data
   utils.ts                       Helpers (formatDuration, etc.)
 
+  DailyCribSheet.tsx             Crib Sheet view — five sections, print-optimized
+  PrepChecklist.tsx              Par-level deficit tracking table
+  KitchenTimers.tsx              Multi-station countdown timers (Firestore-backed)
+  TestKitchenHub.tsx             AI dish optimizer (calls Anthropic API directly)
+  Settings.tsx                   Theme toggle + station preset CRUD
+  HistoricalAlerts.tsx           Alert History view (all alerts, read-only)
+  IngredientsTable.tsx
+  RecipeSpecSheet.tsx
+
   components/
     AppHeader.tsx                Nav bar — edit navItems[] to add/remove tabs
     KitchenStateContext.tsx      React context wrapping KitchenStateProvider
     ErrorBoundary.tsx
     AlertDialog.tsx
-    CribComponents.tsx           Shared Section wrapper used by DailyCribSheet
+    CribComponents.tsx           Shared Section wrapper
     RecipeParser.tsx
     StationPassHeader.tsx
 
     dashboard/
-      DailyCribSheet.tsx         Main dashboard view (loaded as "dashboard" route)
       LineTimerModule.tsx
       MetricsHUD.tsx
       PrepRegistrationForm.tsx
@@ -80,22 +88,11 @@ src/
       RecipeTrendCard.tsx
 
   hooks/
-    useKitchenState.ts           Firestore listeners for prepItems, recipes, items86
+    useKitchenState.ts           Firestore listeners for all collections
     useStationPresets.ts         Firestore listener for station_presets collection
 
   lib/
     costEngine.ts                Recipe cost calculation logic
-
-  PrepChecklist.tsx              Par-level deficit tracking table
-  KitchenTimers.tsx              Multi-station countdown timers (Firestore-backed)
-  TestKitchenHub.tsx             AI dish optimizer (calls Anthropic API directly)
-  Settings.tsx                   Theme toggle + station preset CRUD
-  Dashboard.tsx                  ** ORPHANED — not imported anywhere, see notes below
-  HistoricalAlerts.tsx
-  IngredientsTable.tsx
-  RecipeSpecSheet.tsx
-  ShiftHandoverLog.tsx           ** DELETED
-  HandoverLog.tsx                ** DELETED
 ```
 
 ## Navigation / routing
@@ -106,17 +103,42 @@ There is no router library. Navigation is a `useState` string in `App.tsx`. The 
 2. Add an entry to `viewMap` in `App.tsx`
 3. Add a `navItems` entry in `src/components/AppHeader.tsx`
 
+Current nav tabs (in order): Crib Sheet · Prep Checklist · Kitchen Timers · Alert History · Test Kitchen · Settings
+
 ## Firestore collections
 
 | Collection | Used by |
 |---|---|
-| `prepItems` | `useKitchenState` |
+| `prepItems` | `useKitchenState`, `PrepChecklist` |
 | `recipes` | `useKitchenState`, `RecipeBuilder` |
 | `items86` | `useKitchenState` |
-| `handovers` | `useKitchenState` (listener still exists, feature removed) |
+| `features` | `useKitchenState`, `DailyCribSheet` |
+| `staff` | `useKitchenState`, `DailyCribSheet` |
+| `events` | `useKitchenState`, `DailyCribSheet` |
+| `alerts` | `useKitchenState`, `DailyCribSheet`, `HistoricalAlerts` |
+| `crib_notes` | `useKitchenState`, `DailyCribSheet` |
 | `timers` | `KitchenTimers.tsx` |
 | `station_presets` | `useStationPresets`, `Settings.tsx`, `KitchenTimers.tsx` |
-| `handover_logs` | Removed (was written by `HandoverLog.tsx`) |
+
+`alerts`: crib sheet shows `resolved === false` only; Alert History shows all.
+
+## Canonical types (`src/types.ts`)
+
+| Type | Description |
+|---|---|
+| `PrepItem` / `ProductionRun` | Prep checklist task |
+| `Recipe` | Recipe with scaling and cost |
+| `Item86` / `Item86Entry` | 86'd item |
+| `PrepStation` | `'Sauté' \| 'Grill' \| 'Garde Manger' \| 'Pastry'` |
+| `Feature` | Nightly special (course, name, price, cost) |
+| `StaffMember` | Staff on today (name, role, station, clockIn) |
+| `KitchenEvent` | Event (title, time, covers, notes) |
+| `KitchenAlert` | Alert (message, severity, resolved, timestamp) |
+| `CribNote` | Freeform crib note (date, content, author) |
+| `KitchenTimer` | Countdown timer |
+| `TrendReport` | Recipe trend scores |
+
+Note: `useKitchenState.ts` also defines `PrepItem`, `Recipe`, and `Item86` locally (pre-existing duplication). The canonical definitions are in `src/types.ts`. New types belong in `src/types.ts` only.
 
 ## Design system
 
@@ -127,6 +149,7 @@ There is no router library. Navigation is a `useState` string in `App.tsx`. The 
 - **Danger:** `red-400` / `red-950`
 - **Font:** `font-mono` throughout; `font-black` + `uppercase` + `tracking-wider` for headings
 - **Cards:** `bg-zinc-950 border border-zinc-800 rounded-xl`
+- **Spacing:** Fibonacci-based tokens from `design-tokens.json` — use as Tailwind arbitrary values (`p-[21px]`, `gap-[34px]`, etc.)
 - No emojis. No comments explaining what code does.
 
 ## AI feature (TestKitchenHub)
@@ -137,20 +160,18 @@ Calls `https://api.anthropic.com/v1/messages` directly from the browser using `a
 
 `npm run lint` reports ~60 errors that predate this project. Do not fix them unless that is the stated task. Key categories:
 
-- `useKitchenState.ts` — Firestore namespace types (`FirestoreError`, `QuerySnapshot`, etc.) used as value types; they should be imported from `firebase/firestore` as type-only imports
+- `useKitchenState.ts` — Firestore namespace types (`FirestoreError`, `QuerySnapshot`, etc.) used as value types; should be type-only imports from `firebase/firestore`. All listeners (old and new) carry this error.
 - `RecipeBuilder.tsx` — references fields (`costPerUnit`, `name`, `unit`, `totalCost`) missing from `RecipeIngredient` and `Recipe` types
-- `PrepRegistrationForm.tsx` — `PrepItem.quantity` is `number` in `src/types.ts` but `string` in `useKitchenState.ts` (duplicate interface)
+- `PrepRegistrationForm.tsx` — `PrepItem.quantity` is `number` in `src/types.ts` but `string` in `useKitchenState.ts` (local duplicate interface mismatch)
 - `data.ts` — seed data doesn't match current type shapes
 - `utils.ts` / `IngredientsTable.tsx` — import `Ingredient` which is not exported from `src/types.ts`
 - `main.tsx` — `document.getElementById` can return `null`
-- `DailyCribSheet.tsx` — `groupedPrep` inferred as `{}` instead of `Record<string, ProductionRun[]>`
-- `@/types` path alias unresolved in some files (tsconfig path mapping issue)
+- `@/types` path alias unresolved in several files (tsconfig path mapping issue)
 
 ## Orphaned / notable files
 
-- **`src/Dashboard.tsx`** — a `DashboardView` component that is never imported. `App.tsx` loads `DailyCribSheet` directly as the dashboard view. This file is dead code.
-- **`useKitchenState.ts`** — still subscribes to the `handovers` Firestore collection and returns `handoverLogs`, but nothing consumes it since the Handover Log feature was removed. The listener runs but is harmless.
-- **`src/types.ts`** still exports `HandoverLog` interface — leftover from the removed feature, harmless.
+Several component files exist at both `src/*.tsx` (root) and `src/components/*.tsx`. App.tsx imports from `src/components/`. The root-level duplicates (`src/AlertDialog.tsx`, `src/AppHeader.tsx`, `src/CribComponents.tsx`, `src/ErrorBoundary.tsx`) are orphaned copies and are never imported.
+
 ---
 
 ## Product Vision & Standards
@@ -188,8 +209,7 @@ path in BrainDumpModule.jsx."
 ### Approved Feature Map
 
 DAILY OPERATIONS
-- Dashboard (86'd items, features tonight, events snapshot)
-- Daily Crib Sheet (print-optimized — morning review + printable)
+- Dashboard / Crib Sheet (86'd items, features tonight, events snapshot — print-optimized)
 - Kitchen Timers (multi-station)
 - Alert History
 
@@ -256,8 +276,8 @@ All ingredient data is static and human-verified.
 No invoice scanning. No live syncing. No external data. Ever.
 
 ### Build Order
-1. Remove Handover Log remnants from useKitchenState.ts and types.ts
-2. Daily Crib Sheet (print-optimized)
+1. ~~Remove Handover Log remnants from useKitchenState.ts and types.ts~~ ✓
+2. ~~Daily Crib Sheet (print-optimized)~~ ✓
 3. Features Module
 4. Staff (lightweight)
 5. Event Calendar
