@@ -61,7 +61,7 @@ src/
   TestKitchenHub.tsx             AI dish optimizer (calls Anthropic API directly)
   Settings.tsx                   Theme toggle + station preset CRUD
   HistoricalAlerts.tsx           Alert History view (all alerts, read-only)
-  IngredientsTable.tsx
+  IngredientsTable.tsx           Master Pantry — static human-verified ingredient CRUD, unit conversion
   RecipeSpecSheet.tsx
 
   components/
@@ -80,9 +80,6 @@ src/
       RecipeBuilder.tsx
       TrendSidebar.tsx
 
-    ingredients/
-      IngredientForm.tsx
-
     recipes/
       RecipeCostSummary.tsx
       RecipeDetail.tsx
@@ -95,7 +92,8 @@ src/
     useStationPresets.ts         Firestore listener for station_presets collection
 
   lib/
-    costEngine.ts                Recipe cost calculation logic
+    costEngine.ts                Recipe cost calculation logic + computeCostPerBaseUnit
+    units.ts                     Canonical unit conversion (g/ml/each base; imperial/metric display)
 ```
 
 ## Navigation / routing
@@ -106,7 +104,7 @@ There is no router library. Navigation is a `useState` string in `App.tsx`. The 
 2. Add an entry to `viewMap` in `App.tsx`
 3. Add a `navItems` entry in `src/components/AppHeader.tsx`
 
-Current nav tabs (in order): Crib Sheet · Features · Staff · Events · Prep Checklist · Kitchen Timers · Alert History · Test Kitchen · Settings
+Current nav tabs (in order): Crib Sheet · Features · Staff · Events · Ingredients · Prep Checklist · Kitchen Timers · Alert History · Test Kitchen · Settings
 
 ## Firestore collections
 
@@ -122,6 +120,7 @@ Current nav tabs (in order): Crib Sheet · Features · Staff · Events · Prep C
 | `crib_notes` | `useKitchenState`, `DailyCribSheet` |
 | `timers` | `KitchenTimers.tsx` |
 | `station_presets` | `useStationPresets`, `Settings.tsx`, `KitchenTimers.tsx` |
+| `ingredients` | `useKitchenState`, `IngredientsTable.tsx` |
 
 `alerts`: crib sheet shows `resolved === false` only; Alert History shows all.
 
@@ -141,6 +140,11 @@ Current nav tabs (in order): Crib Sheet · Features · Staff · Events · Prep C
 | `CribNote` | Freeform crib note (date, content, author) |
 | `KitchenTimer` | Countdown timer |
 | `TrendReport` | Recipe trend scores |
+| `Ingredient` | Master Pantry item (name, category, measureType, purchaseCost, purchaseQty, yieldPercent, nutrition, allergens) |
+| `IngredientCategory` | `'Produce' \| 'Protein' \| 'Dairy' \| 'Dry Goods' \| 'Frozen' \| 'Beverage' \| 'Other'` |
+| `MeasureType` | `'weight' \| 'volume' \| 'each'` — determines base unit (g, ml, each) |
+| `Allergen` | FDA Big-9: `'milk' \| 'eggs' \| 'fish' \| 'shellfish' \| 'treeNuts' \| 'peanuts' \| 'wheat' \| 'soybeans' \| 'sesame'` |
+| `NutritionPer100g` | Optional nutrition facts stored per 100g on each Ingredient |
 
 Note: `useKitchenState.ts` also defines `PrepItem`, `Recipe`, and `Item86` locally (pre-existing duplication). The canonical definitions are in `src/types.ts`. New types belong in `src/types.ts` only.
 
@@ -168,7 +172,7 @@ Calls `https://api.anthropic.com/v1/messages` directly from the browser using `a
 - `RecipeBuilder.tsx` — references fields (`costPerUnit`, `name`, `unit`, `totalCost`) missing from `RecipeIngredient` and `Recipe` types
 - `PrepRegistrationForm.tsx` — `PrepItem.quantity` is `number` in `src/types.ts` but `string` in `useKitchenState.ts` (local duplicate interface mismatch)
 - `data.ts` — seed data doesn't match current type shapes
-- `utils.ts` / `IngredientsTable.tsx` — import `Ingredient` which is not exported from `src/types.ts`
+- `utils.ts` — imports `Ingredient` which is not exported from `src/types.ts`
 - `main.tsx` — `document.getElementById` can return `null`
 - `@/types` path alias unresolved in several files (tsconfig path mapping issue)
 
@@ -285,7 +289,7 @@ No invoice scanning. No live syncing. No external data. Ever.
 3. ~~Features Module~~ ✓
 4. ~~Staff (lightweight)~~ ✓
 5. ~~Event Calendar~~ ✓
-6. Ingredients Master Library
+6. ~~Ingredients Master Library~~ ✓
 7. Recipe Builder + Cost Engine
 8. Menu View
 9. Catering Module
