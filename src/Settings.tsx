@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Sun, Moon, Trash2, PlusCircle, AlertTriangle, Pencil, Check, X } from 'lucide-react';
+import { Settings as SettingsIcon, Sun, Moon, Trash2, PlusCircle, AlertTriangle, Pencil, Check, X, Scale } from 'lucide-react';
+import type { UnitSystem } from './lib/units';
 import { db } from './firebaseConfig';
 import { collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy, updateDoc } from 'firebase/firestore';
 import { AlertDialog } from './components/AlertDialog';
@@ -7,6 +8,8 @@ import { AlertDialog } from './components/AlertDialog';
 interface SettingsProps {
   theme: 'light' | 'dark';
   setTheme: (theme: 'light' | 'dark') => void;
+  unitSystem?: UnitSystem;
+  setUnitSystem?: (u: UnitSystem) => void;
 }
 
 interface StationPreset {
@@ -14,7 +17,7 @@ interface StationPreset {
   name: string;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ theme, setTheme }) => {
+export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem = 'imperial', setUnitSystem }) => {
   const [stations, setStations] = useState<StationPreset[]>([]);
   const [newStationName, setNewStationName] = useState('');
   const [stationToDelete, setStationToDelete] = useState<StationPreset | null>(null);
@@ -99,6 +102,36 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme }) => {
           >
             <Moon className="w-4 h-4" />
             Dark
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-6 bg-zinc-900/40 p-5 rounded-xl border border-zinc-800/60 shadow-md">
+        <h3 className="text-sm font-bold tracking-widest text-zinc-400 uppercase border-b border-zinc-800/80 pb-3 mb-4 flex items-center gap-2">
+          <Scale className="w-4 h-4" />
+          Display Units
+        </h3>
+        <p className="text-[10px] text-zinc-600 mb-3 uppercase tracking-wider">Used throughout the app for ingredient quantities and costs</p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setUnitSystem?.('imperial')}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-wider border transition-colors ${
+              unitSystem === 'imperial'
+                ? 'bg-emerald-700 text-white border-emerald-600'
+                : 'bg-zinc-800/50 text-zinc-400 border-zinc-700 hover:bg-zinc-700/50 hover:text-zinc-200'
+            }`}
+          >
+            Imperial (oz · lb · fl oz · qt)
+          </button>
+          <button
+            onClick={() => setUnitSystem?.('metric')}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-wider border transition-colors ${
+              unitSystem === 'metric'
+                ? 'bg-emerald-700 text-white border-emerald-600'
+                : 'bg-zinc-800/50 text-zinc-400 border-zinc-700 hover:bg-zinc-700/50 hover:text-zinc-200'
+            }`}
+          >
+            Metric (g · kg · ml · L)
           </button>
         </div>
       </div>

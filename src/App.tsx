@@ -2,12 +2,14 @@ import React, { Suspense, useState, useEffect } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AppHeader } from './components/AppHeader';
 import { KitchenStateProvider } from './components/KitchenStateContext';
+import type { UnitSystem } from './lib/units';
 
 // --- LAZY-LOADING STRUCTURE ---
 const Dashboard = React.lazy(() => import('./DailyCribSheet'));
 const FeaturesView = React.lazy(() => import('./Features'));
 const StaffView = React.lazy(() => import('./Staff'));
 const EventsView = React.lazy(() => import('./EventCalendar'));
+const IngredientsView = React.lazy(() => import('./IngredientsTable'));
 const TestKitchenHub = React.lazy(() => import('./TestKitchenHub'));
 const PrepChecklist = React.lazy(() => import('./PrepChecklist').then(m => ({ default: m.PrepChecklist })));
 const KitchenTimers = React.lazy(() => import('./KitchenTimers').then(m => ({ default: m.KitchenTimers })));
@@ -20,6 +22,7 @@ const viewMap: { [key: string]: React.LazyExoticComponent<React.ComponentType<an
   features: FeaturesView,
   staff: StaffView,
   events: EventsView,
+  ingredients: IngredientsView,
   prep: PrepChecklist,
   timers: KitchenTimers,
   'alert-history': AlertHistory,
@@ -37,6 +40,14 @@ const ActiveViewRenderer = ({ view, ...props }: { view: string; [key: string]: a
 export default function App() {
   const [activeView, setActiveView] = useState('dashboard');
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+  const [unitSystem, setUnitSystemRaw] = useState<UnitSystem>(
+    () => (localStorage.getItem('miseos_unit_system') as UnitSystem | null) ?? 'imperial'
+  );
+
+  const setUnitSystem = (u: UnitSystem) => {
+    localStorage.setItem('miseos_unit_system', u);
+    setUnitSystemRaw(u);
+  };
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -51,7 +62,13 @@ export default function App() {
         <main className="py-6">
           <ErrorBoundary>
             <Suspense fallback={<div className="p-12 text-center text-sm text-zinc-500">Loading...</div>}>
-              <ActiveViewRenderer view={activeView} theme={theme} setTheme={setTheme} />
+              <ActiveViewRenderer
+                view={activeView}
+                theme={theme}
+                setTheme={setTheme}
+                unitSystem={unitSystem}
+                setUnitSystem={setUnitSystem}
+              />
             </Suspense>
           </ErrorBoundary>
         </main>

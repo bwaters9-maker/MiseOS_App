@@ -83,6 +83,39 @@ export interface StaffMember {
 
 export type EventType = 'Private Dining' | 'Buyout' | 'Special Event';
 
+export type IngredientCategory = 'Produce' | 'Protein' | 'Dairy' | 'Dry Goods' | 'Frozen' | 'Beverage' | 'Other';
+export type MeasureType = 'weight' | 'volume' | 'each';
+export type Allergen = 'milk' | 'eggs' | 'fish' | 'shellfish' | 'treeNuts' | 'peanuts' | 'wheat' | 'soybeans' | 'sesame';
+
+export interface NutritionPer100g {
+  calories?: number;
+  totalFat?: number;
+  saturatedFat?: number;
+  transFat?: number;
+  cholesterol?: number;
+  sodium?: number;
+  totalCarbs?: number;
+  fiber?: number;
+  sugars?: number;
+  addedSugars?: number;
+  protein?: number;
+}
+
+export interface Ingredient {
+  id: string;
+  name: string;
+  category: IngredientCategory;
+  measureType: MeasureType;
+  purchaseUnit: string;
+  purchaseCost: number;
+  purchaseQty: number;
+  yieldPercent: number;
+  nutritionPer100g?: NutritionPer100g;
+  allergens?: Allergen[];
+  vendorId?: string;
+  lastVerified: string;
+}
+
 export interface KitchenEvent {
   id: string;
   title: string;

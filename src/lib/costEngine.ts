@@ -72,6 +72,15 @@ export const calculateRecipeCosts = (
   };
 };
 
+export const computeCostPerBaseUnit = (
+  purchaseCost: number,
+  purchaseQty: number,
+  yieldPercent: number,
+): number => {
+  if (purchaseQty <= 0 || yieldPercent <= 0) return 0;
+  return purchaseCost / (purchaseQty * (yieldPercent / 100));
+};
+
 export const calculateTrueCost = (apCost: number, yieldPercent: number): number => {
   if (!yieldPercent || yieldPercent <= 0) return apCost;
   return apCost / (yieldPercent / 100);
