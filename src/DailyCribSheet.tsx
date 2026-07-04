@@ -35,6 +35,8 @@ const DailyCribSheet: React.FC = () => {
     return true;
   });
 
+  const todayStaff = staff.filter(s => s.date === todayStr);
+
   const activeAlerts = alerts.filter(a => !a.resolved);
   const hasCritical  = activeAlerts.some(a => a.severity === 'critical');
 
@@ -130,11 +132,11 @@ const DailyCribSheet: React.FC = () => {
               <Users className="w-3.5 h-3.5" />
               Staff On Today
             </h2>
-            {staff.length === 0 ? (
+            {todayStaff.length === 0 ? (
               <p className={EMPTY}>No staff scheduled.</p>
             ) : (
               <div>
-                {staff.map(s => (
+                {todayStaff.map(s => (
                   <div key={s.id} className={ROW}>
                     <div className="flex items-baseline gap-[13px]">
                       <span className="font-bold text-zinc-100">{s.name}</span>

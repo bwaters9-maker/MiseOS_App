@@ -76,8 +76,9 @@ export interface StaffMember {
   id: string;
   name: string;
   role: string;
-  station?: string;
+  station?: PrepStation;
   clockIn?: string;
+  date?: string;
 }
 
 export interface KitchenEvent {

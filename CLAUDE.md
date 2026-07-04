@@ -54,6 +54,7 @@ src/
 
   DailyCribSheet.tsx             Crib Sheet view — five sections, print-optimized
   Features.tsx                   Nightly specials CRUD — 86 toggle syncs to Crib Sheet live
+  Staff.tsx                      Today's roster CRUD — date-filtered, feeds Crib Sheet only
   PrepChecklist.tsx              Par-level deficit tracking table
   KitchenTimers.tsx              Multi-station countdown timers (Firestore-backed)
   TestKitchenHub.tsx             AI dish optimizer (calls Anthropic API directly)
@@ -104,7 +105,7 @@ There is no router library. Navigation is a `useState` string in `App.tsx`. The 
 2. Add an entry to `viewMap` in `App.tsx`
 3. Add a `navItems` entry in `src/components/AppHeader.tsx`
 
-Current nav tabs (in order): Crib Sheet · Features · Prep Checklist · Kitchen Timers · Alert History · Test Kitchen · Settings
+Current nav tabs (in order): Crib Sheet · Features · Staff · Prep Checklist · Kitchen Timers · Alert History · Test Kitchen · Settings
 
 ## Firestore collections
 
@@ -114,7 +115,7 @@ Current nav tabs (in order): Crib Sheet · Features · Prep Checklist · Kitchen
 | `recipes` | `useKitchenState`, `RecipeBuilder` |
 | `items86` | `useKitchenState` |
 | `features` | `useKitchenState`, `Features`, `DailyCribSheet` |
-| `staff` | `useKitchenState`, `DailyCribSheet` |
+| `staff` | `useKitchenState`, `Staff`, `DailyCribSheet` |
 | `events` | `useKitchenState`, `DailyCribSheet` |
 | `alerts` | `useKitchenState`, `DailyCribSheet`, `HistoricalAlerts` |
 | `crib_notes` | `useKitchenState`, `DailyCribSheet` |
@@ -132,7 +133,7 @@ Current nav tabs (in order): Crib Sheet · Features · Prep Checklist · Kitchen
 | `Item86` / `Item86Entry` | 86'd item |
 | `PrepStation` | `'Sauté' \| 'Grill' \| 'Garde Manger' \| 'Pastry'` |
 | `Feature` | Nightly special (course, name, description, price, cost, activeFrom, activeTo, is86d) |
-| `StaffMember` | Staff on today (name, role, station, clockIn) |
+| `StaffMember` | Staff on today (name, role, station: PrepStation, clockIn, date) |
 | `KitchenEvent` | Event (title, time, covers, notes) |
 | `KitchenAlert` | Alert (message, severity, resolved, timestamp) |
 | `CribNote` | Freeform crib note (date, content, author) |
@@ -280,7 +281,7 @@ No invoice scanning. No live syncing. No external data. Ever.
 1. ~~Remove Handover Log remnants from useKitchenState.ts and types.ts~~ ✓
 2. ~~Daily Crib Sheet (print-optimized)~~ ✓
 3. ~~Features Module~~ ✓
-4. Staff (lightweight)
+4. ~~Staff (lightweight)~~ ✓
 5. Event Calendar
 6. Ingredients Master Library
 7. Recipe Builder + Cost Engine
