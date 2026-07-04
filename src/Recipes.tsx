@@ -366,7 +366,7 @@ const RecipeEditor: React.FC<{
 
       <div className={`grid grid-cols-1 ${form.recipeType === 'menu' ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-[13px]`}>
         <div>
-          <label className={FIELD_LABEL}>Yield Type</label>
+          <label className={FIELD_LABEL}>Measurement Type</label>
           <select value={form.batchYieldMeasureType} onChange={e => handleBatchMeasureTypeChange(e.target.value as MeasureType)} className={INPUT}>
             <option value="weight">Weight</option>
             <option value="volume">Volume</option>
@@ -374,11 +374,11 @@ const RecipeEditor: React.FC<{
           </select>
         </div>
         <div>
-          <label className={FIELD_LABEL}>Batch Yield</label>
+          <label className={FIELD_LABEL}>Amount</label>
           <input type="number" value={form.batchYieldQtyDisplay} onChange={e => set('batchYieldQtyDisplay', e.target.value)} placeholder="0" min="0" step="any" className={INPUT} />
         </div>
         <div>
-          <label className={FIELD_LABEL}>Unit</label>
+          <label className={FIELD_LABEL}>Measurement Unit</label>
           <select value={form.batchYieldUnit} onChange={e => set('batchYieldUnit', e.target.value as DisplayUnit)} className={INPUT} disabled={form.batchYieldMeasureType === 'each'}>
             {batchYieldUnits.map(u => <option key={u} value={u}>{u}</option>)}
           </select>
