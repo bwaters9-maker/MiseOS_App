@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Package, Plus, Pencil, Trash2, X, Check, ChevronDown, ChevronUp, Search, ChevronsUpDown } from 'lucide-react';
+import { Package, Plus, Pencil, Trash2, X, Check, ChevronDown, ChevronUp, Search, ChevronsUpDown, AlertTriangle } from 'lucide-react';
 import { db } from './firebaseConfig';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { useKitchenSelector } from './components/KitchenStateContext';
@@ -10,22 +10,29 @@ import {
 import type { Ingredient, IngredientCategory, MeasureType, Allergen, NutritionPer100g } from './types';
 import type { UnitSystem, DisplayUnit } from './lib/units';
 
-const CATEGORIES: IngredientCategory[] = ['Produce', 'Protein', 'Dairy', 'Dry Goods', 'Frozen', 'Beverage', 'Other'];
-const ALL_ALLERGENS: Allergen[] = ['milk', 'eggs', 'fish', 'shellfish', 'treeNuts', 'peanuts', 'wheat', 'soybeans', 'sesame'];
+const CATEGORIES: IngredientCategory[] = ['Produce', 'Protein', 'Dairy', 'Dry Goods', 'Frozen', 'Beverage', 'Other', 'Spices', 'Oils & Fats', 'Sauces', 'Beverages', 'Bakery'];
+const FDA_BIG_9: Allergen[] = ['milk', 'eggs', 'fish', 'shellfish', 'treeNuts', 'peanuts', 'wheat', 'soybeans', 'sesame'];
+const ADDITIONAL_DISCLOSURES: Allergen[] = ['gluten', 'sulfites'];
 
 const ALLERGEN_LABELS: Record<Allergen, string> = {
   milk: 'Milk', eggs: 'Eggs', fish: 'Fish', shellfish: 'Shellfish',
   treeNuts: 'Tree Nuts', peanuts: 'Peanuts', wheat: 'Wheat', soybeans: 'Soybeans', sesame: 'Sesame',
+  gluten: 'Gluten', sulfites: 'Sulfites',
 };
 
 const CATEGORY_STYLE: Record<IngredientCategory, string> = {
-  Produce:    'text-emerald-300 border-emerald-900 bg-emerald-950/30',
-  Protein:    'text-red-300    border-red-900    bg-red-950/30',
-  Dairy:      'text-blue-300   border-blue-900   bg-blue-950/30',
-  'Dry Goods':'text-amber-300  border-amber-900  bg-amber-950/30',
-  Frozen:     'text-cyan-300   border-cyan-900   bg-cyan-950/30',
-  Beverage:   'text-purple-300 border-purple-900 bg-purple-950/30',
-  Other:      'text-zinc-400   border-zinc-700   bg-zinc-900/30',
+  Produce:      'text-emerald-300 border-emerald-900 bg-emerald-950/30',
+  Protein:      'text-red-300     border-red-900     bg-red-950/30',
+  Dairy:        'text-blue-300    border-blue-900    bg-blue-950/30',
+  'Dry Goods':  'text-amber-300   border-amber-900   bg-amber-950/30',
+  Frozen:       'text-cyan-300    border-cyan-900    bg-cyan-950/30',
+  Beverage:     'text-purple-300  border-purple-900  bg-purple-950/30',
+  Other:        'text-zinc-400    border-zinc-700    bg-zinc-900/30',
+  Spices:       'text-orange-300  border-orange-900  bg-orange-950/30',
+  'Oils & Fats':'text-yellow-300  border-yellow-900  bg-yellow-950/30',
+  Sauces:       'text-pink-300    border-pink-900    bg-pink-950/30',
+  Beverages:    'text-indigo-300  border-indigo-900  bg-indigo-950/30',
+  Bakery:       'text-lime-300    border-lime-900    bg-lime-950/30',
 };
 
 interface FormState {
@@ -107,6 +114,7 @@ const toDoc = (f: FormState): Omit<Ingredient, 'id'> => {
     ...(Object.keys(nutrition).length > 0 && { nutritionPer100g: nutrition }),
     ...(f.allergens.length > 0 && { allergens: f.allergens }),
     lastVerified: new Date().toISOString().slice(0, 10),
+    priceSource: 'manual',
   };
 };
 
@@ -173,23 +181,44 @@ const NutritionAllergenSection: React.FC<{
               </div>
             ))}
           </div>
-          <div>
-            <p className={`${FIELD_LABEL} mb-[8px]`}>Allergens (FDA Big-9)</p>
-            <div className="flex flex-wrap gap-[5px]">
-              {ALL_ALLERGENS.map(a => (
-                <button
-                  key={a}
-                  type="button"
-                  onClick={() => toggleAllergen(a)}
-                  className={`${BADGE} transition-colors duration-[144ms] ${
-                    form.allergens.includes(a)
-                      ? 'text-amber-300 border-amber-700 bg-amber-950/50'
-                      : 'text-zinc-600 border-zinc-800 hover:text-zinc-400'
-                  }`}
-                >
-                  {ALLERGEN_LABELS[a]}
-                </button>
-              ))}
+          <div className="space-y-[13px]">
+            <div>
+              <p className={`${FIELD_LABEL} mb-[8px]`}>Allergens — FDA Big-9</p>
+              <div className="flex flex-wrap gap-[5px]">
+                {FDA_BIG_9.map(a => (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => toggleAllergen(a)}
+                    className={`${BADGE} transition-colors duration-[144ms] ${
+                      form.allergens.includes(a)
+                        ? 'text-amber-300 border-amber-700 bg-amber-950/50'
+                        : 'text-zinc-600 border-zinc-800 hover:text-zinc-400'
+                    }`}
+                  >
+                    {ALLERGEN_LABELS[a]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className={`${FIELD_LABEL} mb-[8px]`}>Additional Disclosures</p>
+              <div className="flex flex-wrap gap-[5px]">
+                {ADDITIONAL_DISCLOSURES.map(a => (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => toggleAllergen(a)}
+                    className={`${BADGE} transition-colors duration-[144ms] ${
+                      form.allergens.includes(a)
+                        ? 'text-amber-300 border-amber-700 bg-amber-950/50'
+                        : 'text-zinc-600 border-zinc-800 hover:text-zinc-400'
+                    }`}
+                  >
+                    {ALLERGEN_LABELS[a]}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -363,6 +392,7 @@ interface IngredientsProps {
 
 const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) => {
   const allIngredients = (useKitchenSelector((s: any) => s.ingredients) as Ingredient[]) ?? [];
+  const hasRegionalEstimate = allIngredients.some(ing => ing.priceSource === 'regional-estimate');
 
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('name');
@@ -483,6 +513,15 @@ const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) =>
         </div>
       </div>
 
+      {hasRegionalEstimate && (
+        <div className="flex items-start gap-[8px] bg-amber-950/20 border border-amber-900 rounded-[8px] px-[13px] py-[8px] mb-[21px]">
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-400 mt-[2px] shrink-0" />
+          <p className="text-[11px] text-amber-300/80 leading-relaxed">
+            Prices are regional estimates based on your location and typical volume. They tighten as you update from invoices or edit directly.
+          </p>
+        </div>
+      )}
+
       {showAdd && (
         <div className="bg-zinc-950 border border-zinc-800 rounded-[13px] p-[21px] mb-[21px]">
           <p className="text-[10px] font-black uppercase tracking-[0.15em] text-amber-400 mb-[13px]">New Ingredient</p>
@@ -547,7 +586,17 @@ const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) =>
 
                   return (
                     <tr key={ing.id} className="border-t border-zinc-900 hover:bg-zinc-900/20 transition-colors duration-[144ms]">
-                      <td className="px-[21px] py-[13px] font-bold text-zinc-100">{ing.name}</td>
+                      <td className="px-[21px] py-[13px] font-bold text-zinc-100">
+                        <span className="flex items-center gap-[5px]">
+                          {ing.name}
+                          {!ing.lastVerified && (
+                            <span
+                              title="Unverified — no confirmed price date"
+                              className="w-[6px] h-[6px] rounded-full bg-amber-500 shrink-0"
+                            />
+                          )}
+                        </span>
+                      </td>
                       <td className="px-[13px] py-[13px]">
                         <span className={`${BADGE} ${CATEGORY_STYLE[ing.category]}`}>{ing.category}</span>
                       </td>

@@ -117,9 +117,10 @@ export interface StaffMember {
 
 export type EventType = 'Private Dining' | 'Buyout' | 'Special Event';
 
-export type IngredientCategory = 'Produce' | 'Protein' | 'Dairy' | 'Dry Goods' | 'Frozen' | 'Beverage' | 'Other';
+export type IngredientCategory = 'Produce' | 'Protein' | 'Dairy' | 'Dry Goods' | 'Frozen' | 'Beverage' | 'Other' | 'Spices' | 'Oils & Fats' | 'Sauces' | 'Beverages' | 'Bakery';
 export type MeasureType = 'weight' | 'volume' | 'each';
-export type Allergen = 'milk' | 'eggs' | 'fish' | 'shellfish' | 'treeNuts' | 'peanuts' | 'wheat' | 'soybeans' | 'sesame';
+export type Allergen = 'milk' | 'eggs' | 'fish' | 'shellfish' | 'treeNuts' | 'peanuts' | 'wheat' | 'soybeans' | 'sesame' | 'gluten' | 'sulfites';
+export type PriceSource = 'regional-estimate' | 'invoice' | 'manual';
 
 export interface NutritionPer100g {
   calories?: number;
@@ -148,6 +149,7 @@ export interface Ingredient {
   allergens?: Allergen[];
   vendorId?: string;
   lastVerified: string;
+  priceSource: PriceSource;
 }
 
 export interface KitchenEvent {
