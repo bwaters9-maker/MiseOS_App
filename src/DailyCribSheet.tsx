@@ -37,6 +37,10 @@ const DailyCribSheet: React.FC = () => {
 
   const todayStaff = staff.filter(s => s.date === todayStr);
 
+  const todayEvents = [...events]
+    .filter(e => e.date === todayStr)
+    .sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''));
+
   const activeAlerts = alerts.filter(a => !a.resolved);
   const hasCritical  = activeAlerts.some(a => a.severity === 'critical');
 
@@ -160,15 +164,18 @@ const DailyCribSheet: React.FC = () => {
               <CalendarDays className="w-3.5 h-3.5" />
               Events Today
             </h2>
-            {events.length === 0 ? (
+            {todayEvents.length === 0 ? (
               <p className={EMPTY}>No events today.</p>
             ) : (
               <div>
-                {events.map(e => (
+                {todayEvents.map(e => (
                   <div key={e.id} className={ROW}>
                     <div className="flex items-baseline gap-[13px] min-w-0">
                       {e.time && (
                         <span className="text-zinc-400 shrink-0 tabular-nums">{e.time}</span>
+                      )}
+                      {e.eventType && (
+                        <span className={`${BADGE} text-purple-300 border-purple-900 bg-purple-950/30 shrink-0`}>{e.eventType}</span>
                       )}
                       <span className="font-bold text-zinc-100 truncate">{e.title}</span>
                       {e.notes && (

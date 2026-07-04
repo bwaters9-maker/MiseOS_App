@@ -7,6 +7,7 @@ import { KitchenStateProvider } from './components/KitchenStateContext';
 const Dashboard = React.lazy(() => import('./DailyCribSheet'));
 const FeaturesView = React.lazy(() => import('./Features'));
 const StaffView = React.lazy(() => import('./Staff'));
+const EventsView = React.lazy(() => import('./EventCalendar'));
 const TestKitchenHub = React.lazy(() => import('./TestKitchenHub'));
 const PrepChecklist = React.lazy(() => import('./PrepChecklist').then(m => ({ default: m.PrepChecklist })));
 const KitchenTimers = React.lazy(() => import('./KitchenTimers').then(m => ({ default: m.KitchenTimers })));
@@ -18,6 +19,7 @@ const viewMap: { [key: string]: React.LazyExoticComponent<React.ComponentType<an
   dashboard: Dashboard,
   features: FeaturesView,
   staff: StaffView,
+  events: EventsView,
   prep: PrepChecklist,
   timers: KitchenTimers,
   'alert-history': AlertHistory,

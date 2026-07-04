@@ -81,13 +81,16 @@ export interface StaffMember {
   date?: string;
 }
 
+export type EventType = 'Private Dining' | 'Buyout' | 'Special Event';
+
 export interface KitchenEvent {
   id: string;
   title: string;
+  date?: string;
   time?: string;
   covers?: number;
   notes?: string;
-  type?: string;
+  eventType?: EventType;
 }
 
 export interface KitchenAlert {
