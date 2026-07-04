@@ -61,7 +61,7 @@ src/
   PrepChecklist.tsx              Par-level deficit tracking table
   KitchenTimers.tsx              Multi-station countdown timers (Firestore-backed)
   TestKitchenHub.tsx             AI dish optimizer (calls server-side /api/ai proxy)
-  Settings.tsx                   Theme toggle + station preset CRUD
+  Settings.tsx                   Theme toggle + station preset CRUD + recipe category CRUD
   HistoricalAlerts.tsx           Alert History view (all alerts, read-only)
   IngredientsTable.tsx           Master Pantry — static human-verified ingredient CRUD, unit conversion
   Recipes.tsx                    Recipe Builder — list (Menu Recipes / Sub-Recipes) + editor + Live Cost Analysis
@@ -83,6 +83,7 @@ src/
   hooks/
     useKitchenState.ts           Firestore listeners for all collections
     useStationPresets.ts         Firestore listener for station_presets collection
+    useRecipeCategories.ts       Firestore listener for recipe_categories collection, seeds defaults if empty
 
   lib/
     costEngine.ts                recipeCost / costPerPortion / fcPercent / suggestedPrice / wouldCreateCycle + computeCostPerBaseUnit
@@ -114,6 +115,7 @@ Current nav tabs (in order): Crib Sheet · Features · Staff · Events · Ingred
 | `timers` | `KitchenTimers.tsx` |
 | `station_presets` | `useStationPresets`, `Settings.tsx`, `KitchenTimers.tsx` |
 | `ingredients` | `useKitchenState`, `IngredientsTable.tsx` |
+| `recipe_categories` | `useRecipeCategories`, `Settings.tsx`, `Recipes.tsx` — seeded with Sides/Sauces/Salads/Soups/Proteins/Desserts if empty |
 
 `alerts`: crib sheet shows `resolved === false` only; Alert History shows all.
 
@@ -122,7 +124,7 @@ Current nav tabs (in order): Crib Sheet · Features · Staff · Events · Ingred
 | Type | Description |
 |---|---|
 | `PrepItem` / `ProductionRun` | Prep checklist task |
-| `Recipe` | id, name, recipeType ('sub' \| 'menu'), course, batchYield { qty, measureType }, portions, lines: RecipeLine[], methodSteps, menuPrice?, updatedAt |
+| `Recipe` | id, name, recipeType ('sub' \| 'menu'), course, categoryId?, batchYield { qty, measureType }, portions, lines: RecipeLine[], methodSteps, menuPrice?, updatedAt |
 | `RecipeLine` | A recipe component: `{ type: 'ingredient' \| 'recipe', refId, qty, note? }`. `qty` is always canonical base units. Only `recipeType: 'sub'` recipes may be referenced as a line — menu recipes never nest |
 | `Item86` / `Item86Entry` | 86'd item |
 | `PrepStation` | `'Sauté' \| 'Grill' \| 'Garde Manger' \| 'Pastry'` |
@@ -135,6 +137,7 @@ Current nav tabs (in order): Crib Sheet · Features · Staff · Events · Ingred
 | `KitchenTimer` | Countdown timer |
 | `TrendReport` | Recipe trend scores |
 | `Ingredient` | Master Pantry item (name, category, measureType, purchaseCost, purchaseQty, yieldPercent, nutrition, allergens) |
+| `RecipeCategory` | Chef-managed recipe category (id, name), CRUD'd from Settings — referenced by `Recipe.categoryId` |
 | `IngredientCategory` | `'Produce' \| 'Protein' \| 'Dairy' \| 'Dry Goods' \| 'Frozen' \| 'Beverage' \| 'Other'` |
 | `MeasureType` | `'weight' \| 'volume' \| 'each'` — determines base unit (g, ml, each) |
 | `Allergen` | FDA Big-9: `'milk' \| 'eggs' \| 'fish' \| 'shellfish' \| 'treeNuts' \| 'peanuts' \| 'wheat' \| 'soybeans' \| 'sesame'` |
@@ -156,7 +159,11 @@ Note: `useKitchenState.ts` also defines `PrepItem` and `Item86` locally (pre-exi
 
 ## Recipe Builder (Recipes.tsx)
 
-Left panel lists recipes grouped by `recipeType` first (Menu Recipes, then Sub-Recipes), and within Menu Recipes, sub-grouped by `course`. Selecting or creating a recipe opens the editor on the golden split from `design-tokens.json` (61.8% editor / 38.2% Live Cost Analysis panel).
+Left panel lists recipes grouped by `recipeType` first (Menu Recipes, then Sub-Recipes), and within Menu Recipes, sub-grouped by resolved category label. Selecting or creating a recipe opens the editor on the golden split from `design-tokens.json` (61.8% editor / 38.2% Live Cost Analysis panel).
+
+- **Recipe categories** (`recipe_categories` collection, CRUD'd from Settings, same pattern as station presets) replace the old free-text `course` field with a `categoryId` select in the editor — applies to both menu and sub-recipes. `Recipe.course` is kept in sync with the chosen category's name as a denormalized fallback. Recipes saved before categories existed (or whose category was later deleted) display as `"{course} (uncategorized)"` in the list until re-saved with a real category.
+- Filter chips (All + one per category) sit above the recipe list and filter both the Menu Recipes and Sub-Recipes groups, stacking with the existing name search.
+- The ingredient/sub-recipe line search box in the editor has its own category chip row to filter sub-recipe results (e.g. pull up all Sauces) independent of the list pane's filter; typing a name and picking a category combine.
 
 - **Menu recipes** (`recipeType: 'menu'`) are finished, sellable plates — the cost panel shows batch cost, cost/portion, an editable menu price, and FC% (color-coded against the `targetFcPercent` Settings value: emerald ≤ target, amber ≤ target+5, red above) plus a suggested price at target FC%.
 - **Sub-recipes** (`recipeType: 'sub'`) are component preparations (stocks, sauces, prep) — no menu price or FC%; the cost panel shows only batch cost and cost per canonical base unit of the batch yield.

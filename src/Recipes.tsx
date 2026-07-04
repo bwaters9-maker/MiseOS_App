@@ -3,13 +3,14 @@ import { ChefHat, Plus, Trash2, X, Check, Search, Layers, UtensilsCrossed, Alert
 import { db } from './firebaseConfig';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { useKitchenSelector } from './components/KitchenStateContext';
+import { useRecipeCategories } from './hooks/useRecipeCategories';
 import {
   recipeCost, costPerPortion, fcPercent, suggestedPrice, wouldCreateCycle,
 } from './lib/costEngine';
 import {
   toBase, displayUnitsFor, defaultDisplayUnit, smartUnit, costPerDisplayUnit,
 } from './lib/units';
-import type { Ingredient, Recipe, RecipeLine, MeasureType } from './types';
+import type { Ingredient, Recipe, RecipeLine, MeasureType, RecipeCategory } from './types';
 import type { UnitSystem, DisplayUnit } from './lib/units';
 
 const INPUT = 'w-full bg-zinc-900 border border-zinc-700 rounded-[5px] px-[8px] py-[5px] text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-500 placeholder-zinc-600';
@@ -20,6 +21,13 @@ const BADGE = 'px-[8px] py-[3px] rounded-[5px] text-[10px] font-bold uppercase t
 
 const fcColor = (fc: number, target: number): string =>
   fc <= target ? 'text-emerald-400' : fc <= target + 5 ? 'text-amber-400' : 'text-red-400';
+
+const categoryLabel = (r: Recipe, categories: RecipeCategory[]): string => {
+  const cat = categories.find(c => c.id === r.categoryId);
+  if (cat) return cat.name;
+  const legacy = r.course?.trim();
+  return legacy ? `${legacy} (uncategorized)` : 'Uncategorized';
+};
 
 interface LineDraft {
   key: string;
@@ -34,6 +42,7 @@ interface FormState {
   name: string;
   recipeType: 'sub' | 'menu';
   course: string;
+  categoryId: string;
   batchYieldMeasureType: MeasureType;
   batchYieldQtyDisplay: string;
   batchYieldUnit: DisplayUnit;
@@ -47,6 +56,7 @@ const BLANK = (recipeType: 'sub' | 'menu', unitSystem: UnitSystem): FormState =>
   name: '',
   recipeType,
   course: '',
+  categoryId: '',
   batchYieldMeasureType: 'weight',
   batchYieldQtyDisplay: '',
   batchYieldUnit: defaultDisplayUnit('weight', unitSystem),
@@ -69,6 +79,7 @@ const toForm = (recipe: Recipe, unitSystem: UnitSystem, ingredients: Ingredient[
     name: recipe.name,
     recipeType: recipe.recipeType,
     course: recipe.course,
+    categoryId: recipe.categoryId ?? '',
     batchYieldMeasureType: recipe.batchYield.measureType,
     batchYieldQtyDisplay: batchYieldValue.toFixed(batchYieldValue >= 10 ? 2 : 3).replace(/\.?0+$/, ''),
     batchYieldUnit,
@@ -94,6 +105,7 @@ const toDoc = (form: FormState): Omit<Recipe, 'id'> => ({
   name: form.name.trim(),
   recipeType: form.recipeType,
   course: form.course.trim(),
+  ...(form.categoryId && { categoryId: form.categoryId }),
   batchYield: {
     qty: toBase(parseFloat(form.batchYieldQtyDisplay) || 0, form.batchYieldUnit),
     measureType: form.batchYieldMeasureType,
@@ -117,6 +129,7 @@ const virtualRecipe = (form: FormState, id: string): Recipe => ({
   name: form.name,
   recipeType: form.recipeType,
   course: form.course,
+  categoryId: form.categoryId || undefined,
   batchYield: {
     qty: toBase(parseFloat(form.batchYieldQtyDisplay) || 0, form.batchYieldUnit),
     measureType: form.batchYieldMeasureType,
@@ -147,18 +160,26 @@ const LineSearchBox: React.FC<{
   currentRecipeId: string;
   ingredients: Ingredient[];
   recipes: Recipe[];
+  categories: RecipeCategory[];
   unitSystem: UnitSystem;
   onAdd: (line: LineDraft) => void;
-}> = ({ currentRecipeId, ingredients, recipes, unitSystem, onAdd }) => {
+}> = ({ currentRecipeId, ingredients, recipes, categories, unitSystem, onAdd }) => {
   const [term, setTerm] = useState('');
   const [focused, setFocused] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const counter = useRef(0);
+
+  const isBrowsing = term.trim().length >= 1 || categoryFilter !== null;
 
   const ingredientMatches = term.trim().length >= 1
     ? ingredients.filter(i => i.name.toLowerCase().includes(term.toLowerCase())).slice(0, 6)
     : [];
-  const subRecipeMatches = term.trim().length >= 1
-    ? recipes.filter(r => r.recipeType === 'sub' && r.name.toLowerCase().includes(term.toLowerCase())).slice(0, 6)
+  const subRecipeMatches = isBrowsing
+    ? recipes
+        .filter(r => r.recipeType === 'sub')
+        .filter(r => term.trim().length === 0 || r.name.toLowerCase().includes(term.toLowerCase()))
+        .filter(r => !categoryFilter || r.categoryId === categoryFilter)
+        .slice(0, 8)
     : [];
 
   const addIngredient = (ing: Ingredient) => {
@@ -194,7 +215,34 @@ const LineSearchBox: React.FC<{
           className={`${INPUT} pl-[26px]`}
         />
       </div>
-      {focused && term.trim().length >= 1 && (
+      {categories.length > 0 && (
+        <div className="flex flex-wrap gap-[5px] mt-[5px]">
+          <button
+            type="button"
+            onMouseDown={e => e.preventDefault()}
+            onClick={() => { setCategoryFilter(null); setFocused(true); }}
+            className={`${BADGE} transition-colors duration-[144ms] ${
+              categoryFilter === null ? 'text-purple-300 border-purple-700 bg-purple-950/40' : 'text-zinc-500 border-zinc-700 hover:text-zinc-300'
+            }`}
+          >
+            All
+          </button>
+          {categories.map(c => (
+            <button
+              key={c.id}
+              type="button"
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => { setCategoryFilter(prev => prev === c.id ? null : c.id); setFocused(true); }}
+              className={`${BADGE} transition-colors duration-[144ms] ${
+                categoryFilter === c.id ? 'text-purple-300 border-purple-700 bg-purple-950/40' : 'text-zinc-500 border-zinc-700 hover:text-zinc-300'
+              }`}
+            >
+              {c.name}
+            </button>
+          ))}
+        </div>
+      )}
+      {focused && isBrowsing && (
         <div className="absolute z-10 w-full mt-[5px] bg-zinc-950 border border-zinc-800 rounded-[8px] shadow-lg max-h-64 overflow-y-auto">
           {!hasResults && (
             <p className="p-[13px] text-xs text-zinc-600 italic">No matches.</p>
@@ -242,9 +290,17 @@ const RecipeEditor: React.FC<{
   currentRecipeId: string;
   ingredients: Ingredient[];
   recipes: Recipe[];
+  categories: RecipeCategory[];
   unitSystem: UnitSystem;
-}> = ({ form, setForm, currentRecipeId, ingredients, recipes, unitSystem }) => {
+}> = ({ form, setForm, currentRecipeId, ingredients, recipes, categories, unitSystem }) => {
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm({ ...form, [k]: v });
+
+  const handleCategoryChange = (categoryId: string) => {
+    const cat = categories.find(c => c.id === categoryId);
+    setForm({ ...form, categoryId, course: cat ? cat.name : form.course });
+  };
+
+  const legacyUncategorized = !categories.some(c => c.id === form.categoryId) && form.course.trim().length > 0;
 
   const updateLine = (key: string, patch: Partial<LineDraft>) => {
     setForm({ ...form, lines: form.lines.map(l => l.key === key ? { ...l, ...patch } : l) });
@@ -295,8 +351,16 @@ const RecipeEditor: React.FC<{
           <input type="text" value={form.name} onChange={e => set('name', e.target.value)} placeholder="Recipe name" className={INPUT} autoFocus />
         </div>
         <div>
-          <label className={FIELD_LABEL}>Course</label>
-          <input type="text" value={form.course} onChange={e => set('course', e.target.value)} placeholder="e.g. Appetizer, Sauce, Family Meal" className={INPUT} />
+          <label className={FIELD_LABEL}>Category</label>
+          <select value={form.categoryId} onChange={e => handleCategoryChange(e.target.value)} className={INPUT}>
+            <option value="">Select category…</option>
+            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          {legacyUncategorized && (
+            <p className="text-[10px] text-amber-500 mt-[5px]">
+              Currently "{form.course}" (uncategorized) — select a category to migrate.
+            </p>
+          )}
         </div>
       </div>
 
@@ -375,6 +439,7 @@ const RecipeEditor: React.FC<{
           currentRecipeId={currentRecipeId}
           ingredients={ingredients}
           recipes={recipes}
+          categories={categories}
           unitSystem={unitSystem}
           onAdd={addLine}
         />
@@ -586,8 +651,10 @@ interface RecipesProps {
 const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPercent = 30 }) => {
   const allRecipes = (useKitchenSelector((s: any) => s.recipes) as Recipe[]) ?? [];
   const allIngredients = (useKitchenSelector((s: any) => s.ingredients) as Ingredient[]) ?? [];
+  const { categories } = useRecipeCategories();
 
   const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [form, setForm] = useState<FormState | null>(null);
@@ -595,18 +662,20 @@ const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPerc
   const [saving, setSaving] = useState(false);
   const [editorSession, setEditorSession] = useState(0);
 
-  const filtered = allRecipes.filter(r => r.name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = allRecipes
+    .filter(r => r.name.toLowerCase().includes(search.toLowerCase()))
+    .filter(r => !categoryFilter || r.categoryId === categoryFilter);
   const menuRecipes = filtered.filter(r => r.recipeType === 'menu').sort((a, b) => a.name.localeCompare(b.name));
   const subRecipes = filtered.filter(r => r.recipeType === 'sub').sort((a, b) => a.name.localeCompare(b.name));
 
   const menuByCourse = useMemo(() => {
     const groups: Record<string, Recipe[]> = {};
     menuRecipes.forEach(r => {
-      const key = r.course.trim() || 'Uncategorized';
+      const key = categoryLabel(r, categories);
       (groups[key] ??= []).push(r);
     });
     return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
-  }, [menuRecipes]);
+  }, [menuRecipes, categories]);
 
   const openRecipe = (r: Recipe) => {
     setSelectedId(r.id);
@@ -687,6 +756,30 @@ const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPerc
             />
           </div>
 
+          {categories.length > 0 && (
+            <div className="flex flex-wrap gap-[5px]">
+              <button
+                onClick={() => setCategoryFilter(null)}
+                className={`${BADGE} transition-colors duration-[144ms] ${
+                  categoryFilter === null ? 'text-emerald-300 border-emerald-700 bg-emerald-950/40' : 'text-zinc-500 border-zinc-700 hover:text-zinc-300'
+                }`}
+              >
+                All
+              </button>
+              {categories.map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => setCategoryFilter(prev => prev === c.id ? null : c.id)}
+                  className={`${BADGE} transition-colors duration-[144ms] ${
+                    categoryFilter === c.id ? 'text-emerald-300 border-emerald-700 bg-emerald-950/40' : 'text-zinc-500 border-zinc-700 hover:text-zinc-300'
+                  }`}
+                >
+                  {c.name}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="flex gap-[8px]">
             <button onClick={() => startCreate('menu')} className={`${BTN_PRIMARY} flex-1 flex items-center justify-center gap-[5px]`}>
               <Plus className="w-3 h-3" /> Menu Recipe
@@ -748,8 +841,8 @@ const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPerc
               </div>
             )}
 
-            {filtered.length === 0 && search && (
-              <p className="text-xs text-zinc-600 italic text-center py-[13px]">No recipes match your search.</p>
+            {filtered.length === 0 && (search || categoryFilter) && (
+              <p className="text-xs text-zinc-600 italic text-center py-[13px]">No recipes match your search or filter.</p>
             )}
           </div>
         </div>
@@ -780,6 +873,7 @@ const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPerc
                   currentRecipeId={selectedId ?? '__draft__'}
                   ingredients={allIngredients}
                   recipes={allRecipes}
+                  categories={categories}
                   unitSystem={unitSystem}
                 />
                 <CostPanel

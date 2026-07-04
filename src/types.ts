@@ -45,12 +45,25 @@ export interface Recipe {
   name: string;
   recipeType: 'sub' | 'menu';
   course: string;
+  categoryId?: string;
   batchYield: { qty: number; measureType: MeasureType };
   portions: number;
   lines: RecipeLine[];
   methodSteps: string[];
   menuPrice?: number;
   updatedAt: string;
+}
+
+/**
+ * A chef-managed recipe category (Sides, Sauces, Salads, …), CRUD'd from
+ * Settings the same way as station presets. `Recipe.categoryId` references
+ * this by id; `Recipe.course` is kept in sync with the category's name at
+ * save time as a denormalized display fallback for recipes saved before a
+ * matching category existed or whose category was later deleted.
+ */
+export interface RecipeCategory {
+  id: string;
+  name: string;
 }
 
 /**
