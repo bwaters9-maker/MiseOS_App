@@ -27,6 +27,14 @@ const DailyCribSheet: React.FC = () => {
 
   const [printTime, setPrintTime] = useState('');
 
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const tonightFeatures = features.filter(f => {
+    if (f.is86d) return false;
+    if (f.activeFrom && todayStr < f.activeFrom) return false;
+    if (f.activeTo && todayStr > f.activeTo) return false;
+    return true;
+  });
+
   const activeAlerts = alerts.filter(a => !a.resolved);
   const hasCritical  = activeAlerts.some(a => a.severity === 'critical');
 
@@ -84,11 +92,11 @@ const DailyCribSheet: React.FC = () => {
               <Star className="w-3.5 h-3.5" />
               Features Tonight
             </h2>
-            {features.length === 0 ? (
+            {tonightFeatures.length === 0 ? (
               <p className={EMPTY}>No features tonight.</p>
             ) : (
               <div>
-                {features.map(f => {
+                {tonightFeatures.map(f => {
                   const fc = f.cost != null && f.price != null && f.price > 0
                     ? Math.round((f.cost / f.price) * 100)
                     : null;

@@ -5,6 +5,7 @@ import { KitchenStateProvider } from './components/KitchenStateContext';
 
 // --- LAZY-LOADING STRUCTURE ---
 const Dashboard = React.lazy(() => import('./DailyCribSheet'));
+const FeaturesView = React.lazy(() => import('./Features'));
 const TestKitchenHub = React.lazy(() => import('./TestKitchenHub'));
 const PrepChecklist = React.lazy(() => import('./PrepChecklist').then(m => ({ default: m.PrepChecklist })));
 const KitchenTimers = React.lazy(() => import('./KitchenTimers').then(m => ({ default: m.KitchenTimers })));
@@ -14,6 +15,7 @@ const AlertHistory = React.lazy(() => import('./HistoricalAlerts').then(m => ({ 
 // --- VIEW MAPPING ---
 const viewMap: { [key: string]: React.LazyExoticComponent<React.ComponentType<any>> } = {
   dashboard: Dashboard,
+  features: FeaturesView,
   prep: PrepChecklist,
   timers: KitchenTimers,
   'alert-history': AlertHistory,

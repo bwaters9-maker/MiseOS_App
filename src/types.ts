@@ -67,6 +67,9 @@ export interface Feature {
   description?: string;
   price?: number;
   cost?: number;
+  activeFrom?: string;
+  activeTo?: string;
+  is86d?: boolean;
 }
 
 export interface StaffMember {
