@@ -248,6 +248,23 @@ INGREDIENTS — MASTER PANTRY
 - Static, human-verified only
 - Purchase unit, yield %, cost per usable unit (calculated)
 - Nutritional data per 100g, allergen flags, vendor links
+- Invoice Price Update (human-confirmed): chef photographs/uploads an
+  invoice, AI extracts line items via the /api/ai proxy, and every
+  price change requires explicit per-line chef acceptance before
+  writing. Nothing writes automatically. Updates set
+  priceSource: 'invoice' and lastVerified.
+- Regional Price Seed (onboarding): app ships with a bundled,
+  versioned baseline price dataset plus a static regional multiplier
+  table. Chef's location, entered once at onboarding, selects the
+  tier. No runtime external calls, no live syncing. Seeded prices
+  carry priceSource: 'regional-estimate' and display a persistent
+  disclaimer: "Prices are regional estimates based on your location
+  and typical volume. They tighten as you update from invoices or
+  edit directly."
+- Ingredient price provenance: every ingredient carries priceSource
+  ('regional-estimate' | 'invoice' | 'manual') and lastVerified.
+- Vendors default to generic placeholders (Broadline Distributor,
+  Produce Supplier, etc.) until the chef edits them.
 
 MENU
 - Active recipes by category with food cost % color coding
@@ -285,15 +302,19 @@ AI LAYER
 - Live POS Sync
 - Automatic Reservation Sync
 - Financial Smoke Detector
-- Invoice Scanning
 - Market Volatility Tracking
 - Training Dashboard
 - Hostess Chat
 - Staff shift scheduling system
 
 ### Master Pantry Mandate
-All ingredient data is static and human-verified.
-No invoice scanning. No live syncing. No external data. Ever.
+No live data feeds. No automatic mutation. No vendor-system
+integrations. Every price change is chef-confirmed.
+
+Clearly-labeled static estimates are permitted as starting defaults
+(regional seed data, invoice-extracted line items awaiting
+acceptance) — chef verification remains the goal state, not the
+only allowed state.
 
 ### Build Order
 1. ~~Remove Handover Log remnants from useKitchenState.ts and types.ts~~ ✓
@@ -302,12 +323,13 @@ No invoice scanning. No live syncing. No external data. Ever.
 4. ~~Staff (lightweight)~~ ✓
 5. ~~Event Calendar~~ ✓
 6. ~~Ingredients Master Library~~ ✓
-7. ~~Recipe Builder + Cost Engine~~ ✓ (AI buttons — [Suggest Ingredients] / [Write Method] — still pending, land via `/api/ai`)
-8. Menu View
-9. Catering Module
-10. Vendor Management
-11. Sous (Chef Chat)
-12. Ingredient Advisor
-13. FDA Label (inside Recipe)
-14. Restaurant Profile / Regional Intelligence
-15. Recipe Collections + Sharing
+7. Invoice Price Update (human-confirmed)
+8. ~~Recipe Builder + Cost Engine~~ ✓ (AI buttons — [Suggest Ingredients] / [Write Method] — still pending, land via `/api/ai`)
+9. Menu View
+10. Catering Module
+11. Vendor Management
+12. Sous (Chef Chat)
+13. Ingredient Advisor
+14. FDA Label (inside Recipe)
+15. Restaurant Profile / Regional Intelligence
+16. Recipe Collections + Sharing
