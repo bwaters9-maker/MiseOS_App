@@ -76,6 +76,9 @@ src/
     StationPassHeader.tsx
     GuestMenuPreview.tsx         Guest-facing menu templates (Classic / Clean), print-optimized
 
+    ingredients/
+      InvoicePriceUpdate.tsx     Photo/PDF invoice → AI-extracted line items → human-confirmed price writes
+
     dashboard/
       LineTimerModule.tsx
       MetricsHUD.tsx
@@ -138,12 +141,14 @@ Current nav tabs (in order): Crib Sheet · Features · Staff · Events · Ingred
 | `CribNote` | Freeform crib note (date, content, author) |
 | `KitchenTimer` | Countdown timer |
 | `TrendReport` | Recipe trend scores |
-| `Ingredient` | Master Pantry item (name, category, measureType, purchaseCost, purchaseQty, yieldPercent, nutrition, allergens) |
+| `Ingredient` | Master Pantry item: name, category, measureType, purchaseUnit, purchaseCost, purchaseQty, yieldPercent, nutritionPer100g?, allergens?, vendorId?, lastVerified, priceSource |
 | `RecipeCategory` | Chef-managed recipe category (id, name), CRUD'd from Settings — referenced by `Recipe.categoryId` |
 | `IngredientCategory` | `'Produce' \| 'Protein' \| 'Dairy' \| 'Dry Goods' \| 'Frozen' \| 'Beverage' \| 'Other'` |
 | `MeasureType` | `'weight' \| 'volume' \| 'each'` — determines base unit (g, ml, each) |
 | `Allergen` | FDA Big-9: `'milk' \| 'eggs' \| 'fish' \| 'shellfish' \| 'treeNuts' \| 'peanuts' \| 'wheat' \| 'soybeans' \| 'sesame'` |
 | `NutritionPer100g` | Optional nutrition facts stored per 100g on each Ingredient |
+| `PriceSource` | `'regional-estimate' \| 'invoice' \| 'manual'` — provenance of an `Ingredient`'s `purchaseCost`, paired with `lastVerified` |
+| `MenuTemplate` | `'classic' \| 'clean'` — Guest Preview styling choice on the Menu view, persisted like `unitSystem`/`targetFcPercent` |
 
 Note: `useKitchenState.ts` also defines `PrepItem` and `Item86` locally (pre-existing duplication). `Recipe` was de-duplicated — `useKitchenState.ts` now imports the canonical type from `src/types.ts` directly. New types belong in `src/types.ts` only.
 
@@ -158,6 +163,17 @@ Note: `useKitchenState.ts` also defines `PrepItem` and `Item86` locally (pre-exi
 - **Cards:** `bg-zinc-950 border border-zinc-800 rounded-xl`
 - **Spacing:** Fibonacci-based tokens from `design-tokens.json` — use as Tailwind arbitrary values (`p-[21px]`, `gap-[34px]`, etc.)
 - No emojis. No comments explaining what code does.
+
+## Invoice Price Update (components/ingredients/InvoicePriceUpdate.tsx)
+
+Opened as a modal from `IngredientsTable.tsx`. Every write is chef-confirmed — nothing is applied automatically, per the Master Pantry Mandate.
+
+- Chef uploads or photographs an invoice (image or PDF); nothing is stored — the file goes to the `/api/ai` proxy for extraction only, never saved. The AI returns `{ vendor, invoiceDate, items: [{ name, packCost, packDescription }] }`, food/beverage line items only (fees, tax, and surcharges are excluded by the extraction prompt).
+- **Matching**: each extracted line is matched against the Master Pantry by exact name after normalization (lowercase, punctuation stripped, whitespace collapsed). Containment matches (e.g. "Yuzu Kosho" containing "Yuzu") are deliberately never auto-matched — false positives there are worse than requiring a manual pick from the ingredient dropdown.
+- **Blank-cost guard**: a row can only be accepted/applied if it has a matched ingredient AND a parsed cost > 0 (`isEligibleRow`). The accept checkbox is disabled otherwise.
+- **Pack-size mismatch guard**: `packSizeMismatch` parses both the pantry's stored `purchaseUnit` and the invoice's `packDescription` into a quantity + unit family (weight/volume/count) and flags a warning icon if the families differ or the ratio is outside 0.7–1.3. This is a warning only — it never auto-converts or blocks acceptance.
+- **Apply**: only checked, eligible rows are written on "Apply" — each becomes an `updateDoc` setting `purchaseCost`, `priceSource: 'invoice'`, and `lastVerified` to today. Unchecked or ineligible rows are left untouched.
+- **Add-unmatched-to-pantry**: invoice lines with no pantry match get a second, non-fatal AI pass suggesting a clean name/category/measureType/pack size/yield%/allergens for a net-new ingredient. The chef reviews/edits the suggestion in an inline form (`canConfirmAdd` requires name, category, qty, and cost) before "Confirm & Add to Pantry" runs an `addDoc` with `priceSource: 'invoice'` and `lastVerified: today`.
 
 ## Recipe Builder (Recipes.tsx)
 
@@ -346,7 +362,7 @@ only allowed state.
 4. ~~Staff (lightweight)~~ ✓
 5. ~~Event Calendar~~ ✓
 6. ~~Ingredients Master Library~~ ✓
-7. Invoice Price Update (human-confirmed)
+7. ~~Invoice Price Update (human-confirmed)~~ ✓
 8. ~~Recipe Builder + Cost Engine~~ ✓ (AI buttons — [Suggest Ingredients] / [Write Method] — still pending, land via `/api/ai`)
 9. ~~Menu View~~ ✓ (operational cost/FC% view + Guest Preview with Classic/Clean templates)
 10. Catering Module
