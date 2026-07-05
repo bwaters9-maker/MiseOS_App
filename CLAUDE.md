@@ -124,7 +124,7 @@ Current nav tabs (in order): Crib Sheet · Features · Staff · Events · Ingred
 | Type | Description |
 |---|---|
 | `PrepItem` / `ProductionRun` | Prep checklist task |
-| `Recipe` | id, name, recipeType ('sub' \| 'menu'), course, categoryId?, batchYield { qty, measureType }, portions, lines: RecipeLine[], methodSteps, menuPrice?, updatedAt |
+| `Recipe` | id, name, recipeType ('sub' \| 'menu'), course, categoryId?, batchYield { qty, measureType }, portions, lines: RecipeLine[], methodSteps, menuPrice?, menuDescription?, updatedAt |
 | `RecipeLine` | A recipe component: `{ type: 'ingredient' \| 'recipe', refId, qty, note? }`. `qty` is always canonical base units. Only `recipeType: 'sub'` recipes may be referenced as a line — menu recipes never nest |
 | `Item86` / `Item86Entry` | 86'd item |
 | `PrepStation` | `'Sauté' \| 'Grill' \| 'Garde Manger' \| 'Pastry'` |

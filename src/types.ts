@@ -51,6 +51,7 @@ export interface Recipe {
   lines: RecipeLine[];
   methodSteps: string[];
   menuPrice?: number;
+  menuDescription?: string;
   updatedAt: string;
 }
 

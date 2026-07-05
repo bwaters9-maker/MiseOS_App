@@ -83,6 +83,7 @@ interface FormState {
   lines: LineDraft[];
   methodSteps: string[];
   menuPrice: string;
+  menuDescription: string;
 }
 
 const BLANK = (recipeType: 'sub' | 'menu', unitSystem: UnitSystem): FormState => ({
@@ -97,6 +98,7 @@ const BLANK = (recipeType: 'sub' | 'menu', unitSystem: UnitSystem): FormState =>
   lines: [],
   methodSteps: [],
   menuPrice: '',
+  menuDescription: '',
 });
 
 const lineMeasureType = (line: LineDraft | RecipeLine, ingredients: Ingredient[], recipes: Recipe[]): MeasureType => {
@@ -131,6 +133,7 @@ const toForm = (recipe: Recipe, unitSystem: UnitSystem, ingredients: Ingredient[
     }),
     methodSteps: recipe.methodSteps.length > 0 ? [...recipe.methodSteps] : [],
     menuPrice: recipe.menuPrice != null ? String(recipe.menuPrice) : '',
+    menuDescription: recipe.menuDescription ?? '',
   };
 };
 
@@ -154,6 +157,9 @@ const toDoc = (form: FormState): Omit<Recipe, 'id'> => ({
   ...(form.recipeType === 'menu' && form.menuPrice !== '' && !isNaN(parseFloat(form.menuPrice))
     ? { menuPrice: parseFloat(form.menuPrice) }
     : {}),
+  ...(form.recipeType === 'menu' && form.menuDescription.trim()
+    ? { menuDescription: form.menuDescription.trim() }
+    : {}),
   updatedAt: new Date().toISOString(),
 });
 
@@ -176,6 +182,7 @@ const virtualRecipe = (form: FormState, id: string): Recipe => ({
   })),
   methodSteps: form.methodSteps,
   menuPrice: form.menuPrice !== '' && !isNaN(parseFloat(form.menuPrice)) ? parseFloat(form.menuPrice) : undefined,
+  menuDescription: form.recipeType === 'menu' && form.menuDescription.trim() ? form.menuDescription.trim() : undefined,
   updatedAt: '',
 });
 
@@ -831,6 +838,17 @@ const CostPanel: React.FC<{
               min="0"
               step="0.01"
               className={INPUT}
+            />
+          </div>
+
+          <div>
+            <label className={FIELD_LABEL}>Menu Description</label>
+            <textarea
+              value={form.menuDescription}
+              onChange={e => setForm({ ...form, menuDescription: e.target.value })}
+              rows={2}
+              className={`${INPUT} resize-none`}
+              placeholder="Guest-facing description for the printed menu…"
             />
           </div>
 
