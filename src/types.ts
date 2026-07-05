@@ -115,13 +115,22 @@ export interface Feature {
   is86d?: boolean;
 }
 
-export interface StaffMember {
+export interface Employee {
   id: string;
   name: string;
-  role: string;
+  positions: string[];
+  hourlyRate?: number;
+  active: boolean;
+}
+
+export interface Shift {
+  id: string;
+  staffId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
   station?: PrepStation;
-  clockIn?: string;
-  date?: string;
+  note?: string;
 }
 
 export type EventType = 'Private Dining' | 'Buyout' | 'Special Event';

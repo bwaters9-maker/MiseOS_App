@@ -56,7 +56,7 @@ src/
 
   DailyCribSheet.tsx             Crib Sheet view — five sections, print-optimized
   Features.tsx                   Nightly specials CRUD — 86 toggle syncs to Crib Sheet live
-  Staff.tsx                      Today's roster CRUD — date-filtered, feeds Crib Sheet only
+  Staff.tsx                      Employee directory + shift scheduling — feeds Crib Sheet (today's shifts only)
   EventCalendar.tsx              Event CRUD — grouped by date, upcoming/past split, feeds Crib Sheet
   PrepChecklist.tsx              Par-level deficit tracking table
   KitchenTimers.tsx              Multi-station countdown timers (Firestore-backed)
@@ -113,7 +113,8 @@ Current nav tabs (in order): Crib Sheet · Features · Staff · Events · Ingred
 | `recipes` | `useKitchenState`, `Recipes.tsx` |
 | `items86` | `useKitchenState` |
 | `features` | `useKitchenState`, `Features`, `DailyCribSheet` |
-| `staff` | `useKitchenState`, `Staff`, `DailyCribSheet` |
+| `staff` | `useKitchenState`, `Staff.tsx` — employee directory (repurposed from daily roster) |
+| `shifts` | `useKitchenState`, `Staff.tsx`, `DailyCribSheet` — planned shifts, joined to `staff` for display |
 | `events` | `useKitchenState`, `EventCalendar`, `DailyCribSheet` |
 | `alerts` | `useKitchenState`, `DailyCribSheet`, `HistoricalAlerts` |
 | `crib_notes` | `useKitchenState`, `DailyCribSheet` |
@@ -134,7 +135,8 @@ Current nav tabs (in order): Crib Sheet · Features · Staff · Events · Ingred
 | `Item86` / `Item86Entry` | 86'd item |
 | `PrepStation` | `'Sauté' \| 'Grill' \| 'Garde Manger' \| 'Pastry'` |
 | `Feature` | Nightly special (course, name, description, price, cost, activeFrom, activeTo, is86d) |
-| `StaffMember` | Staff on today (name, role, station: PrepStation, clockIn, date) |
+| `Employee` | Directory entry: id, name, positions: string[], hourlyRate?, active |
+| `Shift` | Planned shift: id, staffId (→ Employee), date, startTime, endTime, station?: PrepStation, note? |
 | `EventType` | `'Private Dining' \| 'Buyout' \| 'Special Event'` |
 | `KitchenEvent` | Event (title, date, time, covers, notes, eventType: EventType) |
 | `KitchenAlert` | Alert (message, severity, resolved, timestamp) |
@@ -312,9 +314,18 @@ CATERING
 - Events, client info, menu selection, cost + quote generation
 - Feeds Event Calendar → feeds Crib Sheet
 
-STAFF (lightweight)
-- Name, role, station, clock-in time for today
-- Feeds Crib Sheet only
+STAFF & SCHEDULING
+- Employee directory: name, positions, active toggle, optional hourly rate
+- Planned shifts: date, start/end time, optional station, optional shift
+  note — scheduled any distance ahead, not just today
+- Week/month calendar merged with Events (part 2)
+- Per-employee projected weekly hours with overtime flag (part 2)
+- Hourly rate and pay projections are visible ONLY inside the scheduler
+  view — never on the Crib Sheet, never in any other view or print output
+- Feeds Crib Sheet: today's shifts joined to directory (name,
+  position/station, start–end, shift note) — no rates, ever
+- EXPLICITLY EXCLUDED, never build: availability management, shift
+  swaps/trades, notifications, time-off requests
 
 EVENT CALENDAR
 - Private dining, buyouts, special events
@@ -344,7 +355,6 @@ AI LAYER
 - Market Volatility Tracking
 - Training Dashboard
 - Hostess Chat
-- Staff shift scheduling system
 
 ### Master Pantry Mandate
 No live data feeds. No automatic mutation. No vendor-system

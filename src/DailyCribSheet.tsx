@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Printer, Star, Users, CalendarDays, AlertTriangle, ClipboardList } from 'lucide-react';
 import { useKitchenSelector } from './components/KitchenStateContext';
-import type { Feature, StaffMember, KitchenEvent, KitchenAlert, CribNote } from './types';
+import type { Feature, Employee, Shift, KitchenEvent, KitchenAlert, CribNote } from './types';
 
 const CARD = 'crib-card bg-zinc-950 border border-zinc-800 rounded-[13px] p-[21px]';
 const LABEL = 'crib-section-header text-[10px] font-black uppercase tracking-[0.15em] flex items-center gap-[8px] mb-[13px]';
@@ -20,7 +20,8 @@ const alertVariant = (severity: KitchenAlert['severity']) => {
 
 const DailyCribSheet: React.FC = () => {
   const features  = (useKitchenSelector((s: any) => s.features)  as Feature[])     ?? [];
-  const staff     = (useKitchenSelector((s: any) => s.staff)     as StaffMember[]) ?? [];
+  const staff     = (useKitchenSelector((s: any) => s.staff)     as Employee[])    ?? [];
+  const shifts    = (useKitchenSelector((s: any) => s.shifts)    as Shift[])       ?? [];
   const events    = (useKitchenSelector((s: any) => s.events)    as KitchenEvent[]) ?? [];
   const alerts    = (useKitchenSelector((s: any) => s.alerts)    as KitchenAlert[]) ?? [];
   const cribNotes = (useKitchenSelector((s: any) => s.cribNotes) as CribNote[])    ?? [];
@@ -35,7 +36,10 @@ const DailyCribSheet: React.FC = () => {
     return true;
   });
 
-  const todayStaff = staff.filter(s => s.date === todayStr);
+  const staffById = new Map(staff.map(e => [e.id, e]));
+  const todayShifts = [...shifts]
+    .filter(sh => sh.date === todayStr)
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
   const todayEvents = [...events]
     .filter(e => e.date === todayStr)
@@ -136,24 +140,30 @@ const DailyCribSheet: React.FC = () => {
               <Users className="w-3.5 h-3.5" />
               Staff On Today
             </h2>
-            {todayStaff.length === 0 ? (
+            {todayShifts.length === 0 ? (
               <p className={EMPTY}>No staff scheduled.</p>
             ) : (
               <div>
-                {todayStaff.map(s => (
-                  <div key={s.id} className={ROW}>
-                    <div className="flex items-baseline gap-[13px]">
-                      <span className="font-bold text-zinc-100">{s.name}</span>
-                      <span className="text-zinc-500">{s.role}</span>
-                      {s.station && (
-                        <span className={`${BADGE} text-zinc-400 border-zinc-800 bg-zinc-900/30`}>{s.station}</span>
+                {todayShifts.map(sh => {
+                  const employee = staffById.get(sh.staffId);
+                  const positionLabel = sh.station ?? employee?.positions?.[0];
+                  return (
+                    <div key={sh.id} className={`${ROW} !items-start ${sh.note ? 'flex-col gap-[3px]' : ''}`}>
+                      <div className="flex items-baseline justify-between gap-[13px] w-full">
+                        <div className="flex items-baseline gap-[13px] min-w-0">
+                          <span className="font-bold text-zinc-100 shrink-0">{employee?.name ?? 'Unknown'}</span>
+                          {positionLabel && (
+                            <span className={`${BADGE} text-zinc-400 border-zinc-800 bg-zinc-900/30 shrink-0`}>{positionLabel}</span>
+                          )}
+                        </div>
+                        <span className="text-zinc-500 shrink-0 tabular-nums">{sh.startTime}–{sh.endTime}</span>
+                      </div>
+                      {sh.note && (
+                        <p className="text-zinc-200 text-xs">{sh.note}</p>
                       )}
                     </div>
-                    {s.clockIn && (
-                      <span className="text-zinc-500 shrink-0 tabular-nums">{s.clockIn}</span>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

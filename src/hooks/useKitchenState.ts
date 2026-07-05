@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, onSnapshot, DocumentData, QuerySnapshot, QueryDocumentSnapshot, FirestoreError } from 'firebase/firestore';
-import type { Feature, StaffMember, KitchenEvent, KitchenAlert, CribNote, Ingredient, Recipe } from '../types';
+import type { Feature, Employee, Shift, KitchenEvent, KitchenAlert, CribNote, Ingredient, Recipe } from '../types';
 
 // Based on firebase-blueprint.json
 export interface PrepItem {
@@ -30,7 +30,8 @@ export const useKitchenState = () => {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [items86, setItems86] = useState<Item86[]>([]);
   const [features, setFeatures] = useState<Feature[]>([]);
-  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [staff, setStaff] = useState<Employee[]>([]);
+  const [shifts, setShifts] = useState<Shift[]>([]);
   const [events, setEvents] = useState<KitchenEvent[]>([]);
   const [alerts, setAlerts] = useState<KitchenAlert[]>([]);
   const [cribNotes, setCribNotes] = useState<CribNote[]>([]);
@@ -85,7 +86,15 @@ export const useKitchenState = () => {
     const unsubStaff = onSnapshot(
       collection(db, 'staff'),
       (snapshot: QuerySnapshot<DocumentData>) => {
-        setStaff(snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as StaffMember)));
+        setStaff(snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as Employee)));
+      },
+      (err: FirestoreError) => { setError(err); }
+    );
+
+    const unsubShifts = onSnapshot(
+      collection(db, 'shifts'),
+      (snapshot: QuerySnapshot<DocumentData>) => {
+        setShifts(snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as Shift)));
       },
       (err: FirestoreError) => { setError(err); }
     );
@@ -128,6 +137,7 @@ export const useKitchenState = () => {
       unsub86();
       unsubFeatures();
       unsubStaff();
+      unsubShifts();
       unsubEvents();
       unsubAlerts();
       unsubCribNotes();
@@ -135,5 +145,5 @@ export const useKitchenState = () => {
     };
   }, []);
 
-  return { prepItems, setPrepItems, recipes, setRecipes, items86, features, staff, events, alerts, cribNotes, ingredients, loading, error };
+  return { prepItems, setPrepItems, recipes, setRecipes, items86, features, staff, shifts, events, alerts, cribNotes, ingredients, loading, error };
 };
