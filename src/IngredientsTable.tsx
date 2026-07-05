@@ -526,6 +526,7 @@ const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) =>
         isOpen={showInvoiceUpdate}
         onClose={() => setShowInvoiceUpdate(false)}
         ingredients={allIngredients}
+        unitSystem={unitSystem}
       />
 
       {hasRegionalEstimate && (
