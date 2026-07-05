@@ -192,6 +192,10 @@ Any future AI feature must follow this same proxy pattern — no `fetch` to `api
 
 - `firestore.rules` is stale Base44-era: it validates an old schema (`vendor_id`, `cost_per_unit`, `price_source: 'regional_estimate'|'invoice_scan'`, etc.) that doesn't match the canonical types in `src/types.ts`, and requires `isAuthenticated()`/`isEditor()` for writes even though the app has no sign-in flow. Must be rewritten to match canonical types, and the auth story decided, before any real deployment.
 
+## Working Session Protocol
+
+- Feature tests must never write to real pantry ingredients. Test with disposable ingredients created for the test and deleted afterward.
+
 ## Orphaned / notable files
 
 Several component files exist at both `src/*.tsx` (root) and `src/components/*.tsx`. App.tsx imports from `src/components/`. The root-level duplicates (`src/AlertDialog.tsx`, `src/AppHeader.tsx`, `src/CribComponents.tsx`, `src/ErrorBoundary.tsx`) are orphaned copies and are never imported.
