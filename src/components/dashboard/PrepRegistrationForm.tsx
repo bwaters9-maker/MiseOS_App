@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { useKitchenState } from '../../hooks/useKitchenState';
-import { PrepItem, PrepStation } from '../../types';
+import { db } from '../../firebaseConfig';
+import { collection, addDoc } from 'firebase/firestore';
+import { PrepStation } from '../../types';
 import { PlusCircle, Clipboard } from 'lucide-react';
 
 interface PrepRegistrationFormProps {
@@ -9,43 +10,48 @@ interface PrepRegistrationFormProps {
 }
 
 export const PrepRegistrationForm: React.FC<PrepRegistrationFormProps> = ({ onSuccess, onCancel }) => {
-  const { prepItems, setPrepItems } = useKitchenState();
-
   // Form states
   const [description, setDescription] = useState('');
   const [quantity, setQuantity] = useState(1);
+  const [par, setPar] = useState(1);
   const [unit, setUnit] = useState('kg');
   const [station, setStation] = useState<PrepStation>('Sauté');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [instructions, setInstructions] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!description.trim()) return;
+    if (!description.trim() || saving) return;
 
-    const newPrepItem: PrepItem = {
-      id: `prep-${Date.now()}`,
-      name: description.trim(),
-      quantity: quantity,
-      unit: unit.trim(),
-      checked: false,
-      station: station,
-      priority: priority,
-      notes: instructions.trim() || undefined,
-      lastModified: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
+    setSaving(true);
+    try {
+      await addDoc(collection(db, 'prepItems'), {
+        name: description.trim(),
+        quantity: quantity,
+        par: par,
+        unit: unit.trim(),
+        checked: false,
+        assignedStation: station,
+        station: station,
+        priority: priority,
+        ...(instructions.trim() && { notes: instructions.trim() }),
+        lastModified: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      });
 
-    setPrepItems([...prepItems, newPrepItem]);
-    
-    // Reset form
-    setDescription('');
-    setQuantity(1);
-    setUnit('kg');
-    setStation('Sauté');
-    setPriority('medium');
-    setInstructions('');
+      // Reset form
+      setDescription('');
+      setQuantity(1);
+      setPar(1);
+      setUnit('kg');
+      setStation('Sauté');
+      setPriority('medium');
+      setInstructions('');
 
-    if (onSuccess) onSuccess();
+      if (onSuccess) onSuccess();
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -71,13 +77,27 @@ export const PrepRegistrationForm: React.FC<PrepRegistrationFormProps> = ({ onSu
           />
         </div>
 
-        {/* Quantity */}
+        {/* On-Hand */}
         <div className="space-y-1">
-          <label className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 block">Quantity Amount</label>
+          <label className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 block">On-Hand</label>
           <input
             type="number"
             value={quantity}
             onChange={(e) => setQuantity(parseFloat(e.target.value) || 0)}
+            min={0.1}
+            step="any"
+            className="w-full bg-zinc-950 border border-zinc-800 p-2.5 rounded-lg text-xs focus:outline-none focus:border-zinc-700 text-zinc-200"
+            required
+          />
+        </div>
+
+        {/* Par Level */}
+        <div className="space-y-1">
+          <label className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 block">Par Level</label>
+          <input
+            type="number"
+            value={par}
+            onChange={(e) => setPar(parseFloat(e.target.value) || 0)}
             min={0.1}
             step="any"
             className="w-full bg-zinc-950 border border-zinc-800 p-2.5 rounded-lg text-xs focus:outline-none focus:border-zinc-700 text-zinc-200"
@@ -123,9 +143,9 @@ export const PrepRegistrationForm: React.FC<PrepRegistrationFormProps> = ({ onSu
               priority === 'high' ? 'text-red-400 animate-pulse' : priority === 'medium' ? 'text-amber-400' : 'text-zinc-400'
             }`}
           >
-            <option value="low">⚪ Low Priority</option>
-            <option value="medium">🟡 Medium Priority</option>
-            <option value="high">🔴 High Priority</option>
+            <option value="low">Low Priority</option>
+            <option value="medium">Medium Priority</option>
+            <option value="high">High Priority</option>
           </select>
         </div>
 
@@ -153,9 +173,10 @@ export const PrepRegistrationForm: React.FC<PrepRegistrationFormProps> = ({ onSu
         )}
         <button
           type="submit"
-          className="bg-emerald-700 hover:bg-emerald-600 border border-emerald-800 text-zinc-100 text-xs uppercase px-5 py-2.5 rounded-lg font-bold tracking-wider flex items-center gap-2 transition-colors shadow-md"
+          disabled={saving}
+          className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed border border-emerald-800 text-zinc-100 text-xs uppercase px-5 py-2.5 rounded-lg font-bold tracking-wider flex items-center gap-2 transition-colors shadow-md"
         >
-          <PlusCircle className="w-4 h-4" /> Register Prep Item
+          <PlusCircle className="w-4 h-4" /> {saving ? 'Registering...' : 'Register Prep Item'}
         </button>
       </div>
     </form>

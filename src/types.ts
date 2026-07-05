@@ -15,7 +15,7 @@ export interface PrepItem {
   station?: string;
   notes?: string;
   lastModified?: string;
-  recipe_id: string;
+  recipe_id?: string;
 }
 
 /**

@@ -1,21 +1,39 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { PrepItem } from './types';
+import { PrepRegistrationForm } from './components/dashboard/PrepRegistrationForm';
+import { useKitchenSelector } from './components/KitchenStateContext';
 
-interface PrepChecklistProps {
-  prepItems?: PrepItem[];
-}
+export const PrepChecklist: React.FC = () => {
+  const [showAddForm, setShowAddForm] = useState(false);
+  const prepItems = (useKitchenSelector((s: any) => s.prepItems) as PrepItem[]) ?? [];
 
-export const PrepChecklist: React.FC<PrepChecklistProps> = ({ prepItems = [] }) => {
   return (
     <div className="w-full max-w-7xl mx-auto p-6 bg-zinc-950 text-zinc-100 font-mono tracking-tight">
-      <div className="border-b border-zinc-900 pb-4 mb-6">
-        <h1 className="text-2xl font-black text-white tracking-tighter uppercase">Line Prep Checklist</h1>
-        <p className="text-xs text-zinc-500 mt-1">Automated par-to-hand deficiency tracking</p>
+      <div className="border-b border-zinc-900 pb-4 mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-black text-white tracking-tighter uppercase">Line Prep Checklist</h1>
+          <p className="text-xs text-zinc-500 mt-1">Automated par-to-hand deficiency tracking</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowAddForm((v) => !v)}
+          className="bg-emerald-700 hover:bg-emerald-600 border border-emerald-800 text-zinc-100 text-xs uppercase px-4 py-2 rounded-lg font-bold tracking-wider transition-colors shadow-md"
+        >
+          + Add Prep Item
+        </button>
       </div>
+      {showAddForm && (
+        <div className="mb-6">
+          <PrepRegistrationForm
+            onSuccess={() => setShowAddForm(false)}
+            onCancel={() => setShowAddForm(false)}
+          />
+        </div>
+      )}
       <div className="border border-zinc-900 rounded-xl overflow-hidden bg-zinc-900/10">
         {prepItems.length === 0 ? (
           <div className="p-8 text-center text-zinc-500 text-sm">
-            No prep items loaded. Add items to your prep list to get started.
+            No prep items registered. Add the first item to begin par tracking.
           </div>
         ) : (
           <table className="w-full text-left text-xs">
