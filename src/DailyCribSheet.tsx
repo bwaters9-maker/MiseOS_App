@@ -183,25 +183,39 @@ const DailyCribSheet: React.FC = () => {
               <p className={EMPTY}>No events today.</p>
             ) : (
               <div>
-                {todayEvents.map(e => (
-                  <div key={e.id} className={ROW}>
-                    <div className="flex items-baseline gap-[13px] min-w-0">
-                      {e.time && (
-                        <span className="text-zinc-400 shrink-0 tabular-nums">{e.time}</span>
-                      )}
-                      {e.eventType && (
-                        <span className={`${BADGE} text-purple-300 border-purple-900 bg-purple-950/30 shrink-0`}>{e.eventType}</span>
-                      )}
-                      <span className="font-bold text-zinc-100 truncate">{e.title}</span>
-                      {e.notes && (
-                        <span className="text-zinc-500 truncate hidden md:inline">{e.notes}</span>
+                {todayEvents.map(e => {
+                  const sortedMilestones = [...(e.milestones ?? [])].sort((a, b) => a.time.localeCompare(b.time));
+                  return (
+                    <div key={e.id} className={`${ROW} ${sortedMilestones.length > 0 ? '!items-start flex-col gap-[5px]' : ''}`}>
+                      <div className="flex items-baseline justify-between gap-[13px] w-full">
+                        <div className="flex items-baseline gap-[13px] min-w-0">
+                          {e.time && (
+                            <span className="text-zinc-400 shrink-0 tabular-nums">{e.time}</span>
+                          )}
+                          {e.eventType && (
+                            <span className={`${BADGE} text-purple-300 border-purple-900 bg-purple-950/30 shrink-0`}>{e.eventType}</span>
+                          )}
+                          <span className="font-bold text-zinc-100 truncate">{e.title}</span>
+                          {e.notes && (
+                            <span className="text-zinc-500 truncate hidden md:inline">{e.notes}</span>
+                          )}
+                        </div>
+                        {readAttendees(e) != null && (
+                          <span className="text-zinc-400 shrink-0 tabular-nums">{readAttendees(e)}&nbsp;attendees</span>
+                        )}
+                      </div>
+                      {sortedMilestones.length > 0 && (
+                        <div className="pl-[13px] border-l border-zinc-800 space-y-[2px] w-full">
+                          {sortedMilestones.map((m, i) => (
+                            <p key={i} className="text-[10px] text-zinc-500">
+                              <span className="tabular-nums text-zinc-400">{m.time}</span>&nbsp;—&nbsp;{m.label}
+                            </p>
+                          ))}
+                        </div>
                       )}
                     </div>
-                    {readAttendees(e) != null && (
-                      <span className="text-zinc-400 shrink-0 tabular-nums">{readAttendees(e)}&nbsp;attendees</span>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

@@ -213,6 +213,17 @@ export interface TentativeMenuLine {
   recipeId?: string;
 }
 
+/**
+ * An append-only entry in an event's change log — the paper trail of what
+ * changed and when. Entries are never edited or deleted once written, either
+ * manually logged by the chef or auto-appended when attendees changes or a
+ * tentative menu line is added/removed/swapped.
+ */
+export interface EventChangeLogEntry {
+  date: string;
+  text: string;
+}
+
 export interface KitchenEvent {
   id: string;
   title: string;
@@ -224,6 +235,7 @@ export interface KitchenEvent {
   clientId?: string;
   milestones?: EventMilestone[];
   tentativeMenu?: TentativeMenuLine[];
+  changeLog?: EventChangeLogEntry[];
 }
 
 export interface KitchenAlert {

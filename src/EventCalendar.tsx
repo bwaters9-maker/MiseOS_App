@@ -6,7 +6,7 @@ import { useKitchenSelector } from './components/KitchenStateContext';
 import { useEventTypes } from './hooks/useEventTypes';
 import { useRecipeCategories } from './hooks/useRecipeCategories';
 import { EventDetailView } from './components/events/EventDetailView';
-import type { KitchenEvent, Client, Employee, Shift, Recipe, Ingredient } from './types';
+import type { KitchenEvent, Client, Employee, Shift, Recipe, Ingredient, EventChangeLogEntry } from './types';
 
 const getToday = () => new Date().toISOString().slice(0, 10);
 
@@ -364,12 +364,16 @@ const ClientForm: React.FC<{
 
 const ClientCard: React.FC<{
   client: Client;
+  events: KitchenEvent[];
+  onOpenEvent: (id: string) => void;
   onEdit: (c: Client) => void;
   onDelete: (id: string) => void;
   deleteConfirmId: string | null;
   setDeleteConfirmId: (id: string | null) => void;
-}> = ({ client: c, onEdit, onDelete, deleteConfirmId, setDeleteConfirmId }) => {
+}> = ({ client: c, events, onOpenEvent, onEdit, onDelete, deleteConfirmId, setDeleteConfirmId }) => {
   const isConfirm = deleteConfirmId === c.id;
+  const [expanded, setExpanded] = useState(false);
+  const clientEvents = [...events].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
 
   return (
     <div className="bg-zinc-950 border border-zinc-800 rounded-[13px] p-[21px]">
@@ -418,6 +422,33 @@ const ClientCard: React.FC<{
           )}
         </div>
       </div>
+      <button
+        onClick={() => setExpanded(x => !x)}
+        disabled={clientEvents.length === 0}
+        className="flex items-center gap-[5px] mt-[13px] pt-[13px] border-t border-zinc-900 text-zinc-500 text-xs w-full hover:text-zinc-300 transition-colors duration-[144ms] disabled:hover:text-zinc-500 disabled:cursor-default"
+      >
+        {clientEvents.length} {clientEvents.length === 1 ? 'event' : 'events'}
+        {clientEvents.length > 0 && (
+          <ChevronDown className={`w-3 h-3 ml-auto transition-transform duration-[144ms] ${expanded ? 'rotate-180' : ''}`} />
+        )}
+      </button>
+      {expanded && clientEvents.length > 0 && (
+        <div className="mt-[8px] space-y-[3px]">
+          {clientEvents.map(e => (
+            <button
+              key={e.id}
+              onClick={() => onOpenEvent(e.id)}
+              className="flex items-center justify-between gap-[8px] w-full text-left px-[8px] py-[5px] rounded-[5px] hover:bg-zinc-900/50 transition-colors duration-[144ms]"
+            >
+              <span className="flex items-center gap-[8px] min-w-0">
+                <span className="text-zinc-400 text-xs shrink-0">{e.date ? formatDate(e.date) : 'No date'}</span>
+                {e.eventType && <span className={TYPE_BADGE}>{e.eventType}</span>}
+              </span>
+              {readAttendees(e) != null && <span className="text-zinc-500 text-xs shrink-0">{readAttendees(e)}&nbsp;attendees</span>}
+            </button>
+          ))}
+        </div>
+      )}
       {c.flagNote && (
         <div className="flex items-start gap-[8px] mt-[13px] pt-[13px] border-t border-zinc-900 text-amber-400">
           <Flag className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
@@ -501,7 +532,22 @@ const EventCalendar: React.FC = () => {
     if (!editEventForm.title.trim() || !editEventForm.date || savingEvent || !editEventId) return;
     setSavingEvent(true);
     try {
-      await updateDoc(doc(db, 'events', editEventId), eventToDoc(editEventForm));
+      const before = allEvents.find(e => e.id === editEventId);
+      const patch: Record<string, unknown> = eventToDoc(editEventForm);
+      const oldAttendees = before ? readAttendees(before) : undefined;
+      const newAttendees = editEventForm.attendees !== '' && !isNaN(parseInt(editEventForm.attendees, 10))
+        ? parseInt(editEventForm.attendees, 10)
+        : undefined;
+      if (oldAttendees !== newAttendees) {
+        const logText = oldAttendees == null
+          ? `Attendees set to ${newAttendees}`
+          : newAttendees == null
+            ? `Attendees (${oldAttendees}) cleared`
+            : `Attendees ${oldAttendees} → ${newAttendees}`;
+        const nextLog: EventChangeLogEntry[] = [...(before?.changeLog ?? []), { date: today, text: logText }];
+        patch.changeLog = nextLog;
+      }
+      await updateDoc(doc(db, 'events', editEventId), patch);
       setEditEventId(null);
     } finally {
       setSavingEvent(false);
@@ -573,6 +619,7 @@ const EventCalendar: React.FC = () => {
         ingredients={allIngredients}
         recipeCategories={recipeCategories}
         onBack={() => setDetailEventId(null)}
+        onNavigateToEvent={setDetailEventId}
       />
     );
   }
@@ -823,6 +870,8 @@ const EventCalendar: React.FC = () => {
                 <ClientCard
                   key={c.id}
                   client={c}
+                  events={allEvents.filter(e => e.clientId === c.id)}
+                  onOpenEvent={setDetailEventId}
                   onEdit={startEditClient}
                   onDelete={handleDeleteClient}
                   deleteConfirmId={deleteClientConfirmId}

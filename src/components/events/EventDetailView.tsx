@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Clock, Plus, Pencil, Trash2, Check, X, Search, ChefHat, Contact, History, Flag, Users, Link2, Unlink } from 'lucide-react';
+import { ArrowLeft, Clock, Plus, Pencil, Trash2, Check, X, Search, ChefHat, Contact, History, Flag, Users, Link2, Unlink, ChevronDown, ScrollText } from 'lucide-react';
 import { db } from '../../firebaseConfig';
 import { updateDoc, doc } from 'firebase/firestore';
-import type { KitchenEvent, Client, Employee, Shift, Recipe, Ingredient, RecipeCategory, EventMilestone, TentativeMenuLine } from '../../types';
+import type { KitchenEvent, Client, Employee, Shift, Recipe, Ingredient, RecipeCategory, EventMilestone, TentativeMenuLine, EventChangeLogEntry } from '../../types';
 import { costPerPortion } from '../../lib/costEngine';
 
 const readAttendees = (e: KitchenEvent): number | undefined =>
@@ -306,10 +306,12 @@ const MenuPanel: React.FC<{
   const [deleteConfirmIdx, setDeleteConfirmIdx] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const writeLines = async (next: TentativeMenuLine[]) => {
+  const writeLines = async (next: TentativeMenuLine[], logText?: string) => {
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'events', event.id), { tentativeMenu: next });
+      const patch: Record<string, unknown> = { tentativeMenu: next };
+      if (logText) patch.changeLog = [...(event.changeLog ?? []), { date: getToday(), text: logText }];
+      await updateDoc(doc(db, 'events', event.id), patch);
     } finally {
       setSaving(false);
     }
@@ -323,7 +325,8 @@ const MenuPanel: React.FC<{
 
   const handleAdd = async () => {
     if (!addForm.course || !addForm.text.trim() || saving) return;
-    await writeLines([...lines, toLine(addForm)]);
+    const line = toLine(addForm);
+    await writeLines([...lines, line], `Added to ${line.course}: ${line.text}`);
     setAddForm(BLANK_MENU_LINE(categories[0]?.name ?? ''));
     setShowAdd(false);
   };
@@ -338,13 +341,22 @@ const MenuPanel: React.FC<{
 
   const handleEdit = async () => {
     if (editIdx === null || !editForm.course || !editForm.text.trim() || saving) return;
-    const next = lines.map((l, i) => i === editIdx ? toLine(editForm) : l);
-    await writeLines(next);
+    const oldLine = lines[editIdx];
+    const newLine = toLine(editForm);
+    const next = lines.map((l, i) => i === editIdx ? newLine : l);
+    let logText: string | undefined;
+    if (oldLine.text !== newLine.text) {
+      logText = `${newLine.course}: ${oldLine.text} → ${newLine.text}`;
+    } else if (oldLine.course !== newLine.course) {
+      logText = `${oldLine.text} moved from ${oldLine.course} to ${newLine.course}`;
+    }
+    await writeLines(next, logText);
     setEditIdx(null);
   };
 
   const handleDelete = async (idx: number) => {
-    await writeLines(lines.filter((_, i) => i !== idx));
+    const line = lines[idx];
+    await writeLines(lines.filter((_, i) => i !== idx), `Removed from ${line.course}: ${line.text}`);
     setDeleteConfirmIdx(null);
   };
 
@@ -461,7 +473,14 @@ const MenuPanel: React.FC<{
 // CLIENT PANEL
 // ===================================================================
 
-const ClientPanel: React.FC<{ event: KitchenEvent; client: Client | undefined; allEvents: KitchenEvent[] }> = ({ event, client, allEvents }) => {
+const ClientPanel: React.FC<{
+  event: KitchenEvent;
+  client: Client | undefined;
+  allEvents: KitchenEvent[];
+  onNavigateToEvent: (id: string) => void;
+}> = ({ event, client, allEvents, onNavigateToEvent }) => {
+  const [expanded, setExpanded] = useState(false);
+
   if (!client) {
     return (
       <div className={CARD}>
@@ -475,7 +494,10 @@ const ClientPanel: React.FC<{ event: KitchenEvent; client: Client | undefined; a
   }
 
   const today = getToday();
-  const pastEventsCount = allEvents.filter(e => e.clientId === client.id && e.id !== event.id && !!e.date && e.date < today).length;
+  const clientEvents = allEvents
+    .filter(e => e.clientId === client.id && e.id !== event.id)
+    .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
+  const pastEventsCount = clientEvents.filter(e => !!e.date && e.date! < today).length;
 
   return (
     <div className={CARD}>
@@ -489,10 +511,36 @@ const ClientPanel: React.FC<{ event: KitchenEvent; client: Client | undefined; a
         {client.phone && <p className="text-zinc-500">{client.phone}</p>}
         {client.email && <p className="text-zinc-500">{client.email}</p>}
       </div>
-      <div className="flex items-center gap-[5px] mt-[13px] pt-[13px] border-t border-zinc-900 text-zinc-500 text-xs">
+      <button
+        onClick={() => setExpanded(x => !x)}
+        disabled={clientEvents.length === 0}
+        className="flex items-center gap-[5px] mt-[13px] pt-[13px] border-t border-zinc-900 text-zinc-500 text-xs w-full hover:text-zinc-300 transition-colors duration-[144ms] disabled:hover:text-zinc-500 disabled:cursor-default"
+      >
         <History className="w-3.5 h-3.5" />
         {pastEventsCount} past {pastEventsCount === 1 ? 'event' : 'events'}
-      </div>
+        {clientEvents.length > 0 && (
+          <ChevronDown className={`w-3 h-3 ml-auto transition-transform duration-[144ms] ${expanded ? 'rotate-180' : ''}`} />
+        )}
+      </button>
+      {expanded && clientEvents.length > 0 && (
+        <div className="mt-[8px] space-y-[3px]">
+          {clientEvents.map(e => (
+            <button
+              key={e.id}
+              onClick={() => onNavigateToEvent(e.id)}
+              className="flex items-center justify-between gap-[8px] w-full text-left px-[8px] py-[5px] rounded-[5px] hover:bg-zinc-900/50 transition-colors duration-[144ms]"
+            >
+              <span className="flex items-center gap-[8px] min-w-0">
+                <span className="text-zinc-400 text-xs shrink-0">{e.date ? formatDate(e.date) : 'No date'}</span>
+                {e.eventType && (
+                  <span className={`${BADGE} text-purple-300 border-purple-900 bg-purple-950/30 shrink-0`}>{e.eventType}</span>
+                )}
+              </span>
+              {readAttendees(e) != null && <span className="text-zinc-500 text-xs shrink-0">{readAttendees(e)}&nbsp;attendees</span>}
+            </button>
+          ))}
+        </div>
+      )}
       {client.flagNote && (
         <div className="flex items-start gap-[8px] mt-[13px] pt-[13px] border-t border-zinc-900 text-amber-400">
           <Flag className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
@@ -504,18 +552,76 @@ const ClientPanel: React.FC<{ event: KitchenEvent; client: Client | undefined; a
 };
 
 // ===================================================================
-// CHANGE LOG PANEL (placeholder — part 3)
+// CHANGE LOG PANEL
 // ===================================================================
 
-const ChangeLogPanel: React.FC = () => (
-  <div className={CARD}>
-    <h2 className={`${PANEL_LABEL} text-zinc-400`}>
-      <History className="w-3.5 h-3.5" />
-      Change Log
-    </h2>
-    <p className="text-xs text-zinc-500 italic py-[8px]">Not tracked yet — coming in part 3.</p>
-  </div>
-);
+const ChangeLogPanel: React.FC<{ event: KitchenEvent }> = ({ event }) => {
+  const entries = event.changeLog ?? [];
+  const reversed = [...entries].reverse();
+
+  const [showAdd, setShowAdd] = useState(false);
+  const [text, setText] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleAdd = async () => {
+    if (!text.trim() || saving) return;
+    setSaving(true);
+    try {
+      const next: EventChangeLogEntry[] = [...entries, { date: getToday(), text: text.trim() }];
+      await updateDoc(doc(db, 'events', event.id), { changeLog: next });
+      setText('');
+      setShowAdd(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className={CARD}>
+      <div className="flex items-center justify-between mb-[13px]">
+        <h2 className={`${PANEL_LABEL} text-zinc-400 !mb-0`}>
+          <ScrollText className="w-3.5 h-3.5" />
+          Change Log
+        </h2>
+        {!showAdd && (
+          <button onClick={() => setShowAdd(true)} className="p-[5px] text-zinc-600 hover:text-zinc-300 transition-colors duration-[144ms]" title="Add log entry">
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+
+      {reversed.length === 0 && !showAdd && (
+        <p className="text-xs text-zinc-500 italic py-[8px]">No changes logged yet.</p>
+      )}
+
+      <div className="space-y-[5px]">
+        {reversed.map((entry, i) => (
+          <p key={i} className="text-xs py-[5px] border-b border-zinc-900 last:border-b-0">
+            <span className="text-zinc-500 tabular-nums">{entry.date}</span>
+            <span className="text-zinc-200"> — {entry.text}</span>
+          </p>
+        ))}
+      </div>
+
+      {showAdd && (
+        <div className="bg-zinc-900/50 border border-zinc-800 rounded-[8px] p-[13px] mt-[8px] space-y-[8px]">
+          <input
+            type="text"
+            value={text}
+            onChange={e => setText(e.target.value)}
+            placeholder="e.g. Client confirmed final guest count by phone"
+            className={INPUT}
+            autoFocus
+          />
+          <div className="flex gap-[8px] justify-end">
+            <button onClick={() => { setShowAdd(false); setText(''); }} className={BTN_GHOST}>Cancel</button>
+            <button onClick={handleAdd} disabled={!text.trim() || saving} className={`${BTN_PRIMARY} disabled:opacity-40 disabled:cursor-not-allowed`}>Add</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ===================================================================
 // MAIN VIEW
@@ -531,7 +637,8 @@ export const EventDetailView: React.FC<{
   ingredients: Ingredient[];
   recipeCategories: RecipeCategory[];
   onBack: () => void;
-}> = ({ event, client, allEvents, staff, shifts, recipes, ingredients, recipeCategories, onBack }) => {
+  onNavigateToEvent: (id: string) => void;
+}> = ({ event, client, allEvents, staff, shifts, recipes, ingredients, recipeCategories, onBack, onNavigateToEvent }) => {
   const staffById = new Map(staff.map(s => [s.id, s]));
   const dateShifts = event.date ? shifts.filter(sh => sh.date === event.date) : [];
   const shiftNotes = dateShifts.filter(sh => sh.note);
@@ -576,8 +683,8 @@ export const EventDetailView: React.FC<{
       <div className="grid grid-cols-1 md:grid-cols-2 gap-[21px]">
         <TimelinePanel event={event} />
         <MenuPanel event={event} recipes={recipes} ingredients={ingredients} categories={recipeCategories} />
-        <ClientPanel event={event} client={client} allEvents={allEvents} />
-        <ChangeLogPanel />
+        <ClientPanel event={event} client={client} allEvents={allEvents} onNavigateToEvent={onNavigateToEvent} />
+        <ChangeLogPanel event={event} />
       </div>
     </div>
   );
