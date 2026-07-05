@@ -40,6 +40,7 @@ service cloud.firestore {
     //   - nutritionPer100g: map (optional)
     //   - allergens: list (optional, <= 20 items)
     //   - vendorId: string (optional — no Vendor Management collection yet)
+    //   - nutritionSource: string (optional) — 'ai' | 'manual'
     //
     // ===============================================================
     // Helper Functions
@@ -55,7 +56,7 @@ service cloud.firestore {
 
     function isValidIngredient(data) {
       let required = ['name', 'category', 'measureType', 'purchaseUnit', 'purchaseCost', 'purchaseQty', 'yieldPercent', 'lastVerified', 'priceSource'];
-      let optional = ['nutritionPer100g', 'allergens', 'vendorId'];
+      let optional = ['nutritionPer100g', 'allergens', 'vendorId', 'nutritionSource'];
       return data.keys().hasAll(required)
         && data.keys().hasOnly(required.concat(optional))
         && data.name is string && data.name.size() > 0 && data.name.size() <= 200
@@ -70,7 +71,8 @@ service cloud.firestore {
         && data.priceSource is string && data.priceSource in ['regional-estimate', 'invoice', 'manual']
         && (!('vendorId' in data) || (data.vendorId is string && data.vendorId.size() <= 200))
         && (!('allergens' in data) || (data.allergens is list && data.allergens.size() <= 20))
-        && (!('nutritionPer100g' in data) || data.nutritionPer100g is map);
+        && (!('nutritionPer100g' in data) || data.nutritionPer100g is map)
+        && (!('nutritionSource' in data) || data.nutritionSource in ['ai', 'manual']);
     }
 
     // ===============================================================

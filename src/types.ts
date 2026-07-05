@@ -168,6 +168,7 @@ export interface Ingredient {
   vendorId?: string;
   lastVerified: string;
   priceSource: PriceSource;
+  nutritionSource?: 'ai' | 'manual';
 }
 
 export interface KitchenEvent {

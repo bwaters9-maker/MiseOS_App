@@ -78,6 +78,8 @@ src/
 
     ingredients/
       InvoicePriceUpdate.tsx     Photo/PDF invoice → AI-extracted line items → human-confirmed price writes
+      AiIngredientLookup.tsx     Name → AI-proposed ingredient → chef-reviewed add (default Add Ingredient path)
+      IngredientForm.tsx         Shared form/types/toDoc used by AiIngredientLookup, manual add, and edit
 
     dashboard/
       LineTimerModule.tsx
@@ -143,7 +145,7 @@ Current nav tabs (in order): Crib Sheet · Features · Staff · Events · Ingred
 | `CribNote` | Freeform crib note (date, content, author) |
 | `KitchenTimer` | Countdown timer |
 | `TrendReport` | Recipe trend scores |
-| `Ingredient` | Master Pantry item: name, category, measureType, purchaseUnit, purchaseCost, purchaseQty, yieldPercent, nutritionPer100g?, allergens?, vendorId?, lastVerified, priceSource |
+| `Ingredient` | Master Pantry item: name, category, measureType, purchaseUnit, purchaseCost, purchaseQty, yieldPercent, nutritionPer100g?, allergens?, vendorId?, lastVerified, priceSource, nutritionSource? ('ai' \| 'manual') |
 | `RecipeCategory` | Chef-managed recipe category (id, name), CRUD'd from Settings — referenced by `Recipe.categoryId` |
 | `IngredientCategory` | `'Produce' \| 'Protein' \| 'Dairy' \| 'Dry Goods' \| 'Frozen' \| 'Beverage' \| 'Other'` |
 | `MeasureType` | `'weight' \| 'volume' \| 'each'` — determines base unit (g, ml, each) |
@@ -165,6 +167,8 @@ Note: `useKitchenState.ts` also defines `PrepItem` and `Item86` locally (pre-exi
 - **Cards:** `bg-zinc-950 border border-zinc-800 rounded-xl`
 - **Spacing:** Fibonacci-based tokens from `design-tokens.json` — use as Tailwind arbitrary values (`p-[21px]`, `gap-[34px]`, etc.)
 - No emojis. No comments explaining what code does.
+- No open free-text inputs except names, comments, and special requests — all
+  other values come from structured selects, ideally user-customizable lists.
 
 ## Invoice Price Update (components/ingredients/InvoicePriceUpdate.tsx)
 
@@ -176,6 +180,15 @@ Opened as a modal from `IngredientsTable.tsx`. Every write is chef-confirmed —
 - **Pack-size mismatch guard**: `packSizeMismatch` parses both the pantry's stored `purchaseUnit` and the invoice's `packDescription` into a quantity + unit family (weight/volume/count) and flags a warning icon if the families differ or the ratio is outside 0.7–1.3. This is a warning only — it never auto-converts or blocks acceptance.
 - **Apply**: only checked, eligible rows are written on "Apply" — each becomes an `updateDoc` setting `purchaseCost`, `priceSource: 'invoice'`, and `lastVerified` to today. Unchecked or ineligible rows are left untouched.
 - **Add-unmatched-to-pantry**: invoice lines with no pantry match get a second, non-fatal AI pass suggesting a clean name/category/measureType/pack size/yield%/allergens for a net-new ingredient. The chef reviews/edits the suggestion in an inline form (`canConfirmAdd` requires name, category, qty, and cost) before "Confirm & Add to Pantry" runs an `addDoc` with `priceSource: 'invoice'` and `lastVerified: today`.
+
+## AI-Guided Ingredient Entry (components/ingredients/AiIngredientLookup.tsx)
+
+The default path when the chef clicks "Add Ingredient" in `IngredientsTable.tsx` — same AI-proposes/chef-confirms pattern as everything else. Shared form logic (types, `toDoc`/`toProposalDoc`, `IngredientForm`, `NutritionAllergenSection`) lives in `components/ingredients/IngredientForm.tsx` so this flow and the plain manual/edit paths never duplicate the form.
+
+- Chef types only a name and hits "Look Up"; one `/api/ai` call returns `{ cleanName, category, measureType, purchaseUnit, packQtyInBaseUnits, baseUnit, estimatedPackCost, yieldPercent, allergens, nutritionPer100g }`, constrained to the same canonical unions as the invoice add-to-pantry prompt.
+- The proposal renders as a pre-filled, fully editable `IngredientForm` (`costEstimateBadge`) with an "Estimate" badge on the cost field. Saving unedited sets `priceSource: 'regional-estimate'` and `lastVerified: ''` (the existing unverified-dot convention); editing the cost field before saving counts as verification — `priceSource: 'manual'`, `lastVerified` today (`toProposalDoc`).
+- Nutrition and allergens auto-fill from the proposal and stay editable. `nutritionSource: 'ai'` is stamped whenever nutrition data is present, so the future FDA label feature knows it's AI-estimated, not chef-verified.
+- "Enter manually instead" (or a failed lookup) drops to the plain blank `IngredientForm` with `showManualCaution` — a persistent warning that small pack-size/yield errors compound into large costing errors. The same `showManualCaution` flag renders on every edit of an existing ingredient, since editing pack/yield carries the same risk. Manual/edit saves always stamp `priceSource: 'manual'`, `lastVerified` today, and `nutritionSource: 'manual'` (`toDoc`) — unconditionally, regardless of which fields were actually touched, matching the pre-existing edit behavior.
 
 ## Recipe Builder (Recipes.tsx)
 
