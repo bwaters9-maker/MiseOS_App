@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { ChefHat, Plus, Trash2, X, Check, Search, Layers, UtensilsCrossed, AlertTriangle, Sparkles, Loader2 } from 'lucide-react';
 import { db } from './firebaseConfig';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
@@ -6,7 +6,7 @@ import { useKitchenSelector } from './components/KitchenStateContext';
 import { useRecipeCategories } from './hooks/useRecipeCategories';
 import { AlertDialog } from './components/AlertDialog';
 import {
-  recipeCost, costPerPortion, fcPercent, suggestedPrice, wouldCreateCycle,
+  recipeCost, costPerPortion, fcPercent, suggestedPrice, wouldCreateCycle, fcColor,
 } from './lib/costEngine';
 import {
   toBase, displayUnitsFor, defaultDisplayUnit, smartUnit, costPerDisplayUnit,
@@ -20,9 +20,6 @@ const FIELD_LABEL = 'block text-[10px] font-bold uppercase tracking-wider text-z
 const BTN_PRIMARY = 'px-[13px] py-[8px] bg-emerald-900/50 border border-emerald-700 rounded-[8px] text-xs font-bold text-emerald-300 hover:bg-emerald-900 transition-colors duration-[144ms]';
 const BTN_GHOST = 'px-[13px] py-[8px] bg-zinc-900 border border-zinc-700 rounded-[8px] text-xs font-bold text-zinc-400 hover:text-zinc-200 transition-colors duration-[144ms]';
 const BADGE = 'px-[8px] py-[3px] rounded-[5px] text-[10px] font-bold uppercase tracking-wider border';
-
-const fcColor = (fc: number, target: number): string =>
-  fc <= target ? 'text-emerald-400' : fc <= target + 5 ? 'text-amber-400' : 'text-red-400';
 
 const pantrySystemPrompt = (unitSystem: UnitSystem): string => `You are a professional chef proposing ingredients for a dish from a specific restaurant's Master Pantry inventory. You will receive the recipe's name, category, recipe type, and the pantry as a JSON list of { id, name }.
 
@@ -863,9 +860,11 @@ const CostPanel: React.FC<{
 interface RecipesProps {
   unitSystem?: UnitSystem;
   targetFcPercent?: number;
+  selectedRecipeId?: string | null;
+  setSelectedRecipeId?: (id: string | null) => void;
 }
 
-const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPercent = 30 }) => {
+const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPercent = 30, selectedRecipeId, setSelectedRecipeId }) => {
   const allRecipes = (useKitchenSelector((s: any) => s.recipes) as Recipe[]) ?? [];
   const allIngredients = (useKitchenSelector((s: any) => s.ingredients) as Ingredient[]) ?? [];
   const { categories } = useRecipeCategories();
@@ -901,6 +900,18 @@ const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPerc
     setDeleteConfirmId(null);
     setEditorSession(s => s + 1);
   };
+
+  // Consumes a pending navigation request (e.g. from the Menu view's row
+  // click) — waits for allRecipes to be populated if the listener hasn't
+  // delivered yet, rather than dropping the request.
+  useEffect(() => {
+    if (!selectedRecipeId) return;
+    const target = allRecipes.find(r => r.id === selectedRecipeId);
+    if (target) {
+      openRecipe(target);
+      setSelectedRecipeId?.(null);
+    }
+  }, [selectedRecipeId, allRecipes]);
 
   const startCreate = (recipeType: 'sub' | 'menu') => {
     setSelectedId(null);

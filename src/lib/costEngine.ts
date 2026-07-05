@@ -94,3 +94,36 @@ export const calculateTrueCost = (apCost: number, yieldPercent: number): number 
   if (!yieldPercent || yieldPercent <= 0) return apCost;
   return apCost / (yieldPercent / 100);
 };
+
+/**
+ * True if any ingredient in `recipe`'s cost chain — including through
+ * sub-recipes — carries priceSource 'regional-estimate'. Used to flag menu
+ * items whose FC% rests partly on an unverified price rather than a
+ * chef-confirmed one. Mirrors recipeCost's cycle-safe recursion; a cycle
+ * simply stops recursing rather than throwing, since this is an informational
+ * read, not a cost total.
+ */
+export const recipeUsesEstimatedPricing = (
+  recipe: Recipe,
+  ingredients: Ingredient[],
+  recipes: Recipe[],
+  visited: Set<string> = new Set(),
+): boolean => {
+  if (visited.has(recipe.id)) return false;
+  const nextVisited = new Set(visited);
+  nextVisited.add(recipe.id);
+
+  return recipe.lines.some(line => {
+    if (line.type === 'ingredient') {
+      const ingredient = ingredients.find(i => i.id === line.refId);
+      return ingredient?.priceSource === 'regional-estimate';
+    }
+    const subRecipe = recipes.find(r => r.id === line.refId);
+    if (!subRecipe) return false;
+    return recipeUsesEstimatedPricing(subRecipe, ingredients, recipes, nextVisited);
+  });
+};
+
+/** Same emerald/amber/red thresholds used everywhere FC% is displayed. */
+export const fcColor = (fc: number, target: number): string =>
+  fc <= target ? 'text-emerald-400' : fc <= target + 5 ? 'text-amber-400' : 'text-red-400';

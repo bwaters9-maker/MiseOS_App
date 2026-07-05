@@ -11,6 +11,7 @@ const StaffView = React.lazy(() => import('./Staff'));
 const EventsView = React.lazy(() => import('./EventCalendar'));
 const IngredientsView = React.lazy(() => import('./IngredientsTable'));
 const RecipesView = React.lazy(() => import('./Recipes'));
+const MenuView = React.lazy(() => import('./Menu'));
 const TestKitchenHub = React.lazy(() => import('./TestKitchenHub'));
 const PrepChecklist = React.lazy(() => import('./PrepChecklist').then(m => ({ default: m.PrepChecklist })));
 const KitchenTimers = React.lazy(() => import('./KitchenTimers').then(m => ({ default: m.KitchenTimers })));
@@ -25,6 +26,7 @@ const viewMap: { [key: string]: React.LazyExoticComponent<React.ComponentType<an
   events: EventsView,
   ingredients: IngredientsView,
   recipes: RecipesView,
+  menu: MenuView,
   prep: PrepChecklist,
   timers: KitchenTimers,
   'alert-history': AlertHistory,
@@ -49,6 +51,12 @@ export default function App() {
     const stored = parseFloat(localStorage.getItem('miseos_target_fc_percent') ?? '');
     return Number.isFinite(stored) && stored > 0 ? stored : 30;
   });
+  const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
+
+  const openRecipeInBuilder = (recipeId: string) => {
+    setSelectedRecipeId(recipeId);
+    setActiveView('recipes');
+  };
 
   const setUnitSystem = (u: UnitSystem) => {
     localStorage.setItem('miseos_unit_system', u);
@@ -81,6 +89,9 @@ export default function App() {
                 setUnitSystem={setUnitSystem}
                 targetFcPercent={targetFcPercent}
                 setTargetFcPercent={setTargetFcPercent}
+                selectedRecipeId={selectedRecipeId}
+                setSelectedRecipeId={setSelectedRecipeId}
+                onOpenRecipe={openRecipeInBuilder}
               />
             </Suspense>
           </ErrorBoundary>
