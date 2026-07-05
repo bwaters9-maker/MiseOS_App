@@ -3,6 +3,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { AppHeader } from './components/AppHeader';
 import { KitchenStateProvider } from './components/KitchenStateContext';
 import type { UnitSystem } from './lib/units';
+import type { MenuTemplate } from './types';
 
 // --- LAZY-LOADING STRUCTURE ---
 const Dashboard = React.lazy(() => import('./DailyCribSheet'));
@@ -52,6 +53,9 @@ export default function App() {
     return Number.isFinite(stored) && stored > 0 ? stored : 30;
   });
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
+  const [menuTemplate, setMenuTemplateRaw] = useState<MenuTemplate>(
+    () => (localStorage.getItem('miseos_menu_template') as MenuTemplate | null) ?? 'clean'
+  );
 
   const openRecipeInBuilder = (recipeId: string) => {
     setSelectedRecipeId(recipeId);
@@ -66,6 +70,11 @@ export default function App() {
   const setTargetFcPercent = (v: number) => {
     localStorage.setItem('miseos_target_fc_percent', String(v));
     setTargetFcPercentRaw(v);
+  };
+
+  const setMenuTemplate = (t: MenuTemplate) => {
+    localStorage.setItem('miseos_menu_template', t);
+    setMenuTemplateRaw(t);
   };
 
   useEffect(() => {
@@ -89,6 +98,8 @@ export default function App() {
                 setUnitSystem={setUnitSystem}
                 targetFcPercent={targetFcPercent}
                 setTargetFcPercent={setTargetFcPercent}
+                menuTemplate={menuTemplate}
+                setMenuTemplate={setMenuTemplate}
                 selectedRecipeId={selectedRecipeId}
                 setSelectedRecipeId={setSelectedRecipeId}
                 onOpenRecipe={openRecipeInBuilder}

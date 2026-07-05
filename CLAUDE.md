@@ -65,6 +65,7 @@ src/
   HistoricalAlerts.tsx           Alert History view (all alerts, read-only)
   IngredientsTable.tsx           Master Pantry — static human-verified ingredient CRUD, unit conversion
   Recipes.tsx                    Recipe Builder — list (Menu Recipes / Sub-Recipes) + editor + Live Cost Analysis
+  Menu.tsx                       Menu view — operational (FC%/cost) table + Guest Preview toggle
 
   components/
     AppHeader.tsx                Nav bar — edit navItems[] to add/remove tabs
@@ -73,6 +74,7 @@ src/
     AlertDialog.tsx
     CribComponents.tsx           Shared Section wrapper
     StationPassHeader.tsx
+    GuestMenuPreview.tsx         Guest-facing menu templates (Classic / Clean), print-optimized
 
     dashboard/
       LineTimerModule.tsx
@@ -171,6 +173,16 @@ Left panel lists recipes grouped by `recipeType` first (Menu Recipes, then Sub-R
 - Cost math lives in `src/lib/costEngine.ts`: `recipeCost` recurses through sub-recipe lines with cycle detection (throws a descriptive error if a cycle is ever hit despite the UI block), `costPerPortion`, `fcPercent`, and `suggestedPrice` are pure functions built on top of it.
 - The batch scale control (×0.5 / ×2 / custom) only scales the numbers displayed in the cost panel — it never mutates the stored recipe.
 - `targetFcPercent` (default 30) is a global setting stored the same way as `unitSystem` (React state in `App.tsx`, persisted to `localStorage`), editable in Settings under "Recipe Costing".
+
+## Menu View (Menu.tsx)
+
+Two modes on one screen, toggled by the "Guest Preview" button — no separate nav tab.
+
+- **Operational** (default): the read-only cost/FC% table described above in the Approved Feature Map's MENU entry — name, menu price, cost/portion, FC%, grouped by category.
+- **Guest Preview**: `components/GuestMenuPreview.tsx` renders what the customer sees — recipe name, `menuDescription`, `menuPrice`, grouped by category — with cost/FC% data entirely absent. Only menu recipes with a `menuPrice > 0` are listed; unpriced items are silently omitted (a guest menu never shows a blank price). Categories that resolve to no priced items are omitted; the internal "Uncategorized" fallback label is never shown here.
+- **Templates**: a Classic/Clean picker in the Guest Preview toolbar selects between two fixed, print-ready visual styles (cream/serif/two-column vs. white/single-column with dotted price leaders). Both are data-only styling choices — same `guestGroups` derivation feeds either one. A consumer advisory line ("Consuming raw or undercooked meat...") is a fixed footer in both templates, not tied to any data field.
+- Template choice is `menuTemplate` (`'classic' | 'clean'`, type in `src/types.ts`), stored the same way as `unitSystem`/`targetFcPercent` (React state in `App.tsx`, persisted to `localStorage` under `miseos_menu_template`, default `'clean'`). Restaurant Profile (build order item 15) will take over ownership of this setting alongside logo/brand color once it exists; for now there's no restaurant-identity data to show, so both templates render a generic "Menu" header rather than a fabricated restaurant name.
+- Print: both templates carry their own `@media print` rules (page size/margins, hides app chrome and the toolbar, forces background-color printing via `print-color-adjust`). The Classic template's two-column layout uses CSS `column-count`, which also paginates correctly across printed pages.
 
 ## AI feature (TestKitchenHub)
 
@@ -276,6 +288,9 @@ INGREDIENTS — MASTER PANTRY
 
 MENU
 - Active recipes by category with food cost % color coding
+- Guest Preview toggle: customer-facing view (name, description, price
+  only — no cost/FC%) with a Classic / Clean template picker,
+  print-optimized
 
 CATERING
 - Events, client info, menu selection, cost + quote generation
@@ -333,7 +348,7 @@ only allowed state.
 6. ~~Ingredients Master Library~~ ✓
 7. Invoice Price Update (human-confirmed)
 8. ~~Recipe Builder + Cost Engine~~ ✓ (AI buttons — [Suggest Ingredients] / [Write Method] — still pending, land via `/api/ai`)
-9. Menu View
+9. ~~Menu View~~ ✓ (operational cost/FC% view + Guest Preview with Classic/Clean templates)
 10. Catering Module
 11. Vendor Management
 12. Sous (Chef Chat)

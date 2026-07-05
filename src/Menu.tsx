@@ -1,9 +1,10 @@
-import React, { useMemo } from 'react';
-import { UtensilsCrossed, AlertTriangle, ChevronRight } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { UtensilsCrossed, AlertTriangle, ChevronRight, Eye } from 'lucide-react';
 import { useKitchenSelector } from './components/KitchenStateContext';
 import { useRecipeCategories } from './hooks/useRecipeCategories';
 import { costPerPortion, fcPercent, fcColor, recipeUsesEstimatedPricing } from './lib/costEngine';
-import type { Ingredient, Recipe } from './types';
+import GuestMenuPreview, { type GuestMenuGroup } from './components/GuestMenuPreview';
+import type { Ingredient, Recipe, MenuTemplate } from './types';
 
 const STAT_CARD = 'bg-zinc-950 border border-zinc-800 rounded-[13px] p-[13px]';
 const STAT_LABEL = 'text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-[5px]';
@@ -25,12 +26,15 @@ interface MenuGroup {
 interface MenuProps {
   targetFcPercent?: number;
   onOpenRecipe?: (recipeId: string) => void;
+  menuTemplate?: MenuTemplate;
+  setMenuTemplate?: (t: MenuTemplate) => void;
 }
 
-const Menu: React.FC<MenuProps> = ({ targetFcPercent = 30, onOpenRecipe }) => {
+const Menu: React.FC<MenuProps> = ({ targetFcPercent = 30, onOpenRecipe, menuTemplate = 'clean', setMenuTemplate = () => {} }) => {
   const allRecipes = (useKitchenSelector((s: any) => s.recipes) as Recipe[]) ?? [];
   const allIngredients = (useKitchenSelector((s: any) => s.ingredients) as Ingredient[]) ?? [];
   const { categories } = useRecipeCategories();
+  const [previewMode, setPreviewMode] = useState(false);
 
   const menuRecipes = useMemo(() => allRecipes.filter(r => r.recipeType === 'menu'), [allRecipes]);
 
@@ -61,6 +65,16 @@ const Menu: React.FC<MenuProps> = ({ targetFcPercent = 30, onOpenRecipe }) => {
     return list;
   }, [categories, rows]);
 
+  const guestGroups = useMemo<GuestMenuGroup[]>(() => groups
+    .map(g => ({
+      key: g.key,
+      label: g.label,
+      recipes: g.rows
+        .filter(r => typeof r.recipe.menuPrice === 'number' && r.recipe.menuPrice > 0)
+        .map(r => r.recipe),
+    }))
+    .filter(g => g.recipes.length > 0), [groups]);
+
   const pricedRows = rows.filter(r => r.fc != null);
   const avgFc = pricedRows.length > 0
     ? pricedRows.reduce((sum, r) => sum + (r.fc as number), 0) / pricedRows.length
@@ -68,16 +82,39 @@ const Menu: React.FC<MenuProps> = ({ targetFcPercent = 30, onOpenRecipe }) => {
   const missingPriceCount = rows.filter(r => !(typeof r.recipe.menuPrice === 'number' && r.recipe.menuPrice > 0)).length;
   const estimateCount = rows.filter(r => r.usesEstimate).length;
 
+  if (previewMode) {
+    return (
+      <div className="max-w-[1597px] mx-auto px-[21px] py-[34px] font-mono">
+        <GuestMenuPreview
+          groups={guestGroups}
+          template={menuTemplate}
+          onTemplateChange={setMenuTemplate}
+          onExit={() => setPreviewMode(false)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-[1597px] mx-auto px-[21px] py-[34px] font-mono">
-      <div className="mb-[34px]">
-        <h1 className="text-xl font-black uppercase tracking-wider text-white flex items-center gap-[8px]">
-          <UtensilsCrossed className="w-5 h-5 text-emerald-400" />
-          Menu
-        </h1>
-        <p className="text-xs text-zinc-500 mt-[5px]">
-          Read-only operational view — edit recipes in the Recipe Builder.
-        </p>
+      <div className="mb-[34px] flex items-start justify-between gap-[13px]">
+        <div>
+          <h1 className="text-xl font-black uppercase tracking-wider text-white flex items-center gap-[8px]">
+            <UtensilsCrossed className="w-5 h-5 text-emerald-400" />
+            Menu
+          </h1>
+          <p className="text-xs text-zinc-500 mt-[5px]">
+            Read-only operational view — edit recipes in the Recipe Builder.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setPreviewMode(true)}
+          className="shrink-0 flex items-center gap-[8px] px-[13px] py-[8px] bg-zinc-900 border border-zinc-700 rounded-[8px] text-xs font-bold text-zinc-300 hover:text-emerald-400 hover:border-emerald-700 transition-colors duration-[144ms]"
+        >
+          <Eye className="w-3.5 h-3.5" />
+          Guest Preview
+        </button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-[13px] mb-[34px]">

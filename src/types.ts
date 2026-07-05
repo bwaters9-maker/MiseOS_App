@@ -68,6 +68,14 @@ export interface RecipeCategory {
 }
 
 /**
+ * Guest-facing menu print/preview styling choice, selected from the Menu
+ * view's Guest Preview toggle. Persisted the same way as unitSystem /
+ * targetFcPercent (App.tsx state + localStorage) until Restaurant Profile
+ * (build order item 15) owns it alongside logo/brand color.
+ */
+export type MenuTemplate = 'classic' | 'clean';
+
+/**
  * Represents an 86'd (out-of-stock) item.
  */
 export interface Item86 {
