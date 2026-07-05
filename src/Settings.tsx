@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings as SettingsIcon, Sun, Moon, Trash2, PlusCircle, AlertTriangle, Pencil, Check, X, Scale } from 'lucide-react';
+import { Settings as SettingsIcon, Sun, Moon, Trash2, PlusCircle, AlertTriangle, Pencil, Check, X, Scale, LogOut, User } from 'lucide-react';
 import type { UnitSystem } from './lib/units';
 import { db } from './firebaseConfig';
 import { collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy, updateDoc } from 'firebase/firestore';
 import { AlertDialog } from './components/AlertDialog';
+import { useAuth } from './components/AuthContext';
 
 interface SettingsProps {
   theme: 'light' | 'dark';
@@ -26,7 +27,16 @@ interface RecipeCategoryPreset {
   name: string;
 }
 
+const DEFAULT_EVENT_TYPES = ['Wedding', 'Private Dining', 'Buyout', 'Bridal Shower', 'Corporate', 'Celebration of Life', 'Special Event'];
+
+interface EventTypePreset {
+  id: string;
+  name: string;
+}
+
 export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem = 'imperial', setUnitSystem, targetFcPercent = 30, setTargetFcPercent }) => {
+  const { user, signOut } = useAuth();
+  const [signingOut, setSigningOut] = useState(false);
   const [stations, setStations] = useState<StationPreset[]>([]);
   const [newStationName, setNewStationName] = useState('');
   const [stationToDelete, setStationToDelete] = useState<StationPreset | null>(null);
@@ -39,6 +49,13 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
   const [categoryToEdit, setCategoryToEdit] = useState<RecipeCategoryPreset | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState('');
   const categorySeeding = useRef(false);
+
+  const [eventTypes, setEventTypes] = useState<EventTypePreset[]>([]);
+  const [newEventTypeName, setNewEventTypeName] = useState('');
+  const [eventTypeToDelete, setEventTypeToDelete] = useState<EventTypePreset | null>(null);
+  const [eventTypeToEdit, setEventTypeToEdit] = useState<EventTypePreset | null>(null);
+  const [editingEventTypeName, setEditingEventTypeName] = useState('');
+  const eventTypeSeeding = useRef(false);
 
   useEffect(() => {
     const q = query(collection(db, 'station_presets'), orderBy('name'));
@@ -65,6 +82,23 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
         ...doc.data()
       } as RecipeCategoryPreset));
       setCategories(categoryData);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const q = query(collection(db, 'event_types'), orderBy('name'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (snapshot.empty && !eventTypeSeeding.current) {
+        eventTypeSeeding.current = true;
+        Promise.all(DEFAULT_EVENT_TYPES.map(name => addDoc(collection(db, 'event_types'), { name })));
+      }
+      const eventTypeData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as EventTypePreset));
+      setEventTypes(eventTypeData);
     });
 
     return () => unsubscribe();
@@ -128,6 +162,45 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
     handleCancelEditCategory();
   };
 
+  const handleAddEventType = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newEventTypeName.trim() === '') return;
+    await addDoc(collection(db, 'event_types'), { name: newEventTypeName.trim() });
+    setNewEventTypeName('');
+  };
+
+  const handleDeleteEventType = async (id: string) => {
+    await deleteDoc(doc(db, 'event_types', id));
+    setEventTypeToDelete(null);
+  };
+
+  const handleEditEventTypeClick = (eventType: EventTypePreset) => {
+    setEventTypeToEdit(eventType);
+    setEditingEventTypeName(eventType.name);
+  };
+
+  const handleCancelEditEventType = () => {
+    setEventTypeToEdit(null);
+    setEditingEventTypeName('');
+  };
+
+  const handleUpdateEventType = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!eventTypeToEdit || editingEventTypeName.trim() === '') return;
+    await updateDoc(doc(db, 'event_types', eventTypeToEdit.id), { name: editingEventTypeName.trim() });
+    handleCancelEditEventType();
+  };
+
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await signOut();
+    } finally {
+      setSigningOut(false);
+    }
+  };
+
   return (
     <div className="w-full max-w-7xl mx-auto p-6 bg-zinc-950 text-zinc-100 font-mono tracking-tight">
       <div className="border-b border-zinc-900 pb-4 mb-6">
@@ -139,6 +212,24 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
       </div>
 
       <div className="bg-zinc-900/40 p-5 rounded-xl border border-zinc-800/60 shadow-md">
+        <h3 className="text-sm font-bold tracking-widest text-zinc-400 uppercase border-b border-zinc-800/80 pb-3 mb-4 flex items-center gap-2">
+          <User className="w-4 h-4" />
+          Account
+        </h3>
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs text-zinc-300 font-semibold">{user?.email}</span>
+          <button
+            onClick={handleSignOut}
+            disabled={signingOut}
+            className="flex items-center gap-2 px-4 py-2 bg-zinc-800/50 border border-zinc-700 hover:bg-red-950/40 hover:border-red-900 hover:text-red-300 text-zinc-400 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors disabled:opacity-50"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            {signingOut ? 'Signing Out…' : 'Sign Out'}
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-6 bg-zinc-900/40 p-5 rounded-xl border border-zinc-800/60 shadow-md">
         <h3 className="text-sm font-bold tracking-widest text-zinc-400 uppercase border-b border-zinc-800/80 pb-3 mb-4">
           Theme
         </h3>
@@ -356,6 +447,76 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
         </form>
       </div>
 
+      <div className="mt-6 bg-zinc-900/40 p-5 rounded-xl border border-zinc-800/60 shadow-md">
+        <h3 className="text-sm font-bold tracking-widest text-zinc-400 uppercase border-b border-zinc-800/80 pb-3 mb-4">
+          Event Types
+        </h3>
+        <p className="text-[10px] text-zinc-600 mb-3 uppercase tracking-wider">Used to categorize events in the Events &amp; Clients tab</p>
+        <div className="space-y-2 mb-4">
+          {eventTypes.map((eventType) => (
+            <div key={eventType.id}>
+              {eventTypeToEdit?.id === eventType.id ? (
+                <form onSubmit={handleUpdateEventType} className="flex items-center justify-between bg-zinc-700/50 p-2 rounded-md text-xs">
+                  <input
+                    type="text"
+                    value={editingEventTypeName}
+                    onChange={(e) => setEditingEventTypeName(e.target.value)}
+                    className="flex-grow bg-zinc-900 border border-emerald-700 text-zinc-200 text-xs rounded-lg px-3 py-1 focus:outline-none focus:border-emerald-500"
+                    autoFocus
+                  />
+                  <div className="flex items-center gap-1 ml-2">
+                    <button type="submit" className="text-emerald-400 hover:text-emerald-300 p-1.5 rounded-full hover:bg-emerald-950/50 transition-colors">
+                      <Check className="w-3.5 h-3.5" />
+                    </button>
+                    <button type="button" onClick={handleCancelEditEventType} className="text-zinc-500 hover:text-zinc-300 p-1.5 rounded-full hover:bg-zinc-800 transition-colors">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="flex items-center justify-between bg-zinc-800/50 p-2 rounded-md text-xs group">
+                  <span className="font-semibold text-zinc-300">{eventType.name}</span>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      aria-label={`Edit event type name for ${eventType.name}`}
+                      onClick={() => handleEditEventTypeClick(eventType)} className="text-zinc-500 hover:text-blue-400 p-1 rounded-full hover:bg-blue-950/50 transition-colors">
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      aria-label={`Delete event type ${eventType.name}`}
+                      onClick={() => setEventTypeToDelete(eventType)}
+                      className="text-zinc-500 hover:text-red-400 p-1 rounded-full hover:bg-red-950/50 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          {eventTypes.length === 0 && (
+            <p className="text-xs text-zinc-600 italic text-center p-4">No event types configured.</p>
+          )}
+        </div>
+        <form onSubmit={handleAddEventType} className="flex items-center gap-2">
+          <input
+            type="text"
+            value={newEventTypeName}
+            onChange={(e) => setNewEventTypeName(e.target.value)}
+            placeholder="New event type..."
+            className="flex-grow bg-zinc-950 border border-zinc-700 text-zinc-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500"
+          />
+          <button
+            type="submit"
+            className="bg-emerald-700 hover:bg-emerald-600 border border-emerald-800 text-white text-xs uppercase font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm disabled:opacity-50"
+            disabled={!newEventTypeName.trim()}
+          >
+            <PlusCircle className="w-4 h-4" />
+            Add
+          </button>
+        </form>
+      </div>
+
       <AlertDialog
         isOpen={!!stationToDelete}
         onClose={() => setStationToDelete(null)}
@@ -379,6 +540,19 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
       >
         <p>
           Are you sure you want to delete the "<strong>{categoryToDelete?.name}</strong>" category? Recipes using it will show as uncategorized. This action cannot be undone.
+        </p>
+      </AlertDialog>
+
+      <AlertDialog
+        isOpen={!!eventTypeToDelete}
+        onClose={() => setEventTypeToDelete(null)}
+        onConfirm={() => eventTypeToDelete && handleDeleteEventType(eventTypeToDelete.id)}
+        title="Delete Event Type"
+        confirmText="Delete"
+        variant="destructive"
+      >
+        <p>
+          Are you sure you want to delete the "<strong>{eventTypeToDelete?.name}</strong>" event type? Events using it will keep the old label as plain text. This action cannot be undone.
         </p>
       </AlertDialog>
     </div>

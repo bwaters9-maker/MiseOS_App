@@ -10,7 +10,7 @@ const navItems = [
   { view: 'dashboard', label: 'Crib Sheet', icon: LayoutDashboard },
   { view: 'features', label: 'Features', icon: Star },
   { view: 'staff', label: 'Staff', icon: Users },
-  { view: 'events', label: 'Events', icon: CalendarDays },
+  { view: 'events', label: 'Events & Clients', icon: CalendarDays },
   { view: 'ingredients', label: 'Ingredients', icon: Package },
   { view: 'recipes', label: 'Recipes', icon: ChefHat },
   { view: 'menu', label: 'Menu', icon: UtensilsCrossed },

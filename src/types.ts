@@ -133,7 +133,31 @@ export interface Shift {
   note?: string;
 }
 
-export type EventType = 'Private Dining' | 'Buyout' | 'Special Event';
+/**
+ * A chef-managed event type (Wedding, Buyout, Corporate, …), CRUD'd from
+ * Settings the same way as recipe categories. `KitchenEvent.eventType`
+ * stores the name directly (no id reference) since events don't need the
+ * cross-entity grouping that justified `Recipe.categoryId`.
+ */
+export interface EventTypePreset {
+  id: string;
+  name: string;
+}
+
+/**
+ * A catering/events client. `flagNote` surfaces as a persistent amber flag
+ * line on the client's directory card (allergy history, payment issues,
+ * VIP handling — whatever the chef needs surfaced every time this client
+ * comes up).
+ */
+export interface Client {
+  id: string;
+  name: string;
+  contactName: string;
+  phone: string;
+  email: string;
+  flagNote?: string;
+}
 
 export type IngredientCategory = 'Produce' | 'Protein' | 'Dairy' | 'Dry Goods' | 'Frozen' | 'Beverage' | 'Other' | 'Spices' | 'Oils & Fats' | 'Sauces' | 'Beverages' | 'Bakery';
 export type MeasureType = 'weight' | 'volume' | 'each';
@@ -171,14 +195,35 @@ export interface Ingredient {
   nutritionSource?: 'ai' | 'manual';
 }
 
+/** A single point on an event's day-of run-of-show timeline. */
+export interface EventMilestone {
+  time: string;
+  label: string;
+}
+
+/**
+ * A single course line on an event's tentative menu. `recipeId` optionally
+ * links the line to a menu recipe for cost projection — `text` still carries
+ * the display label either way (the recipe's name when linked, freely typed
+ * otherwise), so the UI never needs to branch on which case it's rendering.
+ */
+export interface TentativeMenuLine {
+  course: string;
+  text: string;
+  recipeId?: string;
+}
+
 export interface KitchenEvent {
   id: string;
   title: string;
   date?: string;
   time?: string;
-  covers?: number;
+  attendees?: number;
   notes?: string;
-  eventType?: EventType;
+  eventType?: string;
+  clientId?: string;
+  milestones?: EventMilestone[];
+  tentativeMenu?: TentativeMenuLine[];
 }
 
 export interface KitchenAlert {

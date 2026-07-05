@@ -12,6 +12,11 @@ const EMPTY = 'text-xs text-zinc-500 italic py-[8px]';
 const fcColor = (fc: number) =>
   fc < 28 ? 'text-emerald-400' : fc < 34 ? 'text-amber-400' : 'text-red-400';
 
+// Pre-rename docs may still carry the old `covers` field — read it as a
+// fallback for display only; every write now uses `attendees`.
+const readAttendees = (e: KitchenEvent): number | undefined =>
+  e.attendees ?? (e as unknown as { covers?: number }).covers;
+
 const alertVariant = (severity: KitchenAlert['severity']) => {
   if (severity === 'critical') return { badge: `${BADGE} text-red-300 border-red-900 bg-red-950/30`, accent: 'border-l-2 border-l-red-700 pl-[8px]' };
   if (severity === 'warning')  return { badge: `${BADGE} text-amber-300 border-amber-900 bg-amber-950/30`, accent: 'border-l-2 border-l-amber-700 pl-[8px]' };
@@ -192,8 +197,8 @@ const DailyCribSheet: React.FC = () => {
                         <span className="text-zinc-500 truncate hidden md:inline">{e.notes}</span>
                       )}
                     </div>
-                    {e.covers != null && (
-                      <span className="text-zinc-400 shrink-0 tabular-nums">{e.covers}&nbsp;cvr</span>
+                    {readAttendees(e) != null && (
+                      <span className="text-zinc-400 shrink-0 tabular-nums">{readAttendees(e)}&nbsp;attendees</span>
                     )}
                   </div>
                 ))}

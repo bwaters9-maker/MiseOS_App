@@ -57,7 +57,7 @@ src/
   DailyCribSheet.tsx             Crib Sheet view — five sections, print-optimized
   Features.tsx                   Nightly specials CRUD — 86 toggle syncs to Crib Sheet live
   Staff.tsx                      Employee directory + shift scheduling — feeds Crib Sheet (today's shifts only)
-  EventCalendar.tsx              Event CRUD — grouped by date, upcoming/past split, feeds Crib Sheet
+  EventCalendar.tsx              Events & Clients — event/client CRUD, grouped by date, upcoming/past split, feeds Crib Sheet; clicking an event opens EventDetailView
   PrepChecklist.tsx              Par-level deficit tracking table
   KitchenTimers.tsx              Multi-station countdown timers (Firestore-backed)
   TestKitchenHub.tsx             AI dish optimizer (calls server-side /api/ai proxy)
@@ -80,6 +80,9 @@ src/
       InvoicePriceUpdate.tsx     Photo/PDF invoice → AI-extracted line items → human-confirmed price writes
       AiIngredientLookup.tsx     Name → AI-proposed ingredient → chef-reviewed add (default Add Ingredient path)
       IngredientForm.tsx         Shared form/types/toDoc used by AiIngredientLookup, manual add, and edit
+
+    events/
+      EventDetailView.tsx        Event detail: header card (name/type/date/attendees/staff strip) + Timeline, Tentative Menu, Client, Change Log (placeholder) panel grid
 
     dashboard/
       LineTimerModule.tsx
@@ -105,7 +108,7 @@ There is no router library. Navigation is a `useState` string in `App.tsx`. The 
 2. Add an entry to `viewMap` in `App.tsx`
 3. Add a `navItems` entry in `src/components/AppHeader.tsx`
 
-Current nav tabs (in order): Crib Sheet · Features · Staff · Events · Ingredients · Recipes · Prep Checklist · Kitchen Timers · Alert History · Test Kitchen · Settings
+Current nav tabs (in order): Crib Sheet · Features · Staff · Events & Clients · Ingredients · Recipes · Prep Checklist · Kitchen Timers · Alert History · Test Kitchen · Settings
 
 ## Firestore collections
 
@@ -117,13 +120,15 @@ Current nav tabs (in order): Crib Sheet · Features · Staff · Events · Ingred
 | `features` | `useKitchenState`, `Features`, `DailyCribSheet` |
 | `staff` | `useKitchenState`, `Staff.tsx` — employee directory (repurposed from daily roster) |
 | `shifts` | `useKitchenState`, `Staff.tsx`, `DailyCribSheet` — planned shifts, joined to `staff` for display |
-| `events` | `useKitchenState`, `EventCalendar`, `DailyCribSheet` |
+| `events` | `useKitchenState`, `EventCalendar`, `DailyCribSheet` — `clientId?` optionally links to `clients`; `attendees` renamed from `covers` (old docs read via a code-level fallback, no data migration) |
+| `clients` | `useKitchenState`, `EventCalendar` — catering/events client directory |
 | `alerts` | `useKitchenState`, `DailyCribSheet`, `HistoricalAlerts` |
 | `crib_notes` | `useKitchenState`, `DailyCribSheet` |
 | `timers` | `KitchenTimers.tsx` |
 | `station_presets` | `useStationPresets`, `Settings.tsx`, `KitchenTimers.tsx` |
 | `ingredients` | `useKitchenState`, `IngredientsTable.tsx` |
 | `recipe_categories` | `useRecipeCategories`, `Settings.tsx`, `Recipes.tsx` — seeded with Sides/Sauces/Salads/Soups/Proteins/Desserts if empty |
+| `event_types` | `useEventTypes`, `Settings.tsx`, `EventCalendar` — seeded with Wedding/Private Dining/Buyout/Bridal Shower/Corporate/Celebration of Life/Special Event if empty |
 
 `alerts`: crib sheet shows `resolved === false` only; Alert History shows all.
 
@@ -139,8 +144,11 @@ Current nav tabs (in order): Crib Sheet · Features · Staff · Events · Ingred
 | `Feature` | Nightly special (course, name, description, price, cost, activeFrom, activeTo, is86d) |
 | `Employee` | Directory entry: id, name, positions: string[], hourlyRate?, active |
 | `Shift` | Planned shift: id, staffId (→ Employee), date, startTime, endTime, station?: PrepStation, note? |
-| `EventType` | `'Private Dining' \| 'Buyout' \| 'Special Event'` |
-| `KitchenEvent` | Event (title, date, time, covers, notes, eventType: EventType) |
+| `EventTypePreset` | Chef-managed event type (id, name), CRUD'd from Settings the same way as `RecipeCategory` — `KitchenEvent.eventType` stores the name directly, no id reference |
+| `Client` | Catering/events client: id, name, contactName, phone, email, flagNote? — `flagNote` renders as a persistent amber flag line on the client's directory card |
+| `EventMilestone` | Day-of timeline entry on an event: `{ time, label }` — `time` is an `HH:MM` string, list is sorted by time for display |
+| `TentativeMenuLine` | Tentative menu line on an event: `{ course, text, recipeId? }` — `text` is the display label either way (free-typed, or the linked recipe's name); `recipeId` optionally points at a `recipeType: 'menu'` recipe for cost projection |
+| `KitchenEvent` | Event (title, date, time, attendees?, notes?, eventType?: string, clientId?: string → Client, milestones?: EventMilestone[], tentativeMenu?: TentativeMenuLine[]) |
 | `KitchenAlert` | Alert (message, severity, resolved, timestamp) |
 | `CribNote` | Freeform crib note (date, content, author) |
 | `KitchenTimer` | Countdown timer |
@@ -323,10 +331,6 @@ MENU
   only — no cost/FC%) with a Classic / Clean template picker,
   print-optimized
 
-CATERING
-- Events, client info, menu selection, cost + quote generation
-- Feeds Event Calendar → feeds Crib Sheet
-
 STAFF & SCHEDULING
 - Employee directory: name, positions, active toggle, optional hourly rate
 - Planned shifts: date, start/end time, optional station, optional shift
@@ -340,9 +344,38 @@ STAFF & SCHEDULING
 - EXPLICITLY EXCLUDED, never build: availability management, shift
   swaps/trades, notifications, time-off requests
 
-EVENT CALENDAR
-- Private dining, buyouts, special events
-- Feeds Crib Sheet
+EVENTS & CLIENTS
+- Merged events + catering system — absorbs the standalone Catering
+  Module (build order item 10, never built separately)
+- Customizable event types (event_types collection, chef-managed CRUD
+  from Settings, same pattern as recipe categories) — replaces the
+  old fixed Private Dining/Buyout/Special Event set
+- Client profiles: name, contact name, phone, email, and an optional
+  flag note that renders as a persistent amber warning line on the
+  client's directory card (payment history, allergy notes, VIP
+  handling — whatever the chef needs surfaced every time)
+- Events optionally link to a client (clientId) — walk-in events need
+  no client
+- Event detail view (click an event from the list): header card (name,
+  type badge, date, attendees, that date's staff count + shift notes)
+  plus a 2x2 panel grid — Event Timeline, Tentative Menu, Client,
+  Change Log
+  - Event Timeline: chronological day-of milestones (time + label),
+    add/edit/remove inline
+  - Tentative Menu: course rows, each line free text or linked to a
+    menu recipe via the same search-select pattern as the Recipe
+    Builder's line search; linked lines show cost per portion and sum
+    to a projected total food cost (attendees × summed per-portion
+    cost of linked lines only — labeled "projected, linked items
+    only" since free-text lines carry no cost data)
+  - Client panel: contact fields, flag note, count of past events —
+    full client event-history view is planned (part 3)
+  - Change Log: placeholder — audit trail of edits to an event or
+    client record is planned (part 3)
+- Quote generation — planned, deferred (was Catering's "cost + quote
+  generation" ask; ties in once menu selection/costing is added)
+- Feeds Crib Sheet: today's events, showing linked client name when
+  present
 
 VENDOR MANAGEMENT
 - Supplier contacts, lead times, linked to Master Pantry
@@ -383,12 +416,12 @@ only allowed state.
 2. ~~Daily Crib Sheet (print-optimized)~~ ✓
 3. ~~Features Module~~ ✓
 4. ~~Staff (lightweight)~~ ✓
-5. ~~Event Calendar~~ ✓
+5. ~~Event Calendar~~ ✓ — upgrading to Events & Clients (part 1 of 3: data model + clients ✓; part 2 of 3: event detail view with milestone timeline + tentative menu ✓; part 3/3 pending: change log, full client event-history view)
 6. ~~Ingredients Master Library~~ ✓
 7. ~~Invoice Price Update (human-confirmed)~~ ✓
 8. ~~Recipe Builder + Cost Engine~~ ✓ (AI buttons — [Suggest Ingredients] / [Write Method] — still pending, land via `/api/ai`)
 9. ~~Menu View~~ ✓ (operational cost/FC% view + Guest Preview with Classic/Clean templates)
-10. Catering Module
+10. ~~Catering Module~~ — absorbed into Events & Clients (item 5); no standalone Catering Module will be built
 11. Vendor Management
 12. Sous (Chef Chat)
 13. Ingredient Advisor

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, onSnapshot, DocumentData, QuerySnapshot, QueryDocumentSnapshot, FirestoreError } from 'firebase/firestore';
-import type { Feature, Employee, Shift, KitchenEvent, KitchenAlert, CribNote, Ingredient, Recipe } from '../types';
+import type { Feature, Employee, Shift, KitchenEvent, KitchenAlert, CribNote, Ingredient, Recipe, Client } from '../types';
 
 // Based on firebase-blueprint.json
 export interface PrepItem {
@@ -33,6 +33,7 @@ export const useKitchenState = () => {
   const [staff, setStaff] = useState<Employee[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [events, setEvents] = useState<KitchenEvent[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [alerts, setAlerts] = useState<KitchenAlert[]>([]);
   const [cribNotes, setCribNotes] = useState<CribNote[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
@@ -107,6 +108,14 @@ export const useKitchenState = () => {
       (err: FirestoreError) => { setError(err); }
     );
 
+    const unsubClients = onSnapshot(
+      collection(db, 'clients'),
+      (snapshot: QuerySnapshot<DocumentData>) => {
+        setClients(snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as Client)));
+      },
+      (err: FirestoreError) => { setError(err); }
+    );
+
     const unsubAlerts = onSnapshot(
       collection(db, 'alerts'),
       (snapshot: QuerySnapshot<DocumentData>) => {
@@ -139,11 +148,12 @@ export const useKitchenState = () => {
       unsubStaff();
       unsubShifts();
       unsubEvents();
+      unsubClients();
       unsubAlerts();
       unsubCribNotes();
       unsubIngredients();
     };
   }, []);
 
-  return { prepItems, setPrepItems, recipes, setRecipes, items86, features, staff, shifts, events, alerts, cribNotes, ingredients, loading, error };
+  return { prepItems, setPrepItems, recipes, setRecipes, items86, features, staff, shifts, events, clients, alerts, cribNotes, ingredients, loading, error };
 };
