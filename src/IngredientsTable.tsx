@@ -69,8 +69,8 @@ const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) =>
     if (sortField === 'name') cmp = a.name.localeCompare(b.name);
     else if (sortField === 'category') cmp = a.category.localeCompare(b.category);
     else if (sortField === 'cost') {
-      const ca = computeCostPerBaseUnit(a.purchaseCost, a.purchaseQty, a.yieldPercent);
-      const cb = computeCostPerBaseUnit(b.purchaseCost, b.purchaseQty, b.yieldPercent);
+      const ca = computeCostPerBaseUnit(a.purchaseCost, a.purchaseQty, a.yieldPercent, a.pieceWeightG);
+      const cb = computeCostPerBaseUnit(b.purchaseCost, b.purchaseQty, b.yieldPercent, b.pieceWeightG);
       cmp = ca - cb;
     }
     return sortDir === 'asc' ? cmp : -cmp;
@@ -227,7 +227,7 @@ const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) =>
                     );
                   }
 
-                  const costPerBase = computeCostPerBaseUnit(ing.purchaseCost, ing.purchaseQty, ing.yieldPercent);
+                  const costPerBase = computeCostPerBaseUnit(ing.purchaseCost, ing.purchaseQty, ing.yieldPercent, ing.pieceWeightG);
                   const { cost: displayCost, unit: displayUnit } = costPerDisplayUnit(costPerBase, ing.measureType, unitSystem);
                   const isConfirm = deleteConfirmId === ing.id;
 

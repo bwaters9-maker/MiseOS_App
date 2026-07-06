@@ -281,13 +281,18 @@ export const IngredientForm: React.FC<{
   const purchaseQtyNum = parseFloat(form.purchaseQtyDisplay) || 0;
   const purchaseQtyBase = toBase(purchaseQtyNum, form.purchaseQtyUnit);
   const yieldNum = parseFloat(form.yieldPercent) || 100;
-  const costPerBase = computeCostPerBaseUnit(purchaseCostNum, purchaseQtyBase, yieldNum);
-  const { cost: displayCost, unit: displayCostUnit } = costPerDisplayUnit(costPerBase, form.measureType, unitSystem);
-
   const pieceWeightNum = parseFloat(form.pieceWeightDisplay) || 0;
   const pieceWeightBase = pieceWeightNum > 0 ? toBase(pieceWeightNum, form.pieceWeightUnit) : 0;
   const piecesPerPack = pieceWeightBase > 0 && purchaseQtyBase > 0 ? Math.floor(purchaseQtyBase / pieceWeightBase) : 0;
   const costPerPiece = piecesPerPack > 0 && purchaseCostNum > 0 ? purchaseCostNum / piecesPerPack : 0;
+
+  const costPerBase = computeCostPerBaseUnit(
+    purchaseCostNum,
+    purchaseQtyBase,
+    yieldNum,
+    form.measureType === 'weight' && pieceWeightBase > 0 ? pieceWeightBase : undefined,
+  );
+  const { cost: displayCost, unit: displayCostUnit } = costPerDisplayUnit(costPerBase, form.measureType, unitSystem);
 
   const canSave = canSaveIngredientForm(form);
   const qtyUnits = displayUnitsFor(form.measureType, unitSystem);

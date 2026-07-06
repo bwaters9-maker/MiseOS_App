@@ -27,7 +27,7 @@ export const recipeCost = (
     if (line.type === 'ingredient') {
       const ingredient = ingredients.find(i => i.id === line.refId);
       if (!ingredient) return total;
-      const costPerBaseUnit = computeCostPerBaseUnit(ingredient.purchaseCost, ingredient.purchaseQty, ingredient.yieldPercent);
+      const costPerBaseUnit = computeCostPerBaseUnit(ingredient.purchaseCost, ingredient.purchaseQty, ingredient.yieldPercent, ingredient.pieceWeightG);
       return total + costPerBaseUnit * line.qty;
     }
     const subRecipe = recipes.find(r => r.id === line.refId);
@@ -81,12 +81,30 @@ const recipeDependsOn = (
   return recipe.lines.some(line => line.type === 'recipe' && recipeDependsOn(line.refId, targetId, recipes, seen));
 };
 
+/**
+ * Cost per canonical base unit (g / ml / each).
+ *
+ * When `pieceWeightG` is present (portioned weight product, e.g. 6 oz
+ * breasts), the rate is piece-true: the pack yields floor(qty / spec) whole
+ * pieces, the shortfall is unusable pack-out, and cost per gram is derived
+ * from cost per piece — what a plate actually pays. Randoms and unspec'd
+ * product keep the plain weight rate. A spec too large for the pack
+ * (floor = 0) falls back to the weight rate rather than dividing by zero.
+ */
 export const computeCostPerBaseUnit = (
   purchaseCost: number,
   purchaseQty: number,
   yieldPercent: number,
+  pieceWeightG?: number,
 ): number => {
   if (purchaseQty <= 0 || yieldPercent <= 0) return 0;
+  if (pieceWeightG != null && pieceWeightG > 0) {
+    const pieces = Math.floor(purchaseQty / pieceWeightG);
+    if (pieces >= 1) {
+      const costPerPiece = purchaseCost / pieces;
+      return costPerPiece / pieceWeightG / (yieldPercent / 100);
+    }
+  }
   return purchaseCost / (purchaseQty * (yieldPercent / 100));
 };
 
