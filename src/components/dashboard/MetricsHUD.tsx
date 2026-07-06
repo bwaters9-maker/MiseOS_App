@@ -32,7 +32,7 @@ export const MetricsHUD: React.FC<MetricsHUDProps> = ({
   prepItems,
   items86,
 }) => {
-  const prepShortageCount = prepItems.filter(item => item.status === 'SHORTAGE').length;
+  const prepShortageCount = prepItems.filter(item => (item.par || 0) - (item.quantity || 0) > 0).length;
   const activeTimersCount = timers.filter(timer => timer.status === 'running').length;
 
   return (

@@ -236,7 +236,6 @@ Any future AI feature must follow this same proxy pattern — no `fetch` to `api
 `npm run lint` reports a handful of errors that predate this project. Do not fix them unless that is the stated task. Key categories:
 
 - `main.tsx` — `document.getElementById` can return `null`
-- `@/types` / `@/lib/utils` path alias unresolved in a few files (tsconfig path mapping issue) — `LineTimerModule.tsx`, `MetricsHUD.tsx`, `TrendSidebar.tsx`, `StationPassHeader.tsx`
 
 ## Known issues
 
