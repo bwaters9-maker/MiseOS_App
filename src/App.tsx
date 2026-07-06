@@ -2,6 +2,8 @@ import React, { Suspense, useState, useEffect } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AppHeader } from './components/AppHeader';
 import { KitchenStateProvider } from './components/KitchenStateContext';
+import { AuthProvider, useAuth } from './components/AuthContext';
+import { SignIn } from './components/SignIn';
 import type { UnitSystem } from './lib/units';
 import type { MenuTemplate } from './types';
 
@@ -38,11 +40,37 @@ const viewMap: { [key: string]: React.LazyExoticComponent<React.ComponentType<an
 // --- RENDERER AND APP COMPONENTS ---
 const ActiveViewRenderer = ({ view, ...props }: { view: string; [key: string]: any }) => {
   const Component = viewMap[view];
-  if (!Component) return <div className="p-6 text-zinc-500">View not found.</div>;
+  if (!Component) return <div className="p-6 text-slate">View not found.</div>;
   return <Component {...props} />;
 };
 
 export default function App() {
+  return (
+    <AuthProvider>
+      <AuthGate />
+    </AuthProvider>
+  );
+}
+
+const AuthGate: React.FC = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-bg-cool flex items-center justify-center">
+        <p className="text-xs text-slate font-body uppercase tracking-wider">Loading…</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <SignIn />;
+  }
+
+  return <AppShell />;
+};
+
+const AppShell: React.FC = () => {
   const [activeView, setActiveView] = useState('dashboard');
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [unitSystem, setUnitSystemRaw] = useState<UnitSystem>(
@@ -85,11 +113,11 @@ export default function App() {
 
   return (
     <KitchenStateProvider>
-      <div className="min-h-screen bg-black text-zinc-100 antialiased font-sans">
+      <div className="min-h-screen bg-bg-cool text-navy antialiased font-body">
         <AppHeader activeView={activeView} onNavigate={setActiveView} />
         <main className="py-6">
           <ErrorBoundary>
-            <Suspense fallback={<div className="p-12 text-center text-sm text-zinc-500">Loading...</div>}>
+            <Suspense fallback={<div className="p-12 text-center text-sm text-slate">Loading...</div>}>
               <ActiveViewRenderer
                 view={activeView}
                 theme={theme}

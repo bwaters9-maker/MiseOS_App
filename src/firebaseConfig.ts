@@ -1,5 +1,6 @@
 ﻿import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 
 const getEnvVar = (k: string): string => {
   if (typeof process !== 'undefined' && process.env && process.env[k]) {
@@ -20,5 +21,6 @@ const firebaseConfig = {
   appId:             getEnvVar('FIREBASE_APP_ID')         || getEnvVar('VITE_FIREBASE_APP_ID'),
 };
 
-export const app = initializeApp(firebaseConfig);
-export const db  = getFirestore(app);
+export const app  = initializeApp(firebaseConfig);
+export const db   = getFirestore(app);
+export const auth = getAuth(app);
