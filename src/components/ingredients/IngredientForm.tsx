@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, AlertTriangle } from 'lucide-react';
 import { computeCostPerBaseUnit } from '../../lib/costEngine';
-import { toBase, displayUnitsFor, defaultDisplayUnit, smartUnit, costPerDisplayUnit } from '../../lib/units';
+import { toBase, fromBase, displayUnitsFor, defaultDisplayUnit, smartUnit, costPerDisplayUnit } from '../../lib/units';
 import type { Ingredient, IngredientCategory, MeasureType, Allergen, NutritionPer100g } from '../../types';
 import type { UnitSystem, DisplayUnit } from '../../lib/units';
 
@@ -24,6 +24,9 @@ export interface FormState {
   purchaseQtyDisplay: string;
   purchaseQtyUnit: DisplayUnit;
   yieldPercent: string;
+  /** Ordered portion spec for weight-type product bought portioned (6 oz breasts). Blank for bulk/randoms. */
+  pieceWeightDisplay: string;
+  pieceWeightUnit: 'oz' | 'g';
   calories: string; totalFat: string; saturatedFat: string; transFat: string;
   cholesterol: string; sodium: string; totalCarbs: string; fiber: string;
   sugars: string; addedSugars: string; protein: string;
@@ -35,6 +38,7 @@ export const BLANK = (unitSystem: UnitSystem): FormState => ({
   purchaseUnit: '', purchaseCost: '',
   purchaseQtyDisplay: '', purchaseQtyUnit: defaultDisplayUnit('weight', unitSystem),
   yieldPercent: '100',
+  pieceWeightDisplay: '', pieceWeightUnit: unitSystem === 'imperial' ? 'oz' : 'g',
   calories: '', totalFat: '', saturatedFat: '', transFat: '',
   cholesterol: '', sodium: '', totalCarbs: '', fiber: '',
   sugars: '', addedSugars: '', protein: '',
@@ -53,6 +57,10 @@ export const toForm = (ing: Ingredient, unitSystem: UnitSystem): FormState => {
     purchaseQtyDisplay: value.toFixed(value >= 10 ? 2 : 3).replace(/\.?0+$/, ''),
     purchaseQtyUnit: unit,
     yieldPercent: String(ing.yieldPercent),
+    pieceWeightDisplay: ing.pieceWeightG != null && ing.pieceWeightG > 0
+      ? String(Number(fromBase(ing.pieceWeightG, unitSystem === 'imperial' ? 'oz' : 'g').toFixed(2)))
+      : '',
+    pieceWeightUnit: unitSystem === 'imperial' ? 'oz' : 'g',
     calories: n.calories != null ? String(n.calories) : '',
     totalFat: n.totalFat != null ? String(n.totalFat) : '',
     saturatedFat: n.saturatedFat != null ? String(n.saturatedFat) : '',
@@ -99,6 +107,9 @@ export const toDoc = (f: FormState): Omit<Ingredient, 'id'> => {
     purchaseCost: parseFloat(f.purchaseCost) || 0,
     purchaseQty: purchaseQtyBase,
     yieldPercent: parseFloat(f.yieldPercent) || 100,
+    ...(f.measureType === 'weight' && parseFloat(f.pieceWeightDisplay) > 0 && {
+      pieceWeightG: toBase(parseFloat(f.pieceWeightDisplay), f.pieceWeightUnit),
+    }),
     ...(Object.keys(nutrition).length > 0 && { nutritionPer100g: nutrition, nutritionSource: 'manual' }),
     ...(f.allergens.length > 0 && { allergens: f.allergens }),
     lastVerified: new Date().toISOString().slice(0, 10),
@@ -122,6 +133,9 @@ export const toProposalDoc = (f: FormState, costEdited: boolean): Omit<Ingredien
     purchaseCost: parseFloat(f.purchaseCost) || 0,
     purchaseQty: purchaseQtyBase,
     yieldPercent: parseFloat(f.yieldPercent) || 100,
+    ...(f.measureType === 'weight' && parseFloat(f.pieceWeightDisplay) > 0 && {
+      pieceWeightG: toBase(parseFloat(f.pieceWeightDisplay), f.pieceWeightUnit),
+    }),
     ...(Object.keys(nutrition).length > 0 && { nutritionPer100g: nutrition, nutritionSource: 'ai' as const }),
     ...(f.allergens.length > 0 && { allergens: f.allergens }),
     lastVerified: costEdited ? new Date().toISOString().slice(0, 10) : '',
@@ -270,6 +284,11 @@ export const IngredientForm: React.FC<{
   const costPerBase = computeCostPerBaseUnit(purchaseCostNum, purchaseQtyBase, yieldNum);
   const { cost: displayCost, unit: displayCostUnit } = costPerDisplayUnit(costPerBase, form.measureType, unitSystem);
 
+  const pieceWeightNum = parseFloat(form.pieceWeightDisplay) || 0;
+  const pieceWeightBase = pieceWeightNum > 0 ? toBase(pieceWeightNum, form.pieceWeightUnit) : 0;
+  const piecesPerPack = pieceWeightBase > 0 && purchaseQtyBase > 0 ? Math.floor(purchaseQtyBase / pieceWeightBase) : 0;
+  const costPerPiece = piecesPerPack > 0 && purchaseCostNum > 0 ? purchaseCostNum / piecesPerPack : 0;
+
   const canSave = canSaveIngredientForm(form);
   const qtyUnits = displayUnitsFor(form.measureType, unitSystem);
 
@@ -389,6 +408,37 @@ export const IngredientForm: React.FC<{
           />
         </div>
       </div>
+
+      {form.measureType === 'weight' && (
+        <div className="grid grid-cols-3 gap-[13px] items-end">
+          <div>
+            <label className={FIELD_LABEL}>Piece Size ({form.pieceWeightUnit}) — Optional</label>
+            <input
+              type="number"
+              value={form.pieceWeightDisplay}
+              onChange={e => set('pieceWeightDisplay', e.target.value)}
+              placeholder="e.g. 6"
+              min="0"
+              step="any"
+              className={INPUT}
+            />
+          </div>
+          <div className="col-span-2 pb-[8px]">
+            {piecesPerPack > 0 ? (
+              <p className="text-[11px] text-zinc-400">
+                ≈ <span className="font-bold text-zinc-200">{piecesPerPack} pieces</span> per {form.purchaseUnit.trim() || 'pack'}
+                {costPerPiece > 0 && (
+                  <> → <span className="font-bold text-emerald-400">${costPerPiece.toFixed(2)} each</span></>
+                )}
+              </p>
+            ) : (
+              <p className="text-[10px] text-zinc-600">
+                For portioned product ordered by spec (6 oz breasts). Leave blank for bulk / randoms — they cost per {unitSystem === 'imperial' ? 'oz or lb' : 'g or kg'}.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center gap-[13px] bg-zinc-900/60 border border-zinc-800 rounded-[8px] px-[13px] py-[8px]">
         <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Cost per usable unit</span>

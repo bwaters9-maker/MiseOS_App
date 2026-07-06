@@ -24,6 +24,12 @@ export const fromBase = (base: number, unit: DisplayUnit): number => {
   return f > 0 ? base / f : base;
 };
 
+export const measureTypeOfUnit = (unit: DisplayUnit): MeasureType => {
+  if (unit === 'each') return 'each';
+  if (unit === 'ml' || unit === 'L' || unit === 'fl oz' || unit === 'qt') return 'volume';
+  return 'weight';
+};
+
 export const displayUnitsFor = (measureType: MeasureType, system: UnitSystem): DisplayUnit[] => {
   if (measureType === 'each') return ['each'];
   if (system === 'imperial') return measureType === 'weight' ? ['oz', 'lb'] : ['fl oz', 'qt'];

@@ -4,6 +4,7 @@ import { db } from '../../firebaseConfig';
 import { collection, addDoc } from 'firebase/firestore';
 import { callAi, parseAiJson } from '../../lib/ai';
 import { smartUnit, defaultDisplayUnit } from '../../lib/units';
+import { yieldReferenceText } from '../../lib/yieldReference';
 import {
   IngredientForm, BLANK, toDoc, toProposalDoc, CATEGORIES,
   INPUT, FIELD_LABEL, BTN_PRIMARY, BTN_GHOST,
@@ -27,10 +28,13 @@ Rules:
 - "packQtyInBaseUnits" is that pack's quantity converted to the canonical base unit: grams if measureType is "weight", milliliters if "volume", or a plain count if "each".
 - "baseUnit" must be "g" if measureType is "weight", "ml" if "volume", or "each" if "each".
 - "estimatedPackCost" is a rough current US foodservice-distributor price, in dollars, for that whole pack — a reasonable estimate, not a live price.
-- "yieldPercent" is a typical usable-yield percentage after trim/waste, from 1 to 100 (use 100 if not applicable).
+- "yieldPercent" is the usable-yield percentage after trim/waste, from 1 to 100 (use 100 if not applicable). A chef-standard yield reference chart is provided below — when the ingredient (or a close equivalent at a comparable fabrication state) appears in it, use that value instead of your own estimate. For ranges, use the midpoint. For items not in the chart, estimate consistently with the closest comparable item.
 - "allergens" is an array containing zero or more of: "milk", "eggs", "fish", "shellfish", "treeNuts", "peanuts", "wheat", "soybeans", "sesame", "gluten", "sulfites" — only ones this ingredient genuinely contains or commonly derives from. Empty array if none apply.
 - "nutritionPer100g" gives typical nutrition values per 100g of the raw ingredient (calories in kcal, all others in grams except cholesterol and sodium in mg). Use your best estimate; omit a field entirely if genuinely unknown rather than guessing 0.
-- If the name is not a recognizable food or beverage ingredient, respond with {"error":"not a recognizable ingredient"} instead.`;
+- If the name is not a recognizable food or beverage ingredient, respond with {"error":"not a recognizable ingredient"} instead.
+
+Yield reference chart (usable-yield percentages by fabrication state):
+${yieldReferenceText()}`;
 
 const isValidCategory = (c: any): c is IngredientCategory => CATEGORIES.includes(c);
 const isValidMeasureType = (m: any): m is MeasureType => m === 'weight' || m === 'volume' || m === 'each';
@@ -64,6 +68,8 @@ const buildProposalForm = (name: string, proposal: any, unitSystem: UnitSystem):
     purchaseQtyDisplay: value > 0 ? value.toFixed(value >= 10 ? 2 : 3).replace(/\.?0+$/, '') : '',
     purchaseQtyUnit: unit,
     yieldPercent,
+    pieceWeightDisplay: '',
+    pieceWeightUnit: (unitSystem === 'imperial' ? 'oz' : 'g') as 'oz' | 'g',
     calories: numStr(n.calories), totalFat: numStr(n.totalFat), saturatedFat: numStr(n.saturatedFat), transFat: numStr(n.transFat),
     cholesterol: numStr(n.cholesterol), sodium: numStr(n.sodium), totalCarbs: numStr(n.totalCarbs), fiber: numStr(n.fiber),
     sugars: numStr(n.sugars), addedSugars: numStr(n.addedSugars), protein: numStr(n.protein),

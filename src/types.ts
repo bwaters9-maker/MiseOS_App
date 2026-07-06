@@ -187,6 +187,12 @@ export interface Ingredient {
   purchaseCost: number;
   purchaseQty: number;
   yieldPercent: number;
+  /**
+   * Ordered portion spec in grams, for weight-type ingredients bought
+   * portioned (e.g. 6 oz chicken breasts → 170.1). Enables pieces-per-case
+   * and cost-per-piece math. Absent for bulk/random product.
+   */
+  pieceWeightG?: number;
   nutritionPer100g?: NutritionPer100g;
   allergens?: Allergen[];
   vendorId?: string;

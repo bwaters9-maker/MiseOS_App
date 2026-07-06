@@ -153,7 +153,7 @@ Current nav tabs (in order): Crib Sheet · Features · Staff · Events & Clients
 | `CribNote` | Freeform crib note (date, content, author) |
 | `KitchenTimer` | Countdown timer |
 | `TrendReport` | Recipe trend scores |
-| `Ingredient` | Master Pantry item: name, category, measureType, purchaseUnit, purchaseCost, purchaseQty, yieldPercent, nutritionPer100g?, allergens?, vendorId?, lastVerified, priceSource, nutritionSource? ('ai' \| 'manual') |
+| `Ingredient` | Master Pantry item: name, category, measureType, purchaseUnit, purchaseCost, purchaseQty, yieldPercent, pieceWeightG? (ordered portion spec in grams for portioned weight product, e.g. 6 oz breasts — drives pieces-per-case, cost-per-piece, and each-yield derivation in the Recipe Builder; absent for bulk/randoms), nutritionPer100g?, allergens?, vendorId?, lastVerified, priceSource, nutritionSource? ('ai' \| 'manual') |
 | `RecipeCategory` | Chef-managed recipe category (id, name), CRUD'd from Settings — referenced by `Recipe.categoryId` |
 | `IngredientCategory` | `'Produce' \| 'Protein' \| 'Dairy' \| 'Dry Goods' \| 'Frozen' \| 'Beverage' \| 'Other'` |
 | `MeasureType` | `'weight' \| 'volume' \| 'each'` — determines base unit (g, ml, each) |
@@ -422,7 +422,7 @@ only allowed state.
 5. ~~Event Calendar~~ ✓ — upgrading to Events & Clients (part 1 of 3: data model + clients ✓; part 2 of 3: event detail view with milestone timeline + tentative menu ✓; part 3/3 pending: change log, full client event-history view)
 6. ~~Ingredients Master Library~~ ✓
 7. ~~Invoice Price Update (human-confirmed)~~ ✓
-8. ~~Recipe Builder + Cost Engine~~ ✓ (AI buttons — [Suggest Ingredients] / [Write Method] — still pending, land via `/api/ai`)
+8. ~~Recipe Builder + Cost Engine~~ ✓ (AI buttons shipped as "Build From Pantry" / "Draft Method" via `/api/ai` — pantry-constrained suggestions, chef-confirmed accepts)
 9. ~~Menu View~~ ✓ (operational cost/FC% view + Guest Preview with Classic/Clean templates)
 10. ~~Catering Module~~ — absorbed into Events & Clients (item 5); no standalone Catering Module will be built
 11. Vendor Management

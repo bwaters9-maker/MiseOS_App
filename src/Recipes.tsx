@@ -9,7 +9,7 @@ import {
   recipeCost, costPerPortion, fcPercent, suggestedPrice, wouldCreateCycle, fcColor,
 } from './lib/costEngine';
 import {
-  toBase, displayUnitsFor, defaultDisplayUnit, smartUnit, costPerDisplayUnit,
+  toBase, fromBase, displayUnitsFor, defaultDisplayUnit, smartUnit, costPerDisplayUnit, measureTypeOfUnit,
 } from './lib/units';
 import { callAi, parseAiJson } from './lib/ai';
 import type { Ingredient, Recipe, RecipeLine, MeasureType, RecipeCategory } from './types';
@@ -54,6 +54,32 @@ interface PantrySuggestion {
   aiUnit: string;
   why: string;
 }
+
+const AutoGrowTextarea: React.FC<{
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  className?: string;
+  placeholder?: string;
+}> = ({ value, onChange, className, placeholder }) => {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = `${el.scrollHeight}px`;
+    }
+  }, [value]);
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      className={`${className ?? ''} resize-none overflow-hidden`}
+    />
+  );
+};
 
 const categoryLabel = (r: Recipe, categories: RecipeCategory[]): string => {
   const cat = categories.find(c => c.id === r.categoryId);
@@ -352,15 +378,50 @@ const RecipeEditor: React.FC<{
     setForm({ ...form, lines: [...form.lines, line] });
   };
 
-  const handleBatchMeasureTypeChange = (mt: MeasureType) => {
-    setForm({ ...form, batchYieldMeasureType: mt, batchYieldUnit: defaultDisplayUnit(mt, unitSystem) });
+  const handleBatchUnitChange = (u: DisplayUnit) => {
+    setForm({ ...form, batchYieldUnit: u, batchYieldMeasureType: measureTypeOfUnit(u) });
+  };
+
+  const fmtQty = (v: number) => v.toFixed(v >= 10 ? 2 : 3).replace(/\.?0+$/, '');
+
+  const lineTotals = useMemo(() => {
+    const totals: Partial<Record<MeasureType, number>> = {};
+    form.lines.forEach(l => {
+      const qty = parseFloat(l.qtyDisplay);
+      if (!(qty > 0)) return;
+      const mt = measureTypeOfUnit(l.qtyUnit);
+      totals[mt] = (totals[mt] ?? 0) + toBase(qty, l.qtyUnit);
+    });
+    return totals;
+  }, [form.lines]);
+
+  const applyTotalAsYield = (mt: MeasureType, baseTotal: number) => {
+    const { value, unit } = smartUnit(baseTotal, mt, unitSystem);
+    setForm({ ...form, batchYieldQtyDisplay: fmtQty(value), batchYieldUnit: unit, batchYieldMeasureType: mt });
+  };
+
+  const pieceYields = useMemo(() => {
+    return form.lines.flatMap(l => {
+      if (l.type !== 'ingredient') return [];
+      const ing = ingredients.find(i => i.id === l.refId);
+      if (!ing?.pieceWeightG || ing.pieceWeightG <= 0) return [];
+      const qty = parseFloat(l.qtyDisplay);
+      if (!(qty > 0) || measureTypeOfUnit(l.qtyUnit) !== 'weight') return [];
+      const pieces = Math.round(toBase(qty, l.qtyUnit) / ing.pieceWeightG);
+      if (pieces <= 0) return [];
+      const specUnit = unitSystem === 'imperial' ? 'oz' as const : 'g' as const;
+      const spec = Number(fromBase(ing.pieceWeightG, specUnit).toFixed(2));
+      return [{ key: l.key, name: ing.name, pieces, spec, specUnit }];
+    });
+  }, [form.lines, ingredients, unitSystem]);
+
+  const applyPiecesAsYield = (pieces: number) => {
+    setForm({ ...form, batchYieldQtyDisplay: String(pieces), batchYieldUnit: 'each', batchYieldMeasureType: 'each' });
   };
 
   const addStep = () => setForm({ ...form, methodSteps: [...form.methodSteps, ''] });
   const updateStep = (idx: number, v: string) => setForm({ ...form, methodSteps: form.methodSteps.map((s, i) => i === idx ? v : s) });
   const removeStep = (idx: number) => setForm({ ...form, methodSteps: form.methodSteps.filter((_, i) => i !== idx) });
-
-  const batchYieldUnits = displayUnitsFor(form.batchYieldMeasureType, unitSystem);
 
   const suggestionCounter = useRef(0);
   const [pantryLoading, setPantryLoading] = useState(false);
@@ -493,7 +554,7 @@ const RecipeEditor: React.FC<{
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-[13px]">
+      <div className={`grid grid-cols-1 ${form.recipeType === 'menu' ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-[13px]`}>
         <div>
           <label className={FIELD_LABEL}>Name</label>
           <input type="text" value={form.name} onChange={e => set('name', e.target.value)} placeholder="Recipe name" className={INPUT} autoFocus />
@@ -509,27 +570,6 @@ const RecipeEditor: React.FC<{
               Currently "{form.course}" (uncategorized) — select a category to migrate.
             </p>
           )}
-        </div>
-      </div>
-
-      <div className={`grid grid-cols-1 ${form.recipeType === 'menu' ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-[13px]`}>
-        <div>
-          <label className={FIELD_LABEL}>Measurement Type</label>
-          <select value={form.batchYieldMeasureType} onChange={e => handleBatchMeasureTypeChange(e.target.value as MeasureType)} className={INPUT}>
-            <option value="weight">Weight</option>
-            <option value="volume">Volume</option>
-            <option value="each">Each / Count</option>
-          </select>
-        </div>
-        <div>
-          <label className={FIELD_LABEL}>Amount</label>
-          <input type="number" value={form.batchYieldQtyDisplay} onChange={e => set('batchYieldQtyDisplay', e.target.value)} placeholder="0" min="0" step="any" className={INPUT} />
-        </div>
-        <div>
-          <label className={FIELD_LABEL}>Measurement Unit</label>
-          <select value={form.batchYieldUnit} onChange={e => set('batchYieldUnit', e.target.value as DisplayUnit)} className={INPUT} disabled={form.batchYieldMeasureType === 'each'}>
-            {batchYieldUnits.map(u => <option key={u} value={u}>{u}</option>)}
-          </select>
         </div>
         {form.recipeType === 'menu' && (
           <div>
@@ -639,6 +679,73 @@ const RecipeEditor: React.FC<{
         />
       </div>
 
+      {form.recipeType === 'sub' && (
+        <div className="space-y-[8px]">
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Batch Yield</h3>
+          <p className="text-[10px] text-zinc-500">
+            What one batch produces after cooking. Batch cost ÷ yield sets this sub-recipe's cost per unit wherever it's used in other recipes.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-[13px]">
+            <div>
+              <label className={FIELD_LABEL}>Amount</label>
+              <input type="number" value={form.batchYieldQtyDisplay} onChange={e => set('batchYieldQtyDisplay', e.target.value)} placeholder="0" min="0" step="any" className={INPUT} />
+            </div>
+            <div>
+              <label className={FIELD_LABEL}>Unit</label>
+              <select value={form.batchYieldUnit} onChange={e => handleBatchUnitChange(e.target.value as DisplayUnit)} className={INPUT}>
+                <optgroup label="Weight">
+                  {displayUnitsFor('weight', unitSystem).map(u => <option key={u} value={u}>{u}</option>)}
+                </optgroup>
+                <optgroup label="Volume">
+                  {displayUnitsFor('volume', unitSystem).map(u => <option key={u} value={u}>{u}</option>)}
+                </optgroup>
+                <optgroup label="Count">
+                  <option value="each">each</option>
+                </optgroup>
+              </select>
+            </div>
+          </div>
+          {form.batchYieldMeasureType === 'each' ? (
+            pieceYields.length > 0 ? (
+              pieceYields.map(p => (
+                <p key={p.key} className="text-[10px] text-zinc-500">
+                  {p.name}: <span className="text-zinc-300 font-bold">≈ {p.pieces} each</span> at {p.spec} {p.specUnit}/piece
+                  <button
+                    type="button"
+                    onClick={() => applyPiecesAsYield(p.pieces)}
+                    className="ml-[8px] text-emerald-400 hover:text-emerald-300 underline transition-colors duration-[144ms]"
+                  >
+                    Use as yield
+                  </button>
+                </p>
+              ))
+            ) : (
+              <p className="text-[10px] text-zinc-500">
+                Enter how many pieces one batch makes (e.g. 1 breast, 12 meatballs) — or set a Piece Size on the ingredient in the Master Pantry and it will be derived here.
+              </p>
+            )
+          ) : (
+            (Object.entries(lineTotals) as [MeasureType, number][])
+              .filter(([mt]) => mt !== 'each')
+              .map(([mt, baseTotal]) => {
+                const { value, unit } = smartUnit(baseTotal, mt, unitSystem);
+                return (
+                  <p key={mt} className="text-[10px] text-zinc-500">
+                    Ingredients total ({mt}): <span className="text-zinc-300 font-bold">{fmtQty(value)} {unit}</span>
+                    <button
+                      type="button"
+                      onClick={() => applyTotalAsYield(mt, baseTotal)}
+                      className="ml-[8px] text-emerald-400 hover:text-emerald-300 underline transition-colors duration-[144ms]"
+                    >
+                      Use as yield
+                    </button>
+                  </p>
+                );
+              })
+          )}
+        </div>
+      )}
+
       <div className="space-y-[8px]">
         <div className="flex items-center justify-between">
           <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Method</h3>
@@ -658,15 +765,14 @@ const RecipeEditor: React.FC<{
             <p className="text-[11px] text-red-300">{methodError}</p>
           </div>
         )}
-        <div className="space-y-[5px]">
+        <div className="space-y-[13px]">
           {form.methodSteps.map((step, idx) => (
             <div key={idx} className="flex items-start gap-[8px]">
               <span className="text-[10px] font-black text-zinc-600 pt-[8px] w-[21px] text-right shrink-0">{idx + 1}.</span>
-              <textarea
+              <AutoGrowTextarea
                 value={step}
                 onChange={e => updateStep(idx, e.target.value)}
-                rows={2}
-                className={`${INPUT} resize-none flex-1`}
+                className={`${INPUT} flex-1`}
                 placeholder="Method step"
               />
               <button onClick={() => removeStep(idx)} className="p-[5px] text-zinc-600 hover:text-red-400 transition-colors duration-[144ms] mt-[5px]">

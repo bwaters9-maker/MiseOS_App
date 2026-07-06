@@ -4,6 +4,7 @@ import { db } from '../../firebaseConfig';
 import { addDoc, collection, updateDoc, doc } from 'firebase/firestore';
 import { callAi, parseAiJson } from '../../lib/ai';
 import { toBase, displayUnitsFor, defaultDisplayUnit, smartUnit } from '../../lib/units';
+import { yieldReferenceText } from '../../lib/yieldReference';
 import type { Ingredient, IngredientCategory, MeasureType, Allergen } from '../../types';
 import type { UnitSystem, DisplayUnit } from '../../lib/units';
 
@@ -35,9 +36,12 @@ Rules:
 - "measureType" must be exactly one of: "weight", "volume", "each".
 - "packQtyInBaseUnits" is the pack quantity from packDescription converted to the canonical base unit: grams if measureType is "weight", milliliters if "volume", or a plain count if "each".
 - "baseUnit" must be "g" if measureType is "weight", "ml" if "volume", or "each" if "each".
-- "yieldPercent" is a typical usable-yield percentage after trim/waste for this ingredient, from 1 to 100 (use 100 if unsure or not applicable).
+- "yieldPercent" is the usable-yield percentage after trim/waste for this ingredient, from 1 to 100 (use 100 if unsure or not applicable). A chef-standard yield reference chart is provided below — when the ingredient (or a close equivalent at a comparable fabrication state) appears in it, use that value instead of your own estimate. For ranges, use the midpoint.
 - "allergens" is an array containing zero or more of: "milk", "eggs", "fish", "shellfish", "treeNuts", "peanuts", "wheat", "soybeans", "sesame", "gluten", "sulfites" — only ones this ingredient genuinely contains or commonly derives from. Empty array if none apply.
-- If you cannot make a reasonable suggestion for a line, omit it from "suggestions" entirely.`;
+- If you cannot make a reasonable suggestion for a line, omit it from "suggestions" entirely.
+
+Yield reference chart (usable-yield percentages by fabrication state):
+${yieldReferenceText()}`;
 
 const normalize = (s: string): string =>
   s.toLowerCase().trim().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
