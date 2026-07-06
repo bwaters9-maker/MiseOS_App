@@ -166,13 +166,16 @@ Note: `useKitchenState.ts` also defines `PrepItem` and `Item86` locally (pre-exi
 
 ## Design system
 
-- **Background:** `bg-black` / `bg-zinc-950`
-- **Borders:** `border-zinc-800` / `border-zinc-900`
-- **Text:** `text-zinc-100` primary, `text-zinc-500` muted
-- **Accent:** `emerald-400` / `emerald-700` (active states, CTAs)
-- **Danger:** `red-400` / `red-950`
-- **Font:** `font-mono` throughout; `font-black` + `uppercase` + `tracking-wider` for headings
-- **Cards:** `bg-zinc-950 border border-zinc-800 rounded-xl`
+MiseOS brand kit v1.0 — Cool tone / Rounded corners / Saffron signal. Tokens defined as a Tailwind v4 `@theme` block in `src/index.css`, mirrored in `design-tokens.json`'s `colors` and `border-radius` sections.
+
+- **Background:** `bg-bg-cool` (page), `bg-surface` (cards/panels — cream)
+- **Borders:** `border-line`
+- **Text:** `text-navy` primary, `text-slate` muted
+- **Accent:** `text-teal` / `bg-teal` (active states), `text-saffron` / `bg-saffron` (signal/CTA)
+- **Danger:** `red-400` / `red-950` (unchanged — no brand-kit danger color defined)
+- **Font:** `font-display` (Quicksand — headings/brand), `font-body` (Nunito Sans — body copy)
+- **Cards:** `bg-surface border border-line rounded-card`
+- **Radius:** `rounded-card` (22px), `rounded-tile` (28px)
 - **Spacing:** Fibonacci-based tokens from `design-tokens.json` — use as Tailwind arbitrary values (`p-[21px]`, `gap-[34px]`, etc.)
 - No emojis. No comments explaining what code does.
 - No open free-text inputs except names, comments, and special requests — all
