@@ -51,7 +51,6 @@ src/
   App.tsx                        View router (viewMap + lazy loading)
   firebaseConfig.ts              Firebase init
   types.ts                       Canonical type definitions
-  data.ts                        Static seed/mock data
   utils.ts                       Helpers (formatDuration, etc.)
 
   DailyCribSheet.tsx             Crib Sheet view — five sections, print-optimized
@@ -234,11 +233,8 @@ Any future AI feature must follow this same proxy pattern — no `fetch` to `api
 
 ## Known pre-existing TypeScript errors
 
-`npm run lint` reports ~60 errors that predate this project. Do not fix them unless that is the stated task. Key categories:
+`npm run lint` reports a handful of errors that predate this project. Do not fix them unless that is the stated task. Key categories:
 
-- `useKitchenState.ts` — Firestore namespace types (`FirestoreError`, `QuerySnapshot`, etc.) used as value types; should be type-only imports from `firebase/firestore`. All listeners (old and new) carry this error.
-- `PrepRegistrationForm.tsx` — `PrepItem.quantity` is `number` in `src/types.ts` but `string` in `useKitchenState.ts` (local duplicate interface mismatch)
-- `data.ts` — seed data doesn't match current type shapes (unused/orphaned file — nothing imports its exports)
 - `main.tsx` — `document.getElementById` can return `null`
 - `@/types` / `@/lib/utils` path alias unresolved in a few files (tsconfig path mapping issue) — `LineTimerModule.tsx`, `MetricsHUD.tsx`, `TrendSidebar.tsx`, `StationPassHeader.tsx`
 
