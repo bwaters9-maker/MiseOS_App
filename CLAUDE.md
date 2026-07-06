@@ -231,12 +231,6 @@ The browser never talks to Anthropic directly. `TestKitchenHub.tsx` posts `{ sys
 
 Any future AI feature must follow this same proxy pattern — no `fetch` to `api.anthropic.com` from `src/`, no Anthropic key in a `VITE_*` env var.
 
-## Known pre-existing TypeScript errors
-
-`npm run lint` reports a handful of errors that predate this project. Do not fix them unless that is the stated task. Key categories:
-
-- `main.tsx` — `document.getElementById` can return `null`
-
 ## Known issues
 
 - `firestore.rules` is stale Base44-era: it validates an old schema (`vendor_id`, `cost_per_unit`, `price_source: 'regional_estimate'|'invoice_scan'`, etc.) that doesn't match the canonical types in `src/types.ts`, and requires `isAuthenticated()`/`isEditor()` for writes even though the app has no sign-in flow. Must be rewritten to match canonical types, and the auth story decided, before any real deployment.
