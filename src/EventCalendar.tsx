@@ -533,7 +533,7 @@ const EventCalendar: React.FC = () => {
     setSavingEvent(true);
     try {
       const before = allEvents.find(e => e.id === editEventId);
-      const patch: Record<string, unknown> = eventToDoc(editEventForm);
+      const patch: Partial<KitchenEvent> = eventToDoc(editEventForm);
       const oldAttendees = before ? readAttendees(before) : undefined;
       const newAttendees = editEventForm.attendees !== '' && !isNaN(parseInt(editEventForm.attendees, 10))
         ? parseInt(editEventForm.attendees, 10)

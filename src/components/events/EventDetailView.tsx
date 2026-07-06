@@ -309,7 +309,7 @@ const MenuPanel: React.FC<{
   const writeLines = async (next: TentativeMenuLine[], logText?: string) => {
     setSaving(true);
     try {
-      const patch: Record<string, unknown> = { tentativeMenu: next };
+      const patch: Partial<KitchenEvent> = { tentativeMenu: next };
       if (logText) patch.changeLog = [...(event.changeLog ?? []), { date: getToday(), text: logText }];
       await updateDoc(doc(db, 'events', event.id), patch);
     } finally {
