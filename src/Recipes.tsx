@@ -134,6 +134,23 @@ const lineMeasureType = (line: LineDraft | RecipeLine, ingredients: Ingredient[]
   return recipes.find(r => r.id === line.refId)?.batchYield.measureType ?? 'weight';
 };
 
+/** Piece spec (grams) for an ingredient line on spec'd weight product, else undefined. */
+const lineSpec = (line: LineDraft | RecipeLine, ingredients: Ingredient[]): number | undefined => {
+  if (line.type !== 'ingredient') return undefined;
+  const ing = ingredients.find(i => i.id === line.refId);
+  return ing?.measureType === 'weight' && ing.pieceWeightG && ing.pieceWeightG > 0 ? ing.pieceWeightG : undefined;
+};
+
+/** Canonical base qty for a draft line — 'each' on a spec'd line converts via the spec. */
+const draftLineBaseQty = (l: LineDraft, ingredients: Ingredient[]): number => {
+  const n = parseFloat(l.qtyDisplay) || 0;
+  if (l.qtyUnit === 'each') {
+    const spec = lineSpec(l, ingredients);
+    if (spec) return n * spec;
+  }
+  return toBase(n, l.qtyUnit);
+};
+
 const toForm = (recipe: Recipe, unitSystem: UnitSystem, ingredients: Ingredient[], recipes: Recipe[]): FormState => {
   const { value: batchYieldValue, unit: batchYieldUnit } = smartUnit(recipe.batchYield.qty, recipe.batchYield.measureType, unitSystem);
   return {
@@ -146,6 +163,18 @@ const toForm = (recipe: Recipe, unitSystem: UnitSystem, ingredients: Ingredient[
     batchYieldUnit,
     portions: String(recipe.portions),
     lines: recipe.lines.map((line, idx) => {
+      const spec = line.entryUnit === 'each' ? lineSpec(line, ingredients) : undefined;
+      if (spec) {
+        const pieces = line.qty / spec;
+        return {
+          key: `${line.type}:${line.refId}:${idx}`,
+          type: line.type,
+          refId: line.refId,
+          qtyDisplay: pieces.toFixed(3).replace(/\.?0+$/, ''),
+          qtyUnit: 'each' as DisplayUnit,
+          note: line.note ?? '',
+        };
+      }
       const mt = lineMeasureType(line, ingredients, recipes);
       const { value, unit } = smartUnit(line.qty, mt, unitSystem);
       return {
@@ -163,7 +192,7 @@ const toForm = (recipe: Recipe, unitSystem: UnitSystem, ingredients: Ingredient[
   };
 };
 
-const toDoc = (form: FormState): Omit<Recipe, 'id'> => ({
+const toDoc = (form: FormState, ingredients: Ingredient[]): Omit<Recipe, 'id'> => ({
   name: form.name.trim(),
   recipeType: form.recipeType,
   course: form.course.trim(),
@@ -176,7 +205,8 @@ const toDoc = (form: FormState): Omit<Recipe, 'id'> => ({
   lines: form.lines.map((l): RecipeLine => ({
     type: l.type,
     refId: l.refId,
-    qty: toBase(parseFloat(l.qtyDisplay) || 0, l.qtyUnit),
+    qty: draftLineBaseQty(l, ingredients),
+    ...(l.qtyUnit === 'each' && lineSpec(l, ingredients) ? { entryUnit: 'each' as const } : {}),
     ...(l.note.trim() && { note: l.note.trim() }),
   })),
   methodSteps: form.methodSteps.map(s => s.trim()).filter(Boolean),
@@ -189,7 +219,7 @@ const toDoc = (form: FormState): Omit<Recipe, 'id'> => ({
   updatedAt: new Date().toISOString(),
 });
 
-const virtualRecipe = (form: FormState, id: string): Recipe => ({
+const virtualRecipe = (form: FormState, id: string, ingredients: Ingredient[]): Recipe => ({
   id,
   name: form.name,
   recipeType: form.recipeType,
@@ -203,7 +233,8 @@ const virtualRecipe = (form: FormState, id: string): Recipe => ({
   lines: form.lines.map((l): RecipeLine => ({
     type: l.type,
     refId: l.refId,
-    qty: toBase(parseFloat(l.qtyDisplay) || 0, l.qtyUnit),
+    qty: draftLineBaseQty(l, ingredients),
+    ...(l.qtyUnit === 'each' && lineSpec(l, ingredients) ? { entryUnit: 'each' as const } : {}),
     ...(l.note.trim() && { note: l.note.trim() }),
   })),
   methodSteps: form.methodSteps,
@@ -249,7 +280,8 @@ const LineSearchBox: React.FC<{
     : [];
 
   const addIngredient = (ing: Ingredient) => {
-    const unit = defaultDisplayUnit(ing.measureType, unitSystem);
+    const specd = ing.measureType === 'weight' && ing.pieceWeightG != null && ing.pieceWeightG > 0;
+    const unit: DisplayUnit = specd ? 'each' : defaultDisplayUnit(ing.measureType, unitSystem);
     counter.current += 1;
     onAdd({ key: `ingredient:${ing.id}:${counter.current}`, type: 'ingredient', refId: ing.id, qtyDisplay: '', qtyUnit: unit, note: '' });
     setTerm('');
@@ -389,11 +421,16 @@ const RecipeEditor: React.FC<{
     form.lines.forEach(l => {
       const qty = parseFloat(l.qtyDisplay);
       if (!(qty > 0)) return;
+      const spec = l.qtyUnit === 'each' ? lineSpec(l, ingredients) : undefined;
+      if (spec) {
+        totals.weight = (totals.weight ?? 0) + qty * spec;
+        return;
+      }
       const mt = measureTypeOfUnit(l.qtyUnit);
       totals[mt] = (totals[mt] ?? 0) + toBase(qty, l.qtyUnit);
     });
     return totals;
-  }, [form.lines]);
+  }, [form.lines, ingredients]);
 
   const applyTotalAsYield = (mt: MeasureType, baseTotal: number) => {
     const { value, unit } = smartUnit(baseTotal, mt, unitSystem);
@@ -406,8 +443,15 @@ const RecipeEditor: React.FC<{
       const ing = ingredients.find(i => i.id === l.refId);
       if (!ing?.pieceWeightG || ing.pieceWeightG <= 0) return [];
       const qty = parseFloat(l.qtyDisplay);
-      if (!(qty > 0) || measureTypeOfUnit(l.qtyUnit) !== 'weight') return [];
-      const pieces = Math.round(toBase(qty, l.qtyUnit) / ing.pieceWeightG);
+      if (!(qty > 0)) return [];
+      let pieces: number;
+      if (l.qtyUnit === 'each') {
+        pieces = Math.round(qty);
+      } else if (measureTypeOfUnit(l.qtyUnit) === 'weight') {
+        pieces = Math.round(toBase(qty, l.qtyUnit) / ing.pieceWeightG);
+      } else {
+        return [];
+      }
       if (pieces <= 0) return [];
       const specUnit = unitSystem === 'imperial' ? 'oz' as const : 'g' as const;
       const spec = Number(fromBase(ing.pieceWeightG, specUnit).toFixed(2));
@@ -601,7 +645,10 @@ const RecipeEditor: React.FC<{
         <div className="space-y-[5px]">
           {form.lines.map(line => {
             const mt = lineMeasureType(line, ingredients, recipes);
-            const units = displayUnitsFor(mt, unitSystem);
+            const spec = lineSpec(line, ingredients);
+            const units: DisplayUnit[] = spec
+              ? [...displayUnitsFor(mt, unitSystem), 'each']
+              : displayUnitsFor(mt, unitSystem);
             const ref = line.type === 'ingredient'
               ? ingredients.find(i => i.id === line.refId)
               : recipes.find(r => r.id === line.refId);
@@ -860,7 +907,7 @@ const CostPanel: React.FC<{
   const [scaleFactor, setScaleFactor] = useState(1);
   const [customScale, setCustomScale] = useState('');
 
-  const base = virtualRecipe(form, currentRecipeId);
+  const base = virtualRecipe(form, currentRecipeId, ingredients);
   const scaled = scaleRecipe(base, scaleFactor);
 
   const { batchCost, perPortion, error } = useMemo(() => {
@@ -1055,7 +1102,7 @@ const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPerc
     if (!form || saving || !form.name.trim()) return;
     setSaving(true);
     try {
-      const docData = toDoc(form);
+      const docData = toDoc(form, allIngredients);
       if (selectedId) {
         await updateDoc(doc(db, 'recipes', selectedId), docData);
       } else {

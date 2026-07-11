@@ -137,7 +137,7 @@ Current nav tabs (in order): Crib Sheet · Features · Staff · Events & Clients
 |---|---|
 | `PrepItem` / `ProductionRun` | Prep checklist task |
 | `Recipe` | id, name, recipeType ('sub' \| 'menu'), course, categoryId?, batchYield { qty, measureType }, portions, lines: RecipeLine[], methodSteps, menuPrice?, menuDescription?, updatedAt |
-| `RecipeLine` | A recipe component: `{ type: 'ingredient' \| 'recipe', refId, qty, note? }`. `qty` is always canonical base units. Only `recipeType: 'sub'` recipes may be referenced as a line — menu recipes never nest |
+| `RecipeLine` | A recipe component: `{ type: 'ingredient' \| 'recipe', refId, qty, entryUnit?, note? }`. `qty` is always canonical base units. `entryUnit: 'each'` marks a line the chef entered by piece on a spec'd weight ingredient (qty stores pieces × pieceWeightG; spec'd ingredients default to 'each' when added and offer it in the unit select). Only `recipeType: 'sub'` recipes may be referenced as a line — menu recipes never nest |
 | `Item86` / `Item86Entry` | 86'd item |
 | `PrepStation` | `'Sauté' \| 'Grill' \| 'Garde Manger' \| 'Pastry'` |
 | `Feature` | Nightly special (course, name, description, price, cost, activeFrom, activeTo, is86d) |

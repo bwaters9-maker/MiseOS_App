@@ -26,7 +26,14 @@ export interface PrepItem {
 export interface RecipeLine {
   type: 'ingredient' | 'recipe';
   refId: string;
+  /** Always canonical base units (g / ml / each), regardless of entryUnit. */
   qty: number;
+  /**
+   * 'each' when the chef entered this line by piece on a spec'd weight
+   * ingredient (pieceWeightG) — qty still stores grams (pieces × spec).
+   * Absent for normal weight/volume entry.
+   */
+  entryUnit?: 'each';
   note?: string;
 }
 
