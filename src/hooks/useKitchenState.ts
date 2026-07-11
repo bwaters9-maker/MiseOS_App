@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, onSnapshot, DocumentData, QuerySnapshot, QueryDocumentSnapshot, FirestoreError } from 'firebase/firestore';
-import type { Feature, Employee, Shift, KitchenEvent, KitchenAlert, CribNote, Ingredient, Recipe, Client } from '../types';
+import type { Feature, Employee, Shift, KitchenEvent, KitchenAlert, CribNote, Ingredient, Recipe, Client, Vendor } from '../types';
 
 // Based on firebase-blueprint.json
 export interface PrepItem {
@@ -37,6 +37,7 @@ export const useKitchenState = () => {
   const [alerts, setAlerts] = useState<KitchenAlert[]>([]);
   const [cribNotes, setCribNotes] = useState<CribNote[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<FirestoreError | null>(null);
 
@@ -140,6 +141,14 @@ export const useKitchenState = () => {
       (err: FirestoreError) => { setError(err); }
     );
 
+    const unsubVendors = onSnapshot(
+      collection(db, 'vendors'),
+      (snapshot: QuerySnapshot<DocumentData>) => {
+        setVendors(snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as Vendor)));
+      },
+      (err: FirestoreError) => { setError(err); }
+    );
+
     return () => {
       unsubPrep();
       unsubRecipes();
@@ -152,8 +161,9 @@ export const useKitchenState = () => {
       unsubAlerts();
       unsubCribNotes();
       unsubIngredients();
+      unsubVendors();
     };
   }, []);
 
-  return { prepItems, setPrepItems, recipes, setRecipes, items86, features, staff, shifts, events, clients, alerts, cribNotes, ingredients, loading, error };
+  return { prepItems, setPrepItems, recipes, setRecipes, items86, features, staff, shifts, events, clients, alerts, cribNotes, ingredients, vendors, loading, error };
 };

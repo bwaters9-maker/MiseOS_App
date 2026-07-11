@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, ClipboardList, Clock, History, Sparkles, Settings, Menu, X, Star, Users, CalendarDays, Package, ChefHat, UtensilsCrossed, LogOut } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Clock, History, Sparkles, Settings, Menu, X, Star, Users, CalendarDays, Package, ChefHat, UtensilsCrossed, LogOut, Truck } from 'lucide-react';
 import { useAuth } from './AuthContext';
 
 interface AppHeaderProps {
@@ -13,6 +13,7 @@ const navItems = [
   { view: 'staff', label: 'Staff', icon: Users },
   { view: 'events', label: 'Events & Clients', icon: CalendarDays },
   { view: 'ingredients', label: 'Ingredients', icon: Package },
+  { view: 'vendors', label: 'Vendors', icon: Truck },
   { view: 'recipes', label: 'Recipes', icon: ChefHat },
   { view: 'menu', label: 'Menu', icon: UtensilsCrossed },
   { view: 'prep', label: 'Prep Checklist', icon: ClipboardList },

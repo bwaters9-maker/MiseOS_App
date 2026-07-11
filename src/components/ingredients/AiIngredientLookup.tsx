@@ -10,7 +10,7 @@ import {
   INPUT, FIELD_LABEL, BTN_PRIMARY, BTN_GHOST,
 } from './IngredientForm';
 import type { FormState } from './IngredientForm';
-import type { IngredientCategory, MeasureType, Allergen } from '../../types';
+import type { IngredientCategory, MeasureType, Allergen, Vendor } from '../../types';
 import type { UnitSystem } from '../../lib/units';
 
 const ALL_ALLERGENS: Allergen[] = ['milk', 'eggs', 'fish', 'shellfish', 'treeNuts', 'peanuts', 'wheat', 'soybeans', 'sesame', 'gluten', 'sulfites'];
@@ -74,6 +74,7 @@ const buildProposalForm = (name: string, proposal: any, unitSystem: UnitSystem):
     cholesterol: numStr(n.cholesterol), sodium: numStr(n.sodium), totalCarbs: numStr(n.totalCarbs), fiber: numStr(n.fiber),
     sugars: numStr(n.sugars), addedSugars: numStr(n.addedSugars), protein: numStr(n.protein),
     allergens,
+    vendorId: '',
   };
 };
 
@@ -81,11 +82,12 @@ type Stage = 'name' | 'looking-up' | 'review' | 'failed' | 'manual';
 
 interface AiIngredientLookupProps {
   unitSystem: UnitSystem;
+  vendors: Vendor[];
   onCancel: () => void;
   onSaved: () => void;
 }
 
-export const AiIngredientLookup: React.FC<AiIngredientLookupProps> = ({ unitSystem, onCancel, onSaved }) => {
+export const AiIngredientLookup: React.FC<AiIngredientLookupProps> = ({ unitSystem, vendors, onCancel, onSaved }) => {
   const [stage, setStage] = useState<Stage>('name');
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -221,6 +223,7 @@ export const AiIngredientLookup: React.FC<AiIngredientLookupProps> = ({ unitSyst
           onCancel={onCancel}
           saving={saving}
           unitSystem={unitSystem}
+          vendors={vendors}
           costEstimateBadge={!costEdited}
         />
       </div>
@@ -236,6 +239,7 @@ export const AiIngredientLookup: React.FC<AiIngredientLookupProps> = ({ unitSyst
         onCancel={onCancel}
         saving={saving}
         unitSystem={unitSystem}
+        vendors={vendors}
         showManualCaution
       />
     </div>

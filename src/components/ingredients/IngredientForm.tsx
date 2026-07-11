@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ChevronDown, AlertTriangle } from 'lucide-react';
 import { computeCostPerBaseUnit } from '../../lib/costEngine';
 import { toBase, fromBase, displayUnitsFor, defaultDisplayUnit, smartUnit, costPerDisplayUnit } from '../../lib/units';
-import type { Ingredient, IngredientCategory, MeasureType, Allergen, NutritionPer100g } from '../../types';
+import type { Ingredient, IngredientCategory, MeasureType, Allergen, NutritionPer100g, Vendor } from '../../types';
 import type { UnitSystem, DisplayUnit } from '../../lib/units';
 
 export const CATEGORIES: IngredientCategory[] = ['Produce', 'Protein', 'Dairy', 'Dry Goods', 'Frozen', 'Beverage', 'Other', 'Spices', 'Oils & Fats', 'Sauces', 'Beverages', 'Bakery'];
@@ -31,6 +31,7 @@ export interface FormState {
   cholesterol: string; sodium: string; totalCarbs: string; fiber: string;
   sugars: string; addedSugars: string; protein: string;
   allergens: Allergen[];
+  vendorId: string;
 }
 
 export const BLANK = (unitSystem: UnitSystem): FormState => ({
@@ -43,6 +44,7 @@ export const BLANK = (unitSystem: UnitSystem): FormState => ({
   cholesterol: '', sodium: '', totalCarbs: '', fiber: '',
   sugars: '', addedSugars: '', protein: '',
   allergens: [],
+  vendorId: '',
 });
 
 export const toForm = (ing: Ingredient, unitSystem: UnitSystem): FormState => {
@@ -73,6 +75,7 @@ export const toForm = (ing: Ingredient, unitSystem: UnitSystem): FormState => {
     addedSugars: n.addedSugars != null ? String(n.addedSugars) : '',
     protein: n.protein != null ? String(n.protein) : '',
     allergens: ing.allergens ?? [],
+    vendorId: ing.vendorId ?? '',
   };
 };
 
@@ -112,6 +115,7 @@ export const toDoc = (f: FormState): Omit<Ingredient, 'id'> => {
     }),
     ...(Object.keys(nutrition).length > 0 && { nutritionPer100g: nutrition, nutritionSource: 'manual' }),
     ...(f.allergens.length > 0 && { allergens: f.allergens }),
+    ...(f.vendorId && { vendorId: f.vendorId }),
     lastVerified: new Date().toISOString().slice(0, 10),
     priceSource: 'manual',
   };
@@ -138,6 +142,7 @@ export const toProposalDoc = (f: FormState, costEdited: boolean): Omit<Ingredien
     }),
     ...(Object.keys(nutrition).length > 0 && { nutritionPer100g: nutrition, nutritionSource: 'ai' as const }),
     ...(f.allergens.length > 0 && { allergens: f.allergens }),
+    ...(f.vendorId && { vendorId: f.vendorId }),
     lastVerified: costEdited ? new Date().toISOString().slice(0, 10) : '',
     priceSource: costEdited ? 'manual' : 'regional-estimate',
   };
@@ -265,12 +270,13 @@ export const IngredientForm: React.FC<{
   onCancel: () => void;
   saving: boolean;
   unitSystem: UnitSystem;
+  vendors: Vendor[];
   /** Manual entry (blank Add) and editing any existing ingredient — pack size
    * and yield errors compound into large costing errors over time. */
   showManualCaution?: boolean;
   /** AI-lookup review — cost is a proposed estimate until the chef edits it. */
   costEstimateBadge?: boolean;
-}> = ({ form, setForm, onSave, onCancel, saving, unitSystem, showManualCaution, costEstimateBadge }) => {
+}> = ({ form, setForm, onSave, onCancel, saving, unitSystem, vendors, showManualCaution, costEstimateBadge }) => {
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm({ ...form, [k]: v });
 
   const handleMeasureTypeChange = (mt: MeasureType) => {
@@ -307,7 +313,7 @@ export const IngredientForm: React.FC<{
           </p>
         </div>
       )}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-[13px]">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-[13px]">
         <div>
           <label className={FIELD_LABEL}>Name</label>
           <input
@@ -328,6 +334,17 @@ export const IngredientForm: React.FC<{
           >
             <option value="">— Select category —</option>
             {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className={FIELD_LABEL}>Vendor</label>
+          <select
+            value={form.vendorId}
+            onChange={e => set('vendorId', e.target.value)}
+            className={INPUT}
+          >
+            <option value="">— None —</option>
+            {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
           </select>
         </div>
       </div>

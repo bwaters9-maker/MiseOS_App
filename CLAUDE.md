@@ -63,6 +63,7 @@ src/
   Settings.tsx                   Theme toggle + station preset CRUD + recipe category CRUD
   HistoricalAlerts.tsx           Alert History view (all alerts, read-only)
   IngredientsTable.tsx           Master Pantry — static human-verified ingredient CRUD, unit conversion
+  Vendors.tsx                    Vendor directory — supplier contacts, lead time, order days, linked-ingredients view; feeds Ingredient.vendorId
   Recipes.tsx                    Recipe Builder — list (Menu Recipes / Sub-Recipes) + editor + Live Cost Analysis
   Menu.tsx                       Menu view — operational (FC%/cost) table + Guest Preview toggle
 
@@ -107,7 +108,7 @@ There is no router library. Navigation is a `useState` string in `App.tsx`. The 
 2. Add an entry to `viewMap` in `App.tsx`
 3. Add a `navItems` entry in `src/components/AppHeader.tsx`
 
-Current nav tabs (in order): Crib Sheet · Features · Staff · Events & Clients · Ingredients · Recipes · Prep Checklist · Kitchen Timers · Alert History · Test Kitchen · Settings
+Current nav tabs (in order): Crib Sheet · Features · Staff · Events & Clients · Ingredients · Vendors · Recipes · Prep Checklist · Kitchen Timers · Alert History · Test Kitchen · Settings
 
 ## Firestore collections
 
@@ -126,6 +127,7 @@ Current nav tabs (in order): Crib Sheet · Features · Staff · Events & Clients
 | `timers` | `KitchenTimers.tsx` |
 | `station_presets` | `useStationPresets`, `Settings.tsx`, `KitchenTimers.tsx` |
 | `ingredients` | `useKitchenState`, `IngredientsTable.tsx` |
+| `vendors` | `useKitchenState`, `Vendors.tsx`, `IngredientsTable.tsx` — `Ingredient.vendorId` optionally links to `vendors`; deleting a vendor clears `vendorId` on every linked ingredient (`deleteField()`) rather than orphaning the reference |
 | `recipe_categories` | `useRecipeCategories`, `Settings.tsx`, `Recipes.tsx` — seeded with Sides/Sauces/Salads/Soups/Proteins/Desserts if empty |
 | `event_types` | `useEventTypes`, `Settings.tsx`, `EventCalendar` — seeded with Wedding/Private Dining/Buyout/Bridal Shower/Corporate/Celebration of Life/Special Event if empty |
 
@@ -161,6 +163,8 @@ Current nav tabs (in order): Crib Sheet · Features · Staff · Events & Clients
 | `NutritionPer100g` | Optional nutrition facts stored per 100g on each Ingredient |
 | `PriceSource` | `'regional-estimate' \| 'invoice' \| 'manual'` — provenance of an `Ingredient`'s `purchaseCost`, paired with `lastVerified` |
 | `MenuTemplate` | `'classic' \| 'clean'` — Guest Preview styling choice on the Menu view, persisted like `unitSystem`/`targetFcPercent` |
+| `Vendor` | Master Pantry supplier: id, name, contactName?, phone?, email?, accountNumber?, leadTimeDays?, orderDays?: Weekday[], notes? — CRUD'd from `Vendors.tsx`, referenced by `Ingredient.vendorId` |
+| `Weekday` | `'Monday' \| 'Tuesday' \| 'Wednesday' \| 'Thursday' \| 'Friday' \| 'Saturday' \| 'Sunday'` — used for `Vendor.orderDays`, a structured multi-select rather than free text |
 
 Note: `useKitchenState.ts` also defines `PrepItem` and `Item86` locally (pre-existing duplication). `Recipe` was de-duplicated — `useKitchenState.ts` now imports the canonical type from `src/types.ts` directly. New types belong in `src/types.ts` only.
 
@@ -226,6 +230,16 @@ Two modes on one screen, toggled by the "Guest Preview" button — no separate n
 - Template choice is `menuTemplate` (`'classic' | 'clean'`, type in `src/types.ts`), stored the same way as `unitSystem`/`targetFcPercent` (React state in `App.tsx`, persisted to `localStorage` under `miseos_menu_template`, default `'clean'`). Restaurant Profile (build order item 15) will take over ownership of this setting alongside logo/brand color once it exists; for now there's no restaurant-identity data to show, so both templates render a generic "Menu" header rather than a fabricated restaurant name.
 - Print: both templates carry their own `@media print` rules (page size/margins, hides app chrome and the toolbar, forces background-color printing via `print-color-adjust`). The Classic template's two-column layout uses CSS `column-count`, which also paginates correctly across printed pages.
 
+## Vendor Management (Vendors.tsx)
+
+Directory CRUD with the same collapsible-add-form / inline-edit / two-step-delete pattern as Staff and Events & Clients — no separate detail page.
+
+- A vendor card shows name, contact, lead time, order days, and notes. Clicking the "N linked ingredients" row (same expand pattern as the client event-history list in Events & Clients) reveals every ingredient with that `vendorId` — name, category, `lastVerified` (or "Unverified"), and `priceSource` badge.
+- `orderDays` is a structured multi-select of `Weekday` toggle chips, not free text, per the no-open-text-inputs principle.
+- Deleting a vendor with linked ingredients requires the two-step confirm to state the count ("Will unlink N ingredients"); confirming clears `vendorId` via `deleteField()` on every linked ingredient before deleting the vendor doc — a reference is never left orphaned.
+- Master Pantry link: the shared `IngredientForm` (`components/ingredients/IngredientForm.tsx`) takes a `vendors` prop and renders a Vendor select (plus "— None —") next to Name/Category — used by the default Add Ingredient path, the AI-lookup review/manual stages, and the edit form. The Master Pantry table resolves and displays the vendor name from `vendorId`. Nothing is seeded — the generic-placeholder-vendors idea from the Approved Feature Map is an onboarding-time feature, not part of this build.
+- `InvoicePriceUpdate.tsx`'s inline add-unmatched-to-pantry form is a separate, minimal form (not the shared `IngredientForm`) and intentionally doesn't get a vendor field in this pass.
+
 ## AI feature (TestKitchenHub)
 
 The browser never talks to Anthropic directly. `TestKitchenHub.tsx` posts `{ system, messages, max_tokens }` to `POST /api/ai` on the Express server; `server.ts` calls `https://api.anthropic.com/v1/messages` server-side with `ANTHROPIC_API_KEY` (read from `process.env`, never a `VITE_` var) and relays Anthropic's JSON response back verbatim, including its `{ error: { message } }` shape on failure. Model is `claude-sonnet-4-6`, default max 1024 tokens.
@@ -234,7 +248,7 @@ Any future AI feature must follow this same proxy pattern — no `fetch` to `api
 
 ## Known issues
 
-- `firestore.rules` is stale Base44-era: it validates an old schema (`vendor_id`, `cost_per_unit`, `price_source: 'regional_estimate'|'invoice_scan'`, etc.) that doesn't match the canonical types in `src/types.ts`, and requires `isAuthenticated()`/`isEditor()` for writes even though the app has no sign-in flow. Must be rewritten to match canonical types, and the auth story decided, before any real deployment.
+- None currently tracked. (`firestore.rules` was previously stale Base44-era and the app had no sign-in flow — both are resolved: rules now validate the canonical types in `src/types.ts` and gate every collection on `isAuthenticated()`; `src/components/AuthContext.tsx` + `SignIn.tsx` provide real Firebase email/password auth, single operator account, no self-registration.)
 
 ## Working Session Protocol
 
@@ -380,7 +394,16 @@ EVENTS & CLIENTS
   opening the event
 
 VENDOR MANAGEMENT
-- Supplier contacts, lead times, linked to Master Pantry
+- Supplier directory: name, contact name, phone, email, account number,
+  lead time (days), order days (structured weekday multi-select), notes
+- Vendor detail: expand a vendor card to see every linked ingredient
+  (name, category, last verified, price source) — "what do I get from
+  this supplier"
+- Master Pantry link: `Ingredient.vendorId` — the ingredient form's
+  vendor field is a select fed from the vendor directory; deleting a
+  vendor with linked ingredients requires a two-step confirm stating
+  the count and clears `vendorId` on those ingredients rather than
+  orphaning the reference
 
 SETTINGS — RESTAURANT PROFILE
 - Identity: name, logo, chef name, brand color
@@ -424,7 +447,7 @@ only allowed state.
 8. ~~Recipe Builder + Cost Engine~~ ✓ (AI buttons shipped as "Build From Pantry" / "Draft Method" via `/api/ai` — pantry-constrained suggestions, chef-confirmed accepts)
 9. ~~Menu View~~ ✓ (operational cost/FC% view + Guest Preview with Classic/Clean templates)
 10. ~~Catering Module~~ — absorbed into Events & Clients (item 5); no standalone Catering Module will be built
-11. Vendor Management
+11. ~~Vendor Management~~ ✓
 12. Sous (Chef Chat)
 13. Ingredient Advisor
 14. FDA Label (inside Recipe)

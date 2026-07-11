@@ -12,7 +12,7 @@ import {
   BTN_PRIMARY, BTN_GHOST, BADGE,
 } from './components/ingredients/IngredientForm';
 import type { FormState } from './components/ingredients/IngredientForm';
-import type { Ingredient, IngredientCategory } from './types';
+import type { Ingredient, IngredientCategory, Vendor } from './types';
 import type { UnitSystem } from './lib/units';
 
 const CATEGORY_STYLE: Record<IngredientCategory, string> = {
@@ -39,6 +39,9 @@ interface IngredientsProps {
 
 const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) => {
   const allIngredients = (useKitchenSelector((s: any) => s.ingredients) as Ingredient[]) ?? [];
+  const allVendors = (useKitchenSelector((s: any) => s.vendors) as Vendor[]) ?? [];
+  const sortedVendors = [...allVendors].sort((a, b) => a.name.localeCompare(b.name));
+  const vendorsById = new Map(allVendors.map(v => [v.id, v]));
   const hasRegionalEstimate = allIngredients.some(ing => ing.priceSource === 'regional-estimate');
 
   const [search, setSearch] = useState('');
@@ -176,6 +179,7 @@ const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) =>
           <p className="text-[10px] font-black uppercase tracking-[0.15em] text-amber-400 mb-[13px]">New Ingredient</p>
           <AiIngredientLookup
             unitSystem={unitSystem}
+            vendors={sortedVendors}
             onCancel={() => setShowAdd(false)}
             onSaved={() => setShowAdd(false)}
           />
@@ -199,6 +203,7 @@ const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) =>
                 <tr>
                   <th className="px-[21px] py-[13px]"><SortHeader field="name">Name</SortHeader></th>
                   <th className="px-[13px] py-[13px]"><SortHeader field="category">Category</SortHeader></th>
+                  <th className="px-[13px] py-[13px] text-[10px] font-bold uppercase tracking-wider text-zinc-500">Vendor</th>
                   <th className="px-[13px] py-[13px] text-[10px] font-bold uppercase tracking-wider text-zinc-500">Purchase Unit</th>
                   <th className="px-[13px] py-[13px] text-[10px] font-bold uppercase tracking-wider text-zinc-500">Cost</th>
                   <th className="px-[13px] py-[13px] text-[10px] font-bold uppercase tracking-wider text-zinc-500">Yield</th>
@@ -211,7 +216,7 @@ const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) =>
                   if (editId === ing.id) {
                     return (
                       <tr key={ing.id} className="border-t border-zinc-800 bg-zinc-900/30">
-                        <td colSpan={7} className="px-[21px] py-[21px]">
+                        <td colSpan={8} className="px-[21px] py-[21px]">
                           <p className="text-[10px] font-black uppercase tracking-[0.15em] text-zinc-400 mb-[13px]">Edit — {ing.name}</p>
                           <IngredientForm
                             form={editForm}
@@ -220,6 +225,7 @@ const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) =>
                             onCancel={() => setEditId(null)}
                             saving={saving}
                             unitSystem={unitSystem}
+                            vendors={sortedVendors}
                             showManualCaution
                           />
                         </td>
@@ -247,6 +253,7 @@ const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) =>
                       <td className="px-[13px] py-[13px]">
                         <span className={`${BADGE} ${CATEGORY_STYLE[ing.category]}`}>{ing.category}</span>
                       </td>
+                      <td className="px-[13px] py-[13px] text-zinc-400">{ing.vendorId ? vendorsById.get(ing.vendorId)?.name ?? '—' : '—'}</td>
                       <td className="px-[13px] py-[13px] text-zinc-400">{ing.purchaseUnit || '—'}</td>
                       <td className="px-[13px] py-[13px] text-zinc-300 tabular-nums">${ing.purchaseCost.toFixed(2)}</td>
                       <td className="px-[13px] py-[13px] text-zinc-400 tabular-nums">{ing.yieldPercent}%</td>

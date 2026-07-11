@@ -251,6 +251,25 @@ export interface KitchenEvent {
   changeLog?: EventChangeLogEntry[];
 }
 
+export type Weekday = 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
+
+/**
+ * A supplier the Master Pantry can link ingredients to. `orderDays` is a
+ * structured multi-select of weekdays (not free text) — the days the chef
+ * can place an order with this vendor.
+ */
+export interface Vendor {
+  id: string;
+  name: string;
+  contactName?: string;
+  phone?: string;
+  email?: string;
+  accountNumber?: string;
+  leadTimeDays?: number;
+  orderDays?: Weekday[];
+  notes?: string;
+}
+
 export interface KitchenAlert {
   id: string;
   message: string;
