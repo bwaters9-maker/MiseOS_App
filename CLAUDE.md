@@ -81,7 +81,7 @@ src/
       IngredientForm.tsx         Shared form/types/toDoc used by AiIngredientLookup, manual add, and edit
 
     events/
-      EventDetailView.tsx        Event detail: header card (name/type/date/attendees/staff strip) + Timeline, Tentative Menu, Client, Change Log (placeholder) panel grid
+      EventDetailView.tsx        Event detail: header card (name/type/date/attendees/staff strip) + Timeline, Tentative Menu, Client, Change Log panel grid
 
     dashboard/
       LineTimerModule.tsx
@@ -147,7 +147,8 @@ Current nav tabs (in order): Crib Sheet · Features · Staff · Events & Clients
 | `Client` | Catering/events client: id, name, contactName, phone, email, flagNote? — `flagNote` renders as a persistent amber flag line on the client's directory card |
 | `EventMilestone` | Day-of timeline entry on an event: `{ time, label }` — `time` is an `HH:MM` string, list is sorted by time for display |
 | `TentativeMenuLine` | Tentative menu line on an event: `{ course, text, recipeId? }` — `text` is the display label either way (free-typed, or the linked recipe's name); `recipeId` optionally points at a `recipeType: 'menu'` recipe for cost projection |
-| `KitchenEvent` | Event (title, date, time, attendees?, notes?, eventType?: string, clientId?: string → Client, milestones?: EventMilestone[], tentativeMenu?: TentativeMenuLine[]) |
+| `EventChangeLogEntry` | Append-only change log entry on an event: `{ date, text }` — entries are never edited or deleted once written, either manually logged by the chef or auto-appended when attendees changes or a tentative menu line is added/removed/swapped |
+| `KitchenEvent` | Event (title, date, time, attendees?, notes?, eventType?: string, clientId?: string → Client, milestones?: EventMilestone[], tentativeMenu?: TentativeMenuLine[], changeLog?: EventChangeLogEntry[]) |
 | `KitchenAlert` | Alert (message, severity, resolved, timestamp) |
 | `CribNote` | Freeform crib note (date, content, author) |
 | `KitchenTimer` | Countdown timer |
@@ -360,14 +361,23 @@ EVENTS & CLIENTS
     to a projected total food cost (attendees × summed per-portion
     cost of linked lines only — labeled "projected, linked items
     only" since free-text lines carry no cost data)
-  - Client panel: contact fields, flag note, count of past events —
-    full client event-history view is planned (part 3)
-  - Change Log: placeholder — audit trail of edits to an event or
-    client record is planned (part 3)
+  - Client panel: contact fields, flag note, an expandable list of
+    the client's other events (date, type, attendees) that links
+    into each event's detail view — same expandable list also lives
+    on the client's directory card in Events & Clients
+  - Change Log: append-only audit trail of an event's changes — a
+    dated "+ Log entry" form for manual notes, plus auto-appended
+    entries when attendees changes or a tentative menu line is
+    added/removed/swapped (e.g. "Attendees 120 → 140", "Entrees:
+    Salmon → Halibut"). Existing entries render read-only, newest
+    first — no edit or delete, since the log is the paper trail
 - Quote generation — planned, deferred (was Catering's "cost + quote
   generation" ask; ties in once menu selection/costing is added)
-- Feeds Crib Sheet: today's events, showing linked client name when
-  present
+- Feeds Crib Sheet: today's events, showing event type badge and,
+  compactly beneath the row, that event's milestone timeline
+  (time — label) so a chef scanning the sheet mid-service sees
+  day-of deadlines (e.g. a 4:30 stationary deadline) without
+  opening the event
 
 VENDOR MANAGEMENT
 - Supplier contacts, lead times, linked to Master Pantry
@@ -408,7 +418,7 @@ only allowed state.
 2. ~~Daily Crib Sheet (print-optimized)~~ ✓
 3. ~~Features Module~~ ✓
 4. ~~Staff (lightweight)~~ ✓
-5. ~~Event Calendar~~ ✓ — upgrading to Events & Clients (part 1 of 3: data model + clients ✓; part 2 of 3: event detail view with milestone timeline + tentative menu ✓; part 3/3 pending: change log, full client event-history view)
+5. ~~Event Calendar~~ ✓ — upgraded to Events & Clients (part 1 of 3: data model + clients ✓; part 2 of 3: event detail view with milestone timeline + tentative menu ✓; part 3 of 3: change log + client event-history view ✓)
 6. ~~Ingredients Master Library~~ ✓
 7. ~~Invoice Price Update (human-confirmed)~~ ✓
 8. ~~Recipe Builder + Cost Engine~~ ✓ (AI buttons shipped as "Build From Pantry" / "Draft Method" via `/api/ai` — pantry-constrained suggestions, chef-confirmed accepts)
