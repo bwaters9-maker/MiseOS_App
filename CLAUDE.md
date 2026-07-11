@@ -59,7 +59,7 @@ src/
   EventCalendar.tsx              Events & Clients — event/client CRUD, grouped by date, upcoming/past split, feeds Crib Sheet; clicking an event opens EventDetailView
   PrepChecklist.tsx              Par-level deficit tracking table
   KitchenTimers.tsx              Multi-station countdown timers (Firestore-backed)
-  TestKitchenHub.tsx             AI dish optimizer (calls server-side /api/ai proxy)
+  TestKitchenHub.tsx             Test Kitchen — sub-tabs "Culinary Trends & Forecasts" and "The Menu Development Playground" (calls server-side /api/ai proxy); Playground chat runs on the shared Sous persona (src/lib/sousPersona.ts)
   Settings.tsx                   Theme toggle + station preset CRUD + recipe category CRUD
   HistoricalAlerts.tsx           Alert History view (all alerts, read-only)
   IngredientsTable.tsx           Master Pantry — static human-verified ingredient CRUD, unit conversion

@@ -1,5 +1,6 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, RefreshCw, Send, AlertCircle, Flame, Lightbulb, Zap } from 'lucide-react';
+import { SOUS_SYSTEM_PROMPT } from './lib/sousPersona';
 
 interface Message {
   role: 'user' | 'model';
@@ -9,10 +10,6 @@ interface Message {
 const MarkdownContent = ({ content }: { content: string }) => (
   <div className="text-xs whitespace-pre-wrap font-mono">{content}</div>
 );
-
-const SYSTEM_PROMPT = `You are a professional executive chef and culinary director advising kitchen staff inside the MiseOS back-of-house system. Your expertise is menu engineering, flavor pairing, and dish development. Give direct, practical, actionable guidance.
-
-Respond in plain text only. No markdown formatting of any kind: no headers, no tables, no asterisks, no bullet or numbered-list characters. Write in plain sentences and short paragraphs — a plain-text list with each item on its own line is fine if a list is genuinely needed. Be short and direct, the way a chef talks mid-service. No flowery language, no filler.`;
 
 const TREND_CARDS = [
   { img: 'photo-1544025162-d76694265947', label: 'Protein Component', title: 'Regenerative Agriculture Proteins' },
@@ -59,7 +56,7 @@ export default function TestKitchenHub() {
         },
         body: JSON.stringify({
           max_tokens: 2048,
-          system: SYSTEM_PROMPT,
+          system: SOUS_SYSTEM_PROMPT,
           messages: updatedMessages.map(msg => ({
             role: msg.role === 'model' ? 'assistant' : 'user',
             content: msg.content,
@@ -83,12 +80,12 @@ export default function TestKitchenHub() {
     <div className="p-6 space-y-6 max-w-7xl mx-auto font-mono text-zinc-100">
       <div className="border-b border-zinc-900 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div>
-          <h1 className="text-xl font-extrabold tracking-wider uppercase">Test Kitchen & Trend Matrix</h1>
+          <h1 className="text-xl font-extrabold tracking-wider uppercase">Test Kitchen</h1>
           <p className="text-[11px] text-zinc-500 uppercase tracking-widest mt-1">Develop new dishes with real-time AI assistance</p>
         </div>
         <div className="flex gap-2 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
-          <button onClick={() => setActiveSubTab('trends')} className={`px-4 py-2 text-xs font-extrabold uppercase tracking-wider rounded-lg transition-all border ${activeSubTab === 'trends' ? 'bg-zinc-900 text-emerald-400 border-zinc-700' : 'bg-transparent text-zinc-500 border-transparent'}`}>Hot Trends</button>
-          <button onClick={() => setActiveSubTab('optimizer')} className={`px-4 py-2 text-xs font-extrabold uppercase tracking-wider rounded-lg transition-all flex items-center gap-2 border ${activeSubTab === 'optimizer' ? 'bg-zinc-900 text-emerald-400 border-zinc-700' : 'bg-transparent text-zinc-500 border-transparent'}`}><Sparkles className="w-3.5 h-3.5" /> AI Dish Optimizer</button>
+          <button onClick={() => setActiveSubTab('trends')} className={`px-4 py-2 text-xs font-extrabold uppercase tracking-wider rounded-lg transition-all border ${activeSubTab === 'trends' ? 'bg-zinc-900 text-emerald-400 border-zinc-700' : 'bg-transparent text-zinc-500 border-transparent'}`}>Culinary Trends & Forecasts</button>
+          <button onClick={() => setActiveSubTab('optimizer')} className={`px-4 py-2 text-xs font-extrabold uppercase tracking-wider rounded-lg transition-all flex items-center gap-2 border ${activeSubTab === 'optimizer' ? 'bg-zinc-900 text-emerald-400 border-zinc-700' : 'bg-transparent text-zinc-500 border-transparent'}`}><Sparkles className="w-3.5 h-3.5" /> The Menu Development Playground</button>
         </div>
       </div>
 
