@@ -76,11 +76,47 @@ export interface RecipeCategory {
 
 /**
  * Guest-facing menu print/preview styling choice, selected from the Menu
- * view's Guest Preview toggle. Persisted the same way as unitSystem /
- * targetFcPercent (App.tsx state + localStorage) until Restaurant Profile
- * (build order item 15) owns it alongside logo/brand color.
+ * view's Guest Preview toggle. Persisted in the `RestaurantProfile` doc
+ * (`menuTemplate`), migrated from an earlier App.tsx + localStorage scheme.
  */
 export type MenuTemplate = 'classic' | 'clean';
+
+export type CuisineStyle =
+  | 'American' | 'Italian' | 'French' | 'Mexican' | 'Asian' | 'Mediterranean'
+  | 'Steakhouse' | 'Seafood' | 'Farm-to-Table' | 'BBQ' | 'Pizza' | 'Bakery/Café' | 'Fusion' | 'Other';
+
+export type PricePoint = '$' | '$$' | '$$$' | '$$$$';
+
+/**
+ * Single-doc restaurant identity + regional context, stored at the fixed
+ * path `restaurant_profile/main` (a singleton, not a growing collection —
+ * there is only ever one restaurant). Every field is optional since the
+ * chef may fill this in gradually, and a missing/blank profile must never
+ * break anything that reads it (see `src/lib/regionContext.ts`).
+ *
+ * `regionalNotes` is free text by design — chef commentary on local
+ * ingredients and traditions, the same allowed exception as names/comments
+ * elsewhere. `state` is a plain string (USPS 2-letter code) rather than a
+ * union — the UI constrains it to a fixed 50-state + DC select without
+ * bloating this type with a 51-member union.
+ *
+ * `targetFcPercent` and `menuTemplate` live here too, migrated from the
+ * earlier App.tsx + localStorage scheme, since both are restaurant-identity
+ * settings rather than per-session UI state. Logo upload is deferred —
+ * `brandColor` is the only visual-identity field implemented so far.
+ */
+export interface RestaurantProfile {
+  name?: string;
+  chefName?: string;
+  brandColor?: string;
+  cuisineStyle?: CuisineStyle;
+  pricePoint?: PricePoint;
+  city?: string;
+  state?: string;
+  regionalNotes?: string;
+  targetFcPercent?: number;
+  menuTemplate?: MenuTemplate;
+}
 
 /**
  * Represents an 86'd (out-of-stock) item.

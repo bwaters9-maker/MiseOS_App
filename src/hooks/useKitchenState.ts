@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
-import { collection, onSnapshot, DocumentData, QuerySnapshot, QueryDocumentSnapshot, FirestoreError } from 'firebase/firestore';
-import type { Feature, Employee, Shift, KitchenEvent, KitchenAlert, CribNote, Ingredient, Recipe, Client, Vendor } from '../types';
+import { collection, doc, onSnapshot, DocumentData, DocumentSnapshot, QuerySnapshot, QueryDocumentSnapshot, FirestoreError } from 'firebase/firestore';
+import type { Feature, Employee, Shift, KitchenEvent, KitchenAlert, CribNote, Ingredient, Recipe, Client, Vendor, RestaurantProfile } from '../types';
 
 // Based on firebase-blueprint.json
 export interface PrepItem {
@@ -38,6 +38,8 @@ export const useKitchenState = () => {
   const [cribNotes, setCribNotes] = useState<CribNote[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [restaurantProfile, setRestaurantProfile] = useState<RestaurantProfile | null>(null);
+  const [restaurantProfileLoaded, setRestaurantProfileLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<FirestoreError | null>(null);
 
@@ -149,6 +151,18 @@ export const useKitchenState = () => {
       (err: FirestoreError) => { setError(err); }
     );
 
+    const unsubProfile = onSnapshot(
+      doc(db, 'restaurant_profile', 'main'),
+      (snap: DocumentSnapshot<DocumentData>) => {
+        setRestaurantProfile(snap.exists() ? (snap.data() as RestaurantProfile) : null);
+        setRestaurantProfileLoaded(true);
+      },
+      (err: FirestoreError) => {
+        setError(err);
+        setRestaurantProfileLoaded(true);
+      }
+    );
+
     return () => {
       unsubPrep();
       unsubRecipes();
@@ -162,8 +176,9 @@ export const useKitchenState = () => {
       unsubCribNotes();
       unsubIngredients();
       unsubVendors();
+      unsubProfile();
     };
   }, []);
 
-  return { prepItems, setPrepItems, recipes, setRecipes, items86, features, staff, shifts, events, clients, alerts, cribNotes, ingredients, vendors, loading, error };
+  return { prepItems, setPrepItems, recipes, setRecipes, items86, features, staff, shifts, events, clients, alerts, cribNotes, ingredients, vendors, restaurantProfile, restaurantProfileLoaded, loading, error };
 };

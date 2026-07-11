@@ -5,12 +5,14 @@ import { collection, addDoc } from 'firebase/firestore';
 import { callAi, parseAiJson } from '../../lib/ai';
 import { smartUnit, defaultDisplayUnit } from '../../lib/units';
 import { yieldReferenceText } from '../../lib/yieldReference';
+import { withRegionContext } from '../../lib/regionContext';
+import { useKitchenSelector } from '../KitchenStateContext';
 import {
   IngredientForm, BLANK, toDoc, toProposalDoc, CATEGORIES,
   INPUT, FIELD_LABEL, BTN_PRIMARY, BTN_GHOST,
 } from './IngredientForm';
 import type { FormState } from './IngredientForm';
-import type { IngredientCategory, MeasureType, Allergen, Vendor } from '../../types';
+import type { IngredientCategory, MeasureType, Allergen, Vendor, RestaurantProfile } from '../../types';
 import type { UnitSystem } from '../../lib/units';
 
 const ALL_ALLERGENS: Allergen[] = ['milk', 'eggs', 'fish', 'shellfish', 'treeNuts', 'peanuts', 'wheat', 'soybeans', 'sesame', 'gluten', 'sulfites'];
@@ -88,6 +90,7 @@ interface AiIngredientLookupProps {
 }
 
 export const AiIngredientLookup: React.FC<AiIngredientLookupProps> = ({ unitSystem, vendors, onCancel, onSaved }) => {
+  const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
   const [stage, setStage] = useState<Stage>('name');
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -106,7 +109,7 @@ export const AiIngredientLookup: React.FC<AiIngredientLookupProps> = ({ unitSyst
     setStage('looking-up');
     setError(null);
     try {
-      const raw = await callAi(LOOKUP_SYSTEM_PROMPT, name.trim(), 1500);
+      const raw = await callAi(withRegionContext(LOOKUP_SYSTEM_PROMPT, restaurantProfile), name.trim(), 1500);
       const parsed = parseAiJson(raw);
       if (parsed?.error) {
         throw new Error(`Could not identify "${name.trim()}" as an ingredient. Try a more specific name, or enter it manually.`);

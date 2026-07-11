@@ -98,6 +98,8 @@ src/
   lib/
     costEngine.ts                recipeCost / costPerPortion / fcPercent / suggestedPrice / wouldCreateCycle + computeCostPerBaseUnit
     units.ts                     Canonical unit conversion (g/ml/each base; imperial/metric display)
+    regionContext.ts             buildRegionContext / withRegionContext — compact restaurant-profile block injected into /api/ai system prompts
+    sousPersona.ts                Sous persona system prompt for the Test Kitchen Playground chat
 ```
 
 ## Navigation / routing
@@ -128,6 +130,7 @@ Current nav tabs (in order): Crib Sheet · Features · Staff · Events & Clients
 | `station_presets` | `useStationPresets`, `Settings.tsx`, `KitchenTimers.tsx` |
 | `ingredients` | `useKitchenState`, `IngredientsTable.tsx` |
 | `vendors` | `useKitchenState`, `Vendors.tsx`, `IngredientsTable.tsx` — `Ingredient.vendorId` optionally links to `vendors`; deleting a vendor clears `vendorId` on every linked ingredient (`deleteField()`) rather than orphaning the reference |
+| `restaurant_profile` | `useKitchenState`, `App.tsx`, `Settings.tsx` — singleton doc at the fixed id `main` (not a growing collection); every field optional, missing doc is a valid state |
 | `recipe_categories` | `useRecipeCategories`, `Settings.tsx`, `Recipes.tsx` — seeded with Sides/Sauces/Salads/Soups/Proteins/Desserts if empty |
 | `event_types` | `useEventTypes`, `Settings.tsx`, `EventCalendar` — seeded with Wedding/Private Dining/Buyout/Bridal Shower/Corporate/Celebration of Life/Special Event if empty |
 
@@ -162,9 +165,12 @@ Current nav tabs (in order): Crib Sheet · Features · Staff · Events & Clients
 | `Allergen` | FDA Big-9: `'milk' \| 'eggs' \| 'fish' \| 'shellfish' \| 'treeNuts' \| 'peanuts' \| 'wheat' \| 'soybeans' \| 'sesame'` |
 | `NutritionPer100g` | Optional nutrition facts stored per 100g on each Ingredient |
 | `PriceSource` | `'regional-estimate' \| 'invoice' \| 'manual'` — provenance of an `Ingredient`'s `purchaseCost`, paired with `lastVerified` |
-| `MenuTemplate` | `'classic' \| 'clean'` — Guest Preview styling choice on the Menu view, persisted like `unitSystem`/`targetFcPercent` |
+| `MenuTemplate` | `'classic' \| 'clean'` — Guest Preview styling choice on the Menu view, persisted on `RestaurantProfile.menuTemplate` (migrated from an earlier App.tsx + localStorage scheme) |
 | `Vendor` | Master Pantry supplier: id, name, contactName?, phone?, email?, accountNumber?, leadTimeDays?, orderDays?: Weekday[], notes? — CRUD'd from `Vendors.tsx`, referenced by `Ingredient.vendorId` |
 | `Weekday` | `'Monday' \| 'Tuesday' \| 'Wednesday' \| 'Thursday' \| 'Friday' \| 'Saturday' \| 'Sunday'` — used for `Vendor.orderDays`, a structured multi-select rather than free text |
+| `CuisineStyle` | Fixed union (American, Italian, French, Mexican, Asian, Mediterranean, Steakhouse, Seafood, Farm-to-Table, BBQ, Pizza, Bakery/Café, Fusion, Other) — `RestaurantProfile.cuisineStyle` |
+| `PricePoint` | `'$' \| '$$' \| '$$$' \| '$$$$'` — `RestaurantProfile.pricePoint` |
+| `RestaurantProfile` | Singleton doc at `restaurant_profile/main`: name?, chefName?, brandColor?, cuisineStyle?, pricePoint?, city?, state?, regionalNotes?, targetFcPercent?, menuTemplate? — every field optional, edited from Settings' Restaurant Profile section. `regionalNotes` is free text by design (chef commentary on local ingredients/traditions); `state` is a plain string (USPS code) rather than a union, UI-constrained to a fixed select. `targetFcPercent`/`menuTemplate` were migrated here from App.tsx state + localStorage — see the Restaurant Profile section below |
 
 Note: `useKitchenState.ts` also defines `PrepItem` and `Item86` locally (pre-existing duplication). `Recipe` was de-duplicated — `useKitchenState.ts` now imports the canonical type from `src/types.ts` directly. New types belong in `src/types.ts` only.
 
@@ -218,7 +224,7 @@ Left panel lists recipes grouped by `recipeType` first (Menu Recipes, then Sub-R
 - Only `recipeType: 'sub'` recipes are selectable as a `RecipeLine` inside another recipe's ingredient list — menu recipes never nest. The line search box still shows a blocked candidate (self-reference or one that would create a cycle) disabled with a "Circular reference" badge, rather than hiding it.
 - Cost math lives in `src/lib/costEngine.ts`: `recipeCost` recurses through sub-recipe lines with cycle detection (throws a descriptive error if a cycle is ever hit despite the UI block), `costPerPortion`, `fcPercent`, and `suggestedPrice` are pure functions built on top of it.
 - The batch scale control (×0.5 / ×2 / custom) only scales the numbers displayed in the cost panel — it never mutates the stored recipe.
-- `targetFcPercent` (default 30) is a global setting stored the same way as `unitSystem` (React state in `App.tsx`, persisted to `localStorage`), editable in Settings under "Recipe Costing".
+- `targetFcPercent` (default 30) is a global setting owned by `RestaurantProfile.targetFcPercent` (migrated from an earlier App.tsx state + localStorage scheme — see the Restaurant Profile section below), editable in Settings under "Recipe Costing". App.tsx still surfaces it as a `targetFcPercent`/`setTargetFcPercent` prop pair, so `Recipes.tsx` and `Settings.tsx`'s "Recipe Costing" card are unchanged — only the storage underneath moved.
 
 ## Menu View (Menu.tsx)
 
@@ -227,7 +233,7 @@ Two modes on one screen, toggled by the "Guest Preview" button — no separate n
 - **Operational** (default): the read-only cost/FC% table described above in the Approved Feature Map's MENU entry — name, menu price, cost/portion, FC%, grouped by category.
 - **Guest Preview**: `components/GuestMenuPreview.tsx` renders what the customer sees — recipe name, `menuDescription`, `menuPrice`, grouped by category — with cost/FC% data entirely absent. Only menu recipes with a `menuPrice > 0` are listed; unpriced items are silently omitted (a guest menu never shows a blank price). Categories that resolve to no priced items are omitted; the internal "Uncategorized" fallback label is never shown here.
 - **Templates**: a Classic/Clean picker in the Guest Preview toolbar selects between two fixed, print-ready visual styles (cream/serif/two-column vs. white/single-column with dotted price leaders). Both are data-only styling choices — same `guestGroups` derivation feeds either one. A consumer advisory line ("Consuming raw or undercooked meat...") is a fixed footer in both templates, not tied to any data field.
-- Template choice is `menuTemplate` (`'classic' | 'clean'`, type in `src/types.ts`), stored the same way as `unitSystem`/`targetFcPercent` (React state in `App.tsx`, persisted to `localStorage` under `miseos_menu_template`, default `'clean'`). Restaurant Profile (build order item 15) will take over ownership of this setting alongside logo/brand color once it exists; for now there's no restaurant-identity data to show, so both templates render a generic "Menu" header rather than a fabricated restaurant name.
+- Template choice is `menuTemplate` (`'classic' | 'clean'`, type in `src/types.ts`), owned by `RestaurantProfile.menuTemplate` (default `'clean'` when unset) — App.tsx still surfaces it as a `menuTemplate`/`setMenuTemplate` prop pair, so this file and `Menu.tsx` are otherwise unchanged. Both templates render the restaurant name from `RestaurantProfile.name` in the header when set, falling back to the generic "Menu" header when the profile is blank — a guest menu never shows a fabricated name.
 - Print: both templates carry their own `@media print` rules (page size/margins, hides app chrome and the toolbar, forces background-color printing via `print-color-adjust`). The Classic template's two-column layout uses CSS `column-count`, which also paginates correctly across printed pages.
 
 ## Vendor Management (Vendors.tsx)
@@ -244,7 +250,15 @@ Directory CRUD with the same collapsible-add-form / inline-edit / two-step-delet
 
 The browser never talks to Anthropic directly. `TestKitchenHub.tsx` posts `{ system, messages, max_tokens }` to `POST /api/ai` on the Express server; `server.ts` calls `https://api.anthropic.com/v1/messages` server-side with `ANTHROPIC_API_KEY` (read from `process.env`, never a `VITE_` var) and relays Anthropic's JSON response back verbatim, including its `{ error: { message } }` shape on failure. Model is `claude-sonnet-4-6`, default max 1024 tokens.
 
-Any future AI feature must follow this same proxy pattern — no `fetch` to `api.anthropic.com` from `src/`, no Anthropic key in a `VITE_*` env var.
+Any future AI feature must follow this same proxy pattern — no `fetch` to `api.anthropic.com` from `src/`, no Anthropic key in a `VITE_*` env var. `server.ts` has no Firestore access by design (a dumb proxy) — regional context (below) is composed client-side into `system` before the request goes out, not injected server-side.
+
+## Restaurant Profile & Regional Intelligence (Settings.tsx, src/lib/regionContext.ts)
+
+- `RestaurantProfile` lives at the singleton doc `restaurant_profile/main` (not a collection — see the Firestore collections table). Every field is optional; a missing doc is a valid, fully-functional state.
+- Settings gains a "Restaurant Profile" card: name, chef name, brand color (native color picker), cuisine style (fixed select), price point ($–$$$$, fixed select), city (free text — a place name, same exception as personal names), state (fixed 50-state + DC select), regional notes (free text by design — chef commentary on local ingredients/traditions, the same allowed exception as comments elsewhere). Logo upload is deferred — the card shows a disabled "Pending — not yet implemented" row rather than a broken control. One local form + explicit "Save Profile" button, matching the add/edit-form-with-Save pattern used elsewhere (Vendors, Staff, Events & Clients) rather than the Settings page's older per-field auto-save style, since auto-saving free text on every keystroke would be excessive Firestore writes. Saving writes every field explicitly, using `deleteField()` for blanked ones (via `setDoc(..., { merge: true })`) so clearing a field in the form actually clears it in Firestore instead of leaving the old value behind.
+- `targetFcPercent` and `menuTemplate` also live on this doc (migrated from an earlier `App.tsx` state + `localStorage` scheme) since both are restaurant-identity settings, not per-session UI state — but they keep their existing edit surfaces (Settings' "Recipe Costing" card, the Guest Preview toolbar's Classic/Clean picker) unchanged; only the storage underneath moved. `App.tsx`'s `AppShell` reads `restaurantProfile` via `useKitchenSelector` (which required moving `KitchenStateProvider` to wrap `AppShell` rather than be created inside it), computes `targetFcPercent`/`menuTemplate` with a legacy-localStorage read fallback for pre-migration browsers, and runs a one-time migration effect (guarded by a ref, gated on `restaurantProfileLoaded`) that merges any legacy localStorage values into the doc the first time it loads.
+- `src/lib/regionContext.ts` exports `buildRegionContext(profile)` (returns a compact `"Restaurant context:\n..."` block, or `''` if the profile has nothing worth surfacing) and `withRegionContext(basePrompt, profile)` (prepends the block, or returns `basePrompt` unchanged when there's no context — so every AI feature works identically with zero profile data).
+- Injected into every `/api/ai` system prompt where it's genuinely relevant: the Sous persona (`TestKitchenHub.tsx` Playground chat), the AI ingredient lookup's price/pack estimate (`AiIngredientLookup.tsx`), the invoice add-unmatched-to-pantry suggestion pass (`InvoicePriceUpdate.tsx`), and both Recipe Builder AI buttons — "Build From Pantry" and "Draft Method" (`Recipes.tsx`). Deliberately **not** injected into `InvoicePriceUpdate.tsx`'s raw invoice line-item extraction prompt — that pass's only job is reading text off a photographed invoice accurately, and region context has no legitimate application there (worse, it risks nudging the model toward region-typical items instead of what's actually printed).
 
 ## Known issues
 
@@ -406,16 +420,27 @@ VENDOR MANAGEMENT
   orphaning the reference
 
 SETTINGS — RESTAURANT PROFILE
-- Identity: name, logo, chef name, brand color
+- Identity: name, chef name, brand color (logo upload deferred —
+  noted as pending in the UI, not silently dropped)
 - Kitchen Context: cuisine style, price point, target FC%
 - Regional Intelligence: city/state, local ingredients and
-  traditions (free text) — injected into every AI prompt
+  traditions (free text) — injected into every AI prompt where
+  it's genuinely relevant (Sous, ingredient lookup, invoice
+  add-to-pantry suggestions, Recipe Builder AI buttons; not the
+  raw invoice-extraction OCR pass, which has no use for it)
   A chef in Buffalo has a different conversation than Napa.
   The AI knows this without being told each time.
 
 AI LAYER
 - Test Kitchen / Dish Optimizer (exists — Anthropic API)
-- Sous (BOH culinary advisor — direct, practical, no mascot)
+- Sous (BOH culinary advisor — direct, practical, no mascot) —
+  the persona itself shipped early, inside the Test Kitchen
+  Playground chat (`src/lib/sousPersona.ts`, item 15's regional
+  context now injected into it too). A standalone "Chef Chat"
+  surface separate from the Playground is intentionally not built
+  — it would duplicate the same persona behind a second UI with no
+  clear new capability. Build it only if a real gap shows up that
+  the Playground can't cover.
 - Ingredient Advisor (web-search enabled, region-aware)
 
 ### Permanently Purged — Never Rebuild
@@ -448,8 +473,13 @@ only allowed state.
 9. ~~Menu View~~ ✓ (operational cost/FC% view + Guest Preview with Classic/Clean templates)
 10. ~~Catering Module~~ — absorbed into Events & Clients (item 5); no standalone Catering Module will be built
 11. ~~Vendor Management~~ ✓
-12. Sous (Chef Chat)
+12. Sous (Chef Chat) — persona shipped early inside the Test Kitchen
+    Playground (`src/lib/sousPersona.ts`); a standalone chat surface
+    is intentionally not built unless it earns its place over the
+    Playground
 13. Ingredient Advisor
 14. FDA Label (inside Recipe)
-15. Restaurant Profile / Regional Intelligence
+15. ~~Restaurant Profile / Regional Intelligence~~ ✓ — built ahead of
+    items 12-13 and Test Kitchen's seasonal work since they depend on
+    it; logo upload still pending
 16. Recipe Collections + Sharing

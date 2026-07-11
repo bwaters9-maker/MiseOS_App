@@ -16,9 +16,11 @@ interface GuestMenuPreviewProps {
   template: MenuTemplate;
   onTemplateChange: (t: MenuTemplate) => void;
   onExit: () => void;
+  restaurantName?: string;
 }
 
-const GuestMenuPreview: React.FC<GuestMenuPreviewProps> = ({ groups, template, onTemplateChange, onExit }) => {
+const GuestMenuPreview: React.FC<GuestMenuPreviewProps> = ({ groups, template, onTemplateChange, onExit, restaurantName }) => {
+  const displayName = restaurantName?.trim() || 'Menu';
   const [printedAt, setPrintedAt] = useState('');
 
   const handlePrint = () => {
@@ -139,7 +141,7 @@ const GuestMenuPreview: React.FC<GuestMenuPreviewProps> = ({ groups, template, o
           <div className="guest-menu-paper menu-classic max-w-[890px] mx-auto rounded-[6px] shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)] px-[55px] py-[44px]">
             <div className="crest">
               <p className="flourish">&mdash;</p>
-              <h2>Menu</h2>
+              <h2>{displayName}</h2>
             </div>
             <hr className="rule" />
             <div className="cols">
@@ -163,7 +165,7 @@ const GuestMenuPreview: React.FC<GuestMenuPreviewProps> = ({ groups, template, o
         ) : (
           <div className="guest-menu-paper menu-modern max-w-[720px] mx-auto rounded-[6px] shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)] px-[55px] py-[44px]">
             <div className="head">
-              <h2>Menu</h2>
+              <h2>{displayName}</h2>
             </div>
             {groups.map(group => (
               <div key={group.key} className="cat-block">

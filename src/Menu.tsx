@@ -4,7 +4,7 @@ import { useKitchenSelector } from './components/KitchenStateContext';
 import { useRecipeCategories } from './hooks/useRecipeCategories';
 import { costPerPortion, fcPercent, fcColor, recipeUsesEstimatedPricing } from './lib/costEngine';
 import GuestMenuPreview, { type GuestMenuGroup } from './components/GuestMenuPreview';
-import type { Ingredient, Recipe, MenuTemplate } from './types';
+import type { Ingredient, Recipe, MenuTemplate, RestaurantProfile } from './types';
 
 const STAT_CARD = 'bg-zinc-950 border border-zinc-800 rounded-[13px] p-[13px]';
 const STAT_LABEL = 'text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-[5px]';
@@ -33,6 +33,7 @@ interface MenuProps {
 const Menu: React.FC<MenuProps> = ({ targetFcPercent = 30, onOpenRecipe, menuTemplate = 'clean', setMenuTemplate = () => {} }) => {
   const allRecipes = (useKitchenSelector((s: any) => s.recipes) as Recipe[]) ?? [];
   const allIngredients = (useKitchenSelector((s: any) => s.ingredients) as Ingredient[]) ?? [];
+  const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
   const { categories } = useRecipeCategories();
   const [previewMode, setPreviewMode] = useState(false);
 
@@ -90,6 +91,7 @@ const Menu: React.FC<MenuProps> = ({ targetFcPercent = 30, onOpenRecipe, menuTem
           template={menuTemplate}
           onTemplateChange={setMenuTemplate}
           onExit={() => setPreviewMode(false)}
+          restaurantName={restaurantProfile?.name}
         />
       </div>
     );

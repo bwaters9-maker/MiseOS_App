@@ -1,11 +1,13 @@
-import React, { Suspense, useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect, useRef } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AppHeader } from './components/AppHeader';
-import { KitchenStateProvider } from './components/KitchenStateContext';
+import { KitchenStateProvider, useKitchenSelector } from './components/KitchenStateContext';
 import { AuthProvider, useAuth } from './components/AuthContext';
 import { SignIn } from './components/SignIn';
+import { db } from './firebaseConfig';
+import { doc, setDoc } from 'firebase/firestore';
 import type { UnitSystem } from './lib/units';
-import type { MenuTemplate } from './types';
+import type { MenuTemplate, RestaurantProfile } from './types';
 
 // --- LAZY-LOADING STRUCTURE ---
 const Dashboard = React.lazy(() => import('./DailyCribSheet'));
@@ -69,23 +71,36 @@ const AuthGate: React.FC = () => {
     return <SignIn />;
   }
 
-  return <AppShell />;
+  return (
+    <KitchenStateProvider>
+      <AppShell />
+    </KitchenStateProvider>
+  );
 };
 
+const profileDocRef = () => doc(db, 'restaurant_profile', 'main');
+
 const AppShell: React.FC = () => {
+  const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
+  const restaurantProfileLoaded = useKitchenSelector((s: any) => s.restaurantProfileLoaded) as boolean;
+
   const [activeView, setActiveView] = useState('dashboard');
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [unitSystem, setUnitSystemRaw] = useState<UnitSystem>(
     () => (localStorage.getItem('miseos_unit_system') as UnitSystem | null) ?? 'imperial'
   );
-  const [targetFcPercent, setTargetFcPercentRaw] = useState<number>(() => {
+  const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
+
+  // targetFcPercent and menuTemplate now live on the restaurant profile doc
+  // (migrated from App.tsx state + localStorage) — read fallback to the old
+  // localStorage keys keeps a pre-migration browser from flashing defaults.
+  const targetFcPercent = restaurantProfile?.targetFcPercent ?? (() => {
     const stored = parseFloat(localStorage.getItem('miseos_target_fc_percent') ?? '');
     return Number.isFinite(stored) && stored > 0 ? stored : 30;
-  });
-  const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
-  const [menuTemplate, setMenuTemplateRaw] = useState<MenuTemplate>(
-    () => (localStorage.getItem('miseos_menu_template') as MenuTemplate | null) ?? 'clean'
-  );
+  })();
+  const menuTemplate: MenuTemplate = restaurantProfile?.menuTemplate
+    ?? (localStorage.getItem('miseos_menu_template') as MenuTemplate | null)
+    ?? 'clean';
 
   const openRecipeInBuilder = (recipeId: string) => {
     setSelectedRecipeId(recipeId);
@@ -98,14 +113,34 @@ const AppShell: React.FC = () => {
   };
 
   const setTargetFcPercent = (v: number) => {
-    localStorage.setItem('miseos_target_fc_percent', String(v));
-    setTargetFcPercentRaw(v);
+    setDoc(profileDocRef(), { targetFcPercent: v }, { merge: true });
   };
 
   const setMenuTemplate = (t: MenuTemplate) => {
-    localStorage.setItem('miseos_menu_template', t);
-    setMenuTemplateRaw(t);
+    setDoc(profileDocRef(), { menuTemplate: t }, { merge: true });
   };
+
+  // One-time migration: once the profile doc has loaded (whether or not it
+  // exists yet), carry any legacy localStorage values into it so future
+  // sessions read from Firestore instead. Guarded so it only ever runs once
+  // per app load, and only writes fields the profile doc doesn't already have.
+  const migratedRef = useRef(false);
+  useEffect(() => {
+    if (!restaurantProfileLoaded || migratedRef.current) return;
+    migratedRef.current = true;
+    const patch: Partial<RestaurantProfile> = {};
+    if (restaurantProfile?.targetFcPercent == null) {
+      const legacy = parseFloat(localStorage.getItem('miseos_target_fc_percent') ?? '');
+      if (Number.isFinite(legacy) && legacy > 0) patch.targetFcPercent = legacy;
+    }
+    if (restaurantProfile?.menuTemplate == null) {
+      const legacy = localStorage.getItem('miseos_menu_template');
+      if (legacy === 'classic' || legacy === 'clean') patch.menuTemplate = legacy;
+    }
+    if (Object.keys(patch).length > 0) {
+      setDoc(profileDocRef(), patch, { merge: true });
+    }
+  }, [restaurantProfileLoaded, restaurantProfile]);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -114,30 +149,28 @@ const AppShell: React.FC = () => {
   }, [theme]);
 
   return (
-    <KitchenStateProvider>
-      <div className="min-h-screen bg-bg-cool text-navy antialiased font-body">
-        <AppHeader activeView={activeView} onNavigate={setActiveView} />
-        <main className="py-6">
-          <ErrorBoundary>
-            <Suspense fallback={<div className="p-12 text-center text-sm text-slate">Loading...</div>}>
-              <ActiveViewRenderer
-                view={activeView}
-                theme={theme}
-                setTheme={setTheme}
-                unitSystem={unitSystem}
-                setUnitSystem={setUnitSystem}
-                targetFcPercent={targetFcPercent}
-                setTargetFcPercent={setTargetFcPercent}
-                menuTemplate={menuTemplate}
-                setMenuTemplate={setMenuTemplate}
-                selectedRecipeId={selectedRecipeId}
-                setSelectedRecipeId={setSelectedRecipeId}
-                onOpenRecipe={openRecipeInBuilder}
-              />
-            </Suspense>
-          </ErrorBoundary>
-        </main>
-      </div>
-    </KitchenStateProvider>
+    <div className="min-h-screen bg-bg-cool text-navy antialiased font-body">
+      <AppHeader activeView={activeView} onNavigate={setActiveView} />
+      <main className="py-6">
+        <ErrorBoundary>
+          <Suspense fallback={<div className="p-12 text-center text-sm text-slate">Loading...</div>}>
+            <ActiveViewRenderer
+              view={activeView}
+              theme={theme}
+              setTheme={setTheme}
+              unitSystem={unitSystem}
+              setUnitSystem={setUnitSystem}
+              targetFcPercent={targetFcPercent}
+              setTargetFcPercent={setTargetFcPercent}
+              menuTemplate={menuTemplate}
+              setMenuTemplate={setMenuTemplate}
+              selectedRecipeId={selectedRecipeId}
+              setSelectedRecipeId={setSelectedRecipeId}
+              onOpenRecipe={openRecipeInBuilder}
+            />
+          </Suspense>
+        </ErrorBoundary>
+      </main>
+    </div>
   );
 }

@@ -12,7 +12,8 @@ import {
   toBase, fromBase, displayUnitsFor, defaultDisplayUnit, smartUnit, costPerDisplayUnit, measureTypeOfUnit,
 } from './lib/units';
 import { callAi, parseAiJson } from './lib/ai';
-import type { Ingredient, Recipe, RecipeLine, MeasureType, RecipeCategory } from './types';
+import { withRegionContext } from './lib/regionContext';
+import type { Ingredient, Recipe, RecipeLine, MeasureType, RecipeCategory, RestaurantProfile } from './types';
 import type { UnitSystem, DisplayUnit } from './lib/units';
 
 const INPUT = 'w-full bg-zinc-900 border border-zinc-700 rounded-[5px] px-[8px] py-[5px] text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-500 placeholder-zinc-600';
@@ -391,6 +392,7 @@ const RecipeEditor: React.FC<{
   categories: RecipeCategory[];
   unitSystem: UnitSystem;
 }> = ({ form, setForm, currentRecipeId, ingredients, recipes, categories, unitSystem }) => {
+  const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm({ ...form, [k]: v });
 
   const handleCategoryChange = (categoryId: string) => {
@@ -484,7 +486,7 @@ const RecipeEditor: React.FC<{
         recipeType: form.recipeType,
         pantry: ingredients.map(i => ({ id: i.id, name: i.name })),
       });
-      const raw = await callAi(pantrySystemPrompt(unitSystem), userContent, 2048);
+      const raw = await callAi(withRegionContext(pantrySystemPrompt(unitSystem), restaurantProfile), userContent, 2048);
       let parsed: any;
       try {
         parsed = parseAiJson(raw);
@@ -549,7 +551,7 @@ const RecipeEditor: React.FC<{
         batchYield: { qty: form.batchYieldQtyDisplay, unit: form.batchYieldUnit },
         ingredients: lineSummaries,
       });
-      const raw = await callAi(METHOD_SYSTEM_PROMPT, userContent, 2048);
+      const raw = await callAi(withRegionContext(METHOD_SYSTEM_PROMPT, restaurantProfile), userContent, 2048);
       let parsed: any;
       try {
         parsed = parseAiJson(raw);

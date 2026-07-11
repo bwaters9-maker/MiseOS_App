@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings as SettingsIcon, Sun, Moon, Trash2, PlusCircle, AlertTriangle, Pencil, Check, X, Scale, LogOut, User } from 'lucide-react';
+import { Settings as SettingsIcon, Sun, Moon, Trash2, PlusCircle, AlertTriangle, Pencil, Check, X, Scale, LogOut, User, ChefHat, Image } from 'lucide-react';
 import type { UnitSystem } from './lib/units';
 import { db } from './firebaseConfig';
-import { collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy, updateDoc, setDoc, deleteField } from 'firebase/firestore';
 import { AlertDialog } from './components/AlertDialog';
 import { useAuth } from './components/AuthContext';
+import { useKitchenSelector } from './components/KitchenStateContext';
+import type { RestaurantProfile, CuisineStyle, PricePoint } from './types';
 
 interface SettingsProps {
   theme: 'light' | 'dark';
@@ -34,9 +36,100 @@ interface EventTypePreset {
   name: string;
 }
 
+const CUISINE_STYLES: CuisineStyle[] = [
+  'American', 'Italian', 'French', 'Mexican', 'Asian', 'Mediterranean',
+  'Steakhouse', 'Seafood', 'Farm-to-Table', 'BBQ', 'Pizza', 'Bakery/Café', 'Fusion', 'Other',
+];
+
+const PRICE_POINTS: PricePoint[] = ['$', '$$', '$$$', '$$$$'];
+
+const US_STATES: { code: string; name: string }[] = [
+  { code: 'AL', name: 'Alabama' }, { code: 'AK', name: 'Alaska' }, { code: 'AZ', name: 'Arizona' },
+  { code: 'AR', name: 'Arkansas' }, { code: 'CA', name: 'California' }, { code: 'CO', name: 'Colorado' },
+  { code: 'CT', name: 'Connecticut' }, { code: 'DE', name: 'Delaware' }, { code: 'DC', name: 'District of Columbia' },
+  { code: 'FL', name: 'Florida' }, { code: 'GA', name: 'Georgia' }, { code: 'HI', name: 'Hawaii' },
+  { code: 'ID', name: 'Idaho' }, { code: 'IL', name: 'Illinois' }, { code: 'IN', name: 'Indiana' },
+  { code: 'IA', name: 'Iowa' }, { code: 'KS', name: 'Kansas' }, { code: 'KY', name: 'Kentucky' },
+  { code: 'LA', name: 'Louisiana' }, { code: 'ME', name: 'Maine' }, { code: 'MD', name: 'Maryland' },
+  { code: 'MA', name: 'Massachusetts' }, { code: 'MI', name: 'Michigan' }, { code: 'MN', name: 'Minnesota' },
+  { code: 'MS', name: 'Mississippi' }, { code: 'MO', name: 'Missouri' }, { code: 'MT', name: 'Montana' },
+  { code: 'NE', name: 'Nebraska' }, { code: 'NV', name: 'Nevada' }, { code: 'NH', name: 'New Hampshire' },
+  { code: 'NJ', name: 'New Jersey' }, { code: 'NM', name: 'New Mexico' }, { code: 'NY', name: 'New York' },
+  { code: 'NC', name: 'North Carolina' }, { code: 'ND', name: 'North Dakota' }, { code: 'OH', name: 'Ohio' },
+  { code: 'OK', name: 'Oklahoma' }, { code: 'OR', name: 'Oregon' }, { code: 'PA', name: 'Pennsylvania' },
+  { code: 'RI', name: 'Rhode Island' }, { code: 'SC', name: 'South Carolina' }, { code: 'SD', name: 'South Dakota' },
+  { code: 'TN', name: 'Tennessee' }, { code: 'TX', name: 'Texas' }, { code: 'UT', name: 'Utah' },
+  { code: 'VT', name: 'Vermont' }, { code: 'VA', name: 'Virginia' }, { code: 'WA', name: 'Washington' },
+  { code: 'WV', name: 'West Virginia' }, { code: 'WI', name: 'Wisconsin' }, { code: 'WY', name: 'Wyoming' },
+];
+
+interface ProfileFormState {
+  name: string;
+  chefName: string;
+  brandColor: string;
+  cuisineStyle: CuisineStyle | '';
+  pricePoint: PricePoint | '';
+  city: string;
+  state: string;
+  regionalNotes: string;
+}
+
+const BLANK_PROFILE_FORM = (): ProfileFormState => ({
+  name: '', chefName: '', brandColor: '', cuisineStyle: '', pricePoint: '', city: '', state: '', regionalNotes: '',
+});
+
+const profileToForm = (p: RestaurantProfile): ProfileFormState => ({
+  name: p.name ?? '',
+  chefName: p.chefName ?? '',
+  brandColor: p.brandColor ?? '',
+  cuisineStyle: p.cuisineStyle ?? '',
+  pricePoint: p.pricePoint ?? '',
+  city: p.city ?? '',
+  state: p.state ?? '',
+  regionalNotes: p.regionalNotes ?? '',
+});
+
+/** Every field is written explicitly — blank ones use deleteField() so
+ * clearing a field in the form actually clears it in Firestore, rather than
+ * silently leaving the old value behind. Combined with setDoc(..., {merge:
+ * true}) at the call site, this only ever touches these profile fields —
+ * targetFcPercent/menuTemplate (owned by App.tsx) are never affected. */
+const profileToDoc = (f: ProfileFormState) => ({
+  name: f.name.trim() ? f.name.trim() : deleteField(),
+  chefName: f.chefName.trim() ? f.chefName.trim() : deleteField(),
+  brandColor: f.brandColor ? f.brandColor : deleteField(),
+  cuisineStyle: f.cuisineStyle ? f.cuisineStyle : deleteField(),
+  pricePoint: f.pricePoint ? f.pricePoint : deleteField(),
+  city: f.city.trim() ? f.city.trim() : deleteField(),
+  state: f.state ? f.state : deleteField(),
+  regionalNotes: f.regionalNotes.trim() ? f.regionalNotes.trim() : deleteField(),
+});
+
 export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem = 'imperial', setUnitSystem, targetFcPercent = 30, setTargetFcPercent }) => {
   const { user, signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
+
+  const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
+  const restaurantProfileLoaded = useKitchenSelector((s: any) => s.restaurantProfileLoaded) as boolean;
+  const [profileForm, setProfileForm] = useState<ProfileFormState>(BLANK_PROFILE_FORM());
+  const [savingProfile, setSavingProfile] = useState(false);
+  const profileSeeded = useRef(false);
+
+  useEffect(() => {
+    if (!restaurantProfileLoaded || profileSeeded.current) return;
+    profileSeeded.current = true;
+    if (restaurantProfile) setProfileForm(profileToForm(restaurantProfile));
+  }, [restaurantProfileLoaded, restaurantProfile]);
+
+  const handleSaveProfile = async () => {
+    if (savingProfile) return;
+    setSavingProfile(true);
+    try {
+      await setDoc(doc(db, 'restaurant_profile', 'main'), profileToDoc(profileForm), { merge: true });
+    } finally {
+      setSavingProfile(false);
+    }
+  };
   const [stations, setStations] = useState<StationPreset[]>([]);
   const [newStationName, setNewStationName] = useState('');
   const [stationToDelete, setStationToDelete] = useState<StationPreset | null>(null);
@@ -225,6 +318,122 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
           >
             <LogOut className="w-3.5 h-3.5" />
             {signingOut ? 'Signing Out…' : 'Sign Out'}
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-6 bg-zinc-900/40 p-5 rounded-xl border border-zinc-800/60 shadow-md">
+        <h3 className="text-sm font-bold tracking-widest text-zinc-400 uppercase border-b border-zinc-800/80 pb-3 mb-4 flex items-center gap-2">
+          <ChefHat className="w-4 h-4" />
+          Restaurant Profile
+        </h3>
+        <p className="text-[10px] text-zinc-600 mb-4 uppercase tracking-wider">
+          Identity and regional context — injected into every AI prompt so suggestions fit this kitchen, not a generic one
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Restaurant Name</label>
+            <input
+              type="text"
+              value={profileForm.name}
+              onChange={e => setProfileForm({ ...profileForm, name: e.target.value })}
+              placeholder="Restaurant name"
+              className="w-full bg-zinc-900 border border-zinc-700 text-zinc-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Chef Name</label>
+            <input
+              type="text"
+              value={profileForm.chefName}
+              onChange={e => setProfileForm({ ...profileForm, chefName: e.target.value })}
+              placeholder="Executive chef name"
+              className="w-full bg-zinc-900 border border-zinc-700 text-zinc-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Cuisine Style</label>
+            <select
+              value={profileForm.cuisineStyle}
+              onChange={e => setProfileForm({ ...profileForm, cuisineStyle: e.target.value as CuisineStyle | '' })}
+              className="w-full bg-zinc-900 border border-zinc-700 text-zinc-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500"
+            >
+              <option value="">— Select —</option>
+              {CUISINE_STYLES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Price Point</label>
+            <select
+              value={profileForm.pricePoint}
+              onChange={e => setProfileForm({ ...profileForm, pricePoint: e.target.value as PricePoint | '' })}
+              className="w-full bg-zinc-900 border border-zinc-700 text-zinc-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500"
+            >
+              <option value="">— Select —</option>
+              {PRICE_POINTS.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Brand Color</label>
+            <input
+              type="color"
+              value={profileForm.brandColor || '#000000'}
+              onChange={e => setProfileForm({ ...profileForm, brandColor: e.target.value })}
+              className="w-full h-[34px] bg-zinc-900 border border-zinc-700 rounded-lg px-1 py-1 cursor-pointer"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">City</label>
+            <input
+              type="text"
+              value={profileForm.city}
+              onChange={e => setProfileForm({ ...profileForm, city: e.target.value })}
+              placeholder="e.g. Buffalo"
+              className="w-full bg-zinc-900 border border-zinc-700 text-zinc-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">State</label>
+            <select
+              value={profileForm.state}
+              onChange={e => setProfileForm({ ...profileForm, state: e.target.value })}
+              className="w-full bg-zinc-900 border border-zinc-700 text-zinc-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500"
+            >
+              <option value="">— Select —</option>
+              {US_STATES.map(s => <option key={s.code} value={s.code}>{s.name}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="mb-4">
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Regional Notes</label>
+          <p className="text-[10px] text-zinc-600 mb-2">Local ingredients, traditions, whatever gives the AI a feel for this region — a chef in Buffalo has a different conversation than Napa</p>
+          <textarea
+            value={profileForm.regionalNotes}
+            onChange={e => setProfileForm({ ...profileForm, regionalNotes: e.target.value })}
+            placeholder="e.g. Heavy Western NY / Great Lakes influence — beef on weck, sponge candy, chicken wings culture, Niagara wine country nearby"
+            rows={3}
+            className="w-full bg-zinc-900 border border-zinc-700 text-zinc-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500 resize-none"
+          />
+        </div>
+        <div className="flex items-center justify-between gap-3 bg-zinc-950/50 border border-zinc-800 rounded-lg px-3 py-2 mb-4">
+          <span className="flex items-center gap-2 text-[10px] text-zinc-600 uppercase tracking-wider">
+            <Image className="w-3.5 h-3.5" />
+            Logo Upload
+          </span>
+          <span className="text-[10px] text-zinc-600 italic">Pending — not yet implemented</span>
+        </div>
+        <div className="flex justify-end">
+          <button
+            onClick={handleSaveProfile}
+            disabled={savingProfile}
+            className="bg-emerald-700 hover:bg-emerald-600 border border-emerald-800 text-white text-xs uppercase font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm disabled:opacity-50"
+          >
+            <Check className="w-4 h-4" />
+            {savingProfile ? 'Saving…' : 'Save Profile'}
           </button>
         </div>
       </div>

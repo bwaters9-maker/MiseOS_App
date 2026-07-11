@@ -1,6 +1,9 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, RefreshCw, Send, AlertCircle, Flame, Lightbulb, Zap } from 'lucide-react';
 import { SOUS_SYSTEM_PROMPT } from './lib/sousPersona';
+import { withRegionContext } from './lib/regionContext';
+import { useKitchenSelector } from './components/KitchenStateContext';
+import type { RestaurantProfile } from './types';
 
 interface Message {
   role: 'user' | 'model';
@@ -20,6 +23,7 @@ const TREND_CARDS = [
 ];
 
 export default function TestKitchenHub() {
+  const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
   const [activeSubTab, setActiveSubTab] = useState<'trends' | 'optimizer'>('trends');
   const [userInput, setUserInput] = useState('');
   const [sessionError, setSessionError] = useState<string | null>(null);
@@ -56,7 +60,7 @@ export default function TestKitchenHub() {
         },
         body: JSON.stringify({
           max_tokens: 2048,
-          system: SOUS_SYSTEM_PROMPT,
+          system: withRegionContext(SOUS_SYSTEM_PROMPT, restaurantProfile),
           messages: updatedMessages.map(msg => ({
             role: msg.role === 'model' ? 'assistant' : 'user',
             content: msg.content,

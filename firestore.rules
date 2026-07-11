@@ -29,6 +29,8 @@ service cloud.firestore {
     // Collection: clients        — see src/types.ts Client
     // Collection: ingredients    — see src/types.ts Ingredient (shape-validated below)
     // Collection: vendors        — see src/types.ts Vendor
+    // Collection: restaurant_profile — see src/types.ts RestaurantProfile;
+    //   singleton doc at a fixed id ("main"), not a growing collection
     //
     // Ingredient fields (src/types.ts):
     //   - name: string (required, 1-200 chars)
@@ -104,6 +106,7 @@ service cloud.firestore {
     match /event_types/{id}         { allow read, write: if isAuthenticated(); }
     match /clients/{id}             { allow read, write: if isAuthenticated(); }
     match /vendors/{id}              { allow read, write: if isAuthenticated(); }
+    match /restaurant_profile/{id}   { allow read, write: if isAuthenticated(); }
 
     match /ingredients/{id} {
       allow read: if isAuthenticated();

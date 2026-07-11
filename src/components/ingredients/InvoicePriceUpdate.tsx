@@ -5,7 +5,9 @@ import { addDoc, collection, updateDoc, doc } from 'firebase/firestore';
 import { callAi, parseAiJson } from '../../lib/ai';
 import { toBase, displayUnitsFor, defaultDisplayUnit, smartUnit } from '../../lib/units';
 import { yieldReferenceText } from '../../lib/yieldReference';
-import type { Ingredient, IngredientCategory, MeasureType, Allergen } from '../../types';
+import { withRegionContext } from '../../lib/regionContext';
+import { useKitchenSelector } from '../KitchenStateContext';
+import type { Ingredient, IngredientCategory, MeasureType, Allergen, RestaurantProfile } from '../../types';
 import type { UnitSystem, DisplayUnit } from '../../lib/units';
 
 const CATEGORIES: IngredientCategory[] = ['Produce', 'Protein', 'Dairy', 'Dry Goods', 'Frozen', 'Beverage', 'Other', 'Spices', 'Oils & Fats', 'Sauces', 'Beverages', 'Bakery'];
@@ -203,6 +205,7 @@ interface InvoicePriceUpdateProps {
 }
 
 export const InvoicePriceUpdate: React.FC<InvoicePriceUpdateProps> = ({ isOpen, onClose, ingredients, unitSystem = 'imperial' }) => {
+  const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
   const [stage, setStage] = useState<Stage>('idle');
   const [error, setError] = useState<string | null>(null);
   const [vendor, setVendor] = useState('');
@@ -237,7 +240,7 @@ export const InvoicePriceUpdate: React.FC<InvoicePriceUpdateProps> = ({ isOpen, 
     setSuggestLoading(true);
     try {
       const raw = await callAi(
-        ADD_TO_PANTRY_SYSTEM_PROMPT,
+        withRegionContext(ADD_TO_PANTRY_SYSTEM_PROMPT, restaurantProfile),
         JSON.stringify({ items }),
         2048,
       );
