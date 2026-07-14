@@ -1,12 +1,13 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { ChefHat, Plus, Trash2, X, Check, Search, Layers, UtensilsCrossed, AlertTriangle, Sparkles, Loader2 } from 'lucide-react';
+import { ChefHat, Plus, Trash2, X, Check, Search, Layers, UtensilsCrossed, AlertTriangle, Sparkles, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
 import { db } from './firebaseConfig';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { useKitchenSelector } from './components/KitchenStateContext';
 import { useRecipeCategories } from './hooks/useRecipeCategories';
 import { AlertDialog } from './components/AlertDialog';
+import NutritionLabel from './components/recipes/NutritionLabel';
 import {
-  recipeCost, costPerPortion, fcPercent, suggestedPrice, wouldCreateCycle, fcColor,
+  recipeCost, costPerPortion, fcPercent, suggestedPrice, wouldCreateCycle, fcColor, isRecipeOnMenu,
 } from './lib/costEngine';
 import {
   toBase, fromBase, displayUnitsFor, defaultDisplayUnit, smartUnit, costPerDisplayUnit, measureTypeOfUnit,
@@ -856,7 +857,9 @@ const ListRow: React.FC<{
   onRequestDelete: () => void;
   onConfirmDelete: () => void;
   onCancelDelete: () => void;
-}> = ({ r, isActive, isConfirm, onOpen, onRequestDelete, onConfirmDelete, onCancelDelete }) => {
+  onToggleOnMenu?: () => void;
+}> = ({ r, isActive, isConfirm, onOpen, onRequestDelete, onConfirmDelete, onCancelDelete, onToggleOnMenu }) => {
+  const onMenu = isRecipeOnMenu(r);
   return (
     <div
       className={`group flex items-center justify-between gap-[8px] px-[13px] py-[8px] rounded-[8px] cursor-pointer transition-colors duration-[144ms] ${
@@ -883,14 +886,27 @@ const ListRow: React.FC<{
           </button>
         </div>
       ) : (
-        <div className="flex items-center gap-[3px] shrink-0 opacity-0 group-hover:opacity-100">
-          <button
-            onClick={e => { e.stopPropagation(); onRequestDelete(); }}
-            className="p-[3px] text-zinc-600 hover:text-red-400 transition-colors duration-[144ms]"
-            title="Delete"
-          >
-            <Trash2 className="w-3 h-3" />
-          </button>
+        <div className="flex items-center gap-[5px] shrink-0">
+          {onToggleOnMenu && (
+            <button
+              onClick={e => { e.stopPropagation(); onToggleOnMenu(); }}
+              className={`${BADGE} transition-colors duration-[144ms] ${
+                onMenu ? 'text-emerald-300 border-emerald-700 bg-emerald-950/40 hover:bg-emerald-900/40' : 'text-zinc-600 border-zinc-700 hover:text-zinc-400'
+              }`}
+              title={onMenu ? 'On menu — click to remove' : 'Off menu — click to add'}
+            >
+              {onMenu ? 'On Menu' : 'Off Menu'}
+            </button>
+          )}
+          <div className="flex items-center gap-[3px] opacity-0 group-hover:opacity-100">
+            <button
+              onClick={e => { e.stopPropagation(); onRequestDelete(); }}
+              className="p-[3px] text-zinc-600 hover:text-red-400 transition-colors duration-[144ms]"
+              title="Delete"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -908,6 +924,7 @@ const CostPanel: React.FC<{
 }> = ({ form, setForm, currentRecipeId, ingredients, recipes, unitSystem, targetFcPercent }) => {
   const [scaleFactor, setScaleFactor] = useState(1);
   const [customScale, setCustomScale] = useState('');
+  const [showNutrition, setShowNutrition] = useState(false);
 
   const base = virtualRecipe(form, currentRecipeId, ingredients);
   const scaled = scaleRecipe(base, scaleFactor);
@@ -1024,6 +1041,20 @@ const CostPanel: React.FC<{
               Suggested price at {targetFcPercent}% target: <span className="text-emerald-400 font-bold">${suggested.toFixed(2)}</span>
             </p>
           </div>
+
+          <div className="space-y-[8px]">
+            <button
+              type="button"
+              onClick={() => setShowNutrition(v => !v)}
+              className="flex items-center gap-[5px] text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-300 transition-colors duration-[144ms]"
+            >
+              {showNutrition ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+              Nutrition Label
+            </button>
+            {showNutrition && (
+              <NutritionLabel recipe={base} ingredients={ingredients} recipes={recipes} />
+            )}
+          </div>
         </>
       )}
     </div>
@@ -1035,9 +1066,10 @@ interface RecipesProps {
   targetFcPercent?: number;
   selectedRecipeId?: string | null;
   setSelectedRecipeId?: (id: string | null) => void;
+  onViewMenu?: () => void;
 }
 
-const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPercent = 30, selectedRecipeId, setSelectedRecipeId }) => {
+const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPercent = 30, selectedRecipeId, setSelectedRecipeId, onViewMenu }) => {
   const allRecipes = (useKitchenSelector((s: any) => s.recipes) as Recipe[]) ?? [];
   const allIngredients = (useKitchenSelector((s: any) => s.ingredients) as Ingredient[]) ?? [];
   const { categories } = useRecipeCategories();
@@ -1123,6 +1155,10 @@ const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPerc
     if (selectedId === id) closeEditor();
   };
 
+  const handleToggleOnMenu = async (r: Recipe) => {
+    await updateDoc(doc(db, 'recipes', r.id), { onMenu: !isRecipeOnMenu(r) });
+  };
+
   return (
     <div className="max-w-[1597px] mx-auto px-[21px] py-[34px] font-mono">
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-[13px] mb-[34px]">
@@ -1135,6 +1171,15 @@ const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPerc
             {allRecipes.length} recipe{allRecipes.length !== 1 ? 's' : ''} — {menuRecipes.length} menu, {subRecipes.length} sub
           </p>
         </div>
+        {onViewMenu && (
+          <button
+            onClick={onViewMenu}
+            className="shrink-0 flex items-center gap-[8px] px-[13px] py-[8px] bg-zinc-900 border border-zinc-700 rounded-[8px] text-xs font-bold text-zinc-300 hover:text-emerald-400 hover:border-emerald-700 transition-colors duration-[144ms]"
+          >
+            <UtensilsCrossed className="w-3.5 h-3.5" />
+            View Menu
+          </button>
+        )}
       </div>
 
       {allRecipes.length === 0 && !isCreating && (
@@ -1181,12 +1226,15 @@ const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPerc
             </div>
           )}
 
-          <div className="flex gap-[8px]">
-            <button onClick={() => startCreate('menu')} className={`${BTN_PRIMARY} flex-1 flex items-center justify-center gap-[5px]`}>
-              <Plus className="w-3 h-3" /> Menu Recipe
+          <div className="space-y-[5px]">
+            <button onClick={() => startCreate('menu')} className={`${BTN_PRIMARY} w-full flex items-center justify-center gap-[5px]`}>
+              <Plus className="w-3 h-3" /> Add New Recipe
             </button>
-            <button onClick={() => startCreate('sub')} className={`${BTN_GHOST} flex-1 flex items-center justify-center gap-[5px]`}>
-              <Plus className="w-3 h-3" /> Sub-Recipe
+            <button
+              onClick={() => startCreate('sub')}
+              className="w-full text-center py-[3px] text-[10px] font-bold uppercase tracking-wider text-zinc-600 hover:text-zinc-300 transition-colors duration-[144ms]"
+            >
+              + Add Sub-Recipe Instead
             </button>
           </div>
 
@@ -1211,6 +1259,7 @@ const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPerc
                             onRequestDelete={() => setDeleteConfirmId(r.id)}
                             onConfirmDelete={() => handleDelete(r.id)}
                             onCancelDelete={() => setDeleteConfirmId(null)}
+                            onToggleOnMenu={() => handleToggleOnMenu(r)}
                           />
                         ))}
                       </div>

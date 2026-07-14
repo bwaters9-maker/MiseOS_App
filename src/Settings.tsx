@@ -6,6 +6,8 @@ import { collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy, updateD
 import { AlertDialog } from './components/AlertDialog';
 import { useAuth } from './components/AuthContext';
 import { useKitchenSelector } from './components/KitchenStateContext';
+import Ingredients from './IngredientsTable';
+import Vendors from './Vendors';
 import type { RestaurantProfile, CuisineStyle, PricePoint } from './types';
 
 interface SettingsProps {
@@ -108,6 +110,7 @@ const profileToDoc = (f: ProfileFormState) => ({
 export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem = 'imperial', setUnitSystem, targetFcPercent = 30, setTargetFcPercent }) => {
   const { user, signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<'general' | 'ingredients' | 'vendors'>('general');
 
   const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
   const restaurantProfileLoaded = useKitchenSelector((s: any) => s.restaurantProfileLoaded) as boolean;
@@ -304,6 +307,24 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
         <p className="text-xs text-zinc-500 mt-1">Configure global application settings and preferences.</p>
       </div>
 
+      <div className="flex items-center gap-2 mb-6">
+        {(['general', 'ingredients', 'vendors'] as const).map(tab => (
+          <button
+            key={tab}
+            onClick={() => setSettingsTab(tab)}
+            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg border transition-colors ${
+              settingsTab === tab
+                ? 'bg-emerald-700 text-white border-emerald-600'
+                : 'bg-zinc-800/50 text-zinc-400 border-zinc-700 hover:bg-zinc-700/50 hover:text-zinc-200'
+            }`}
+          >
+            {tab === 'general' ? 'General' : tab === 'ingredients' ? 'Ingredients' : 'Vendors'}
+          </button>
+        ))}
+      </div>
+
+      {settingsTab === 'general' && (
+        <>
       <div className="bg-zinc-900/40 p-5 rounded-xl border border-zinc-800/60 shadow-md">
         <h3 className="text-sm font-bold tracking-widest text-zinc-400 uppercase border-b border-zinc-800/80 pb-3 mb-4 flex items-center gap-2">
           <User className="w-4 h-4" />
@@ -725,6 +746,10 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
           </button>
         </form>
       </div>
+        </>
+      )}
+      {settingsTab === 'ingredients' && <Ingredients unitSystem={unitSystem} />}
+      {settingsTab === 'vendors' && <Vendors />}
 
       <AlertDialog
         isOpen={!!stationToDelete}

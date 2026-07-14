@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, ClipboardList, Clock, History, Sparkles, Settings, Menu, X, Star, Users, CalendarDays, Package, ChefHat, UtensilsCrossed, LogOut, Truck } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, History, Sparkles, Settings, Menu, X, Users, CalendarDays, ChefHat, LogOut } from 'lucide-react';
 import { useAuth } from './AuthContext';
 
 interface AppHeaderProps {
@@ -8,16 +8,11 @@ interface AppHeaderProps {
 }
 
 const navItems = [
-  { view: 'dashboard', label: 'Crib Sheet', icon: LayoutDashboard },
-  { view: 'features', label: 'Features', icon: Star },
+  { view: 'dashboard-home', label: 'Dashboard', icon: LayoutDashboard },
   { view: 'staff', label: 'Staff', icon: Users },
   { view: 'events', label: 'Events & Clients', icon: CalendarDays },
-  { view: 'ingredients', label: 'Ingredients', icon: Package },
-  { view: 'vendors', label: 'Vendors', icon: Truck },
   { view: 'recipes', label: 'Recipes', icon: ChefHat },
-  { view: 'menu', label: 'Menu', icon: UtensilsCrossed },
-  { view: 'prep', label: 'Prep Checklist', icon: ClipboardList },
-  { view: 'timers', label: 'Kitchen Timers', icon: Clock },
+  { view: 'prep', label: 'Prep List', icon: ClipboardList },
   { view: 'alert-history', label: 'Alert History', icon: History },
   { view: 'test-kitchen', label: 'Test Kitchen', icon: Sparkles },
   { view: 'settings', label: 'Settings', icon: Settings },
@@ -33,22 +28,22 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ activeView, onNavigate }) 
   };
 
   return (
-    <header className='border-b border-line bg-surface/80 backdrop-blur-md sticky top-0 z-50'>
-      <div className='max-w-7xl mx-auto px-4 h-16 flex items-center justify-between'>
-        <div className='flex items-center gap-6'>
-          <div className='flex items-center gap-3'>
+    <header className='border-b border-line bg-surface/80 backdrop-blur-md sticky top-0 z-50 w-full overflow-x-hidden'>
+      <div className='max-w-7xl mx-auto px-4 min-h-16 py-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2'>
+        <div className='flex items-center gap-6 min-w-0'>
+          <div className='flex items-center gap-3 shrink-0'>
               <div className='h-9 w-9 rounded-tile bg-navy flex items-center justify-center font-display font-bold text-cream text-lg'>M</div>
               <div>
                   <div className='flex items-center gap-2'><span className='font-display font-bold tracking-tight text-navy uppercase text-sm'>MISEOS</span><span className='px-1.5 py-0.5 rounded-full bg-saffron-soft text-[10px] font-bold text-saffron-text uppercase'>The Pass</span></div>
                   <p className='text-[10px] text-slate font-medium'>System Operator Matrix</p>
               </div>
           </div>
-          <div className="hidden md:flex items-center gap-2 bg-bg-cool p-1 rounded-card border border-line shadow-inner">
+          <div className="hidden md:flex flex-wrap items-center gap-2 bg-bg-cool p-1 rounded-card border border-line shadow-inner">
             {navItems.map(item => (
               <button
                 key={item.view}
                 onClick={() => onNavigate(item.view)}
-                className={`px-3 py-1.5 text-xs font-extrabold uppercase tracking-wider rounded-lg transition-all border flex items-center gap-2 ${
+                className={`px-3 py-1.5 text-xs font-extrabold uppercase tracking-wider rounded-lg transition-all border flex items-center gap-2 whitespace-nowrap ${
                   activeView === item.view
                     ? 'bg-navy text-cream border-navy shadow-md'
                     : 'bg-transparent text-slate hover:text-navy border-transparent'
@@ -60,11 +55,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ activeView, onNavigate }) 
             ))}
           </div>
         </div>
-        <div className='hidden md:flex items-center gap-4'>
-          <span className='text-xs text-slate font-medium tracking-tight'>Active Workstation Configuration</span>
+        <div className='hidden md:flex items-center gap-4 shrink-0'>
+          <span className='text-xs text-slate font-medium tracking-tight whitespace-nowrap'>Active Workstation Configuration</span>
           <button
             onClick={() => signOut()}
-            className='flex items-center gap-2 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-slate hover:text-navy border border-line rounded-lg transition-colors'
+            className='flex items-center gap-2 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-slate hover:text-navy border border-line rounded-lg transition-colors shrink-0'
           >
             <LogOut className='w-3.5 h-3.5' />
             Sign Out

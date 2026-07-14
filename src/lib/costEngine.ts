@@ -145,3 +145,30 @@ export const recipeUsesEstimatedPricing = (
 /** Same emerald/amber/red thresholds used everywhere FC% is displayed. */
 export const fcColor = (fc: number, target: number): string =>
   fc <= target ? 'text-emerald-400' : fc <= target + 5 ? 'text-amber-400' : 'text-red-400';
+
+/**
+ * One-time snapshot for a feature created by linking to a recipe — not a
+ * live join. Called once at creation; the caller stores the returned
+ * values directly on the Feature doc, same shape a manual entry already
+ * uses. `recipeId` is stored separately, purely as provenance.
+ */
+export const featureFieldsFromRecipe = (
+  recipe: Recipe,
+  ingredients: Ingredient[],
+  recipes: Recipe[],
+): { name: string; description: string; price: number | undefined; cost: number } => ({
+  name: recipe.name,
+  description: recipe.menuDescription ?? '',
+  price: recipe.menuPrice,
+  cost: Math.round(costPerPortion(recipe, ingredients, recipes) * 100) / 100,
+});
+
+/**
+ * Whether `recipe` currently appears on the guest/operational menu. Only
+ * `recipeType: 'menu'` recipes are ever eligible — sub-recipes have no
+ * menuPrice/guest description and are never shown here. Recipes saved
+ * before the `onMenu` field existed default to `true` (their prior,
+ * unconditional menu status) rather than silently dropping off the menu.
+ */
+export const isRecipeOnMenu = (recipe: Recipe): boolean =>
+  recipe.recipeType === 'menu' && (recipe.onMenu ?? true);

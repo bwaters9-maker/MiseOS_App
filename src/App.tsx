@@ -10,14 +10,12 @@ import type { UnitSystem } from './lib/units';
 import type { MenuTemplate, RestaurantProfile } from './types';
 
 // --- LAZY-LOADING STRUCTURE ---
-const Dashboard = React.lazy(() => import('./DailyCribSheet'));
-const FeaturesView = React.lazy(() => import('./Features'));
+const CribSheetView = React.lazy(() => import('./DailyCribSheet'));
+const ChefDashboardView = React.lazy(() => import('./ChefDashboard'));
 const StaffView = React.lazy(() => import('./Staff'));
 const EventsView = React.lazy(() => import('./EventCalendar'));
-const IngredientsView = React.lazy(() => import('./IngredientsTable'));
-const VendorsView = React.lazy(() => import('./Vendors'));
-const RecipesView = React.lazy(() => import('./Recipes'));
-const MenuView = React.lazy(() => import('./Menu'));
+const RecipesHub = React.lazy(() => import('./RecipesHub'));
+const FeaturesView = React.lazy(() => import('./Features'));
 const TestKitchenHub = React.lazy(() => import('./TestKitchenHub'));
 const PrepChecklist = React.lazy(() => import('./PrepChecklist').then(m => ({ default: m.PrepChecklist })));
 const KitchenTimers = React.lazy(() => import('./KitchenTimers').then(m => ({ default: m.KitchenTimers })));
@@ -26,14 +24,12 @@ const AlertHistory = React.lazy(() => import('./HistoricalAlerts').then(m => ({ 
 
 // --- VIEW MAPPING ---
 const viewMap: { [key: string]: React.LazyExoticComponent<React.ComponentType<any>> } = {
-  dashboard: Dashboard,
-  features: FeaturesView,
+  'dashboard-home': ChefDashboardView,
+  dashboard: CribSheetView,
   staff: StaffView,
   events: EventsView,
-  ingredients: IngredientsView,
-  vendors: VendorsView,
-  recipes: RecipesView,
-  menu: MenuView,
+  recipes: RecipesHub,
+  features: FeaturesView,
   prep: PrepChecklist,
   timers: KitchenTimers,
   'alert-history': AlertHistory,
@@ -84,7 +80,7 @@ const AppShell: React.FC = () => {
   const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
   const restaurantProfileLoaded = useKitchenSelector((s: any) => s.restaurantProfileLoaded) as boolean;
 
-  const [activeView, setActiveView] = useState('dashboard');
+  const [activeView, setActiveView] = useState('dashboard-home');
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [unitSystem, setUnitSystemRaw] = useState<UnitSystem>(
     () => (localStorage.getItem('miseos_unit_system') as UnitSystem | null) ?? 'imperial'
@@ -149,7 +145,7 @@ const AppShell: React.FC = () => {
   }, [theme]);
 
   return (
-    <div className="min-h-screen bg-bg-cool text-navy antialiased font-body">
+    <div className="min-h-screen w-full overflow-x-hidden bg-bg-cool text-navy antialiased font-body">
       <AppHeader activeView={activeView} onNavigate={setActiveView} />
       <main className="py-6">
         <ErrorBoundary>
@@ -167,6 +163,7 @@ const AppShell: React.FC = () => {
               selectedRecipeId={selectedRecipeId}
               setSelectedRecipeId={setSelectedRecipeId}
               onOpenRecipe={openRecipeInBuilder}
+              onNavigate={setActiveView}
             />
           </Suspense>
         </ErrorBoundary>

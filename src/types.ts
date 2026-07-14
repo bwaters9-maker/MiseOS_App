@@ -46,6 +46,13 @@ export interface RecipeLine {
  * analysis). recipeType 'sub' is a component preparation (stock, sauce,
  * prep) — no menuPrice, and only 'sub' recipes may be referenced as a
  * RecipeLine inside another recipe. Menu recipes never nest.
+ *
+ * `onMenu` is independent of `recipeType` — whether a finished
+ * (`recipeType: 'menu'`) recipe is *currently* offered, not whether it's
+ * structurally capable of being offered. Recipes saved before this field
+ * existed have no stored value; `isRecipeOnMenu` (costEngine.ts) treats a
+ * missing value as `true` for menu-type recipes, so nothing already on the
+ * menu silently disappears. Sub-recipes are never on the menu regardless.
  */
 export interface Recipe {
   id: string;
@@ -59,6 +66,7 @@ export interface Recipe {
   methodSteps: string[];
   menuPrice?: number;
   menuDescription?: string;
+  onMenu?: boolean;
   updatedAt: string;
 }
 
@@ -137,15 +145,59 @@ export type ProductionRun = PrepItem;
 
 export type Item86Entry = Item86;
 
-export interface TrendReport {
-  recipe_scores?: {
-    [recipe_id: string]: {
-      status: 'hot' | 'cold' | 'stable';
-    };
-  };
-  // Other potential properties for TrendReport
+/**
+ * A single editorial trend card shown in Test Kitchen's Culinary Trends &
+ * Forecasts sub-tab. Drafted by AI per refresh, then independently verified
+ * via a web-search-grounded follow-up call before it ships — `sourceUrl`/
+ * `sourceName` are populated only from the API's own search citations,
+ * never model-written text. A drafted card with no supporting citation is
+ * dropped entirely rather than shipped unverified. Exactly one surviving
+ * card may carry `isViralBridge: true` — the single most significant
+ * viral/popular trend, framed as an elevated-version opportunity rather
+ * than a straight chase of social volume.
+ */
+export interface TrendCard {
+  headline: string;
+  description: string;
+  category: string;
+  isViralBridge?: boolean;
+  sourceUrl?: string;
+  sourceName?: string;
 }
 
+/** One line of AI pricing commentary — informational only, never linked to
+ * a real `Ingredient` or its `purchaseCost`. See the Master Pantry Mandate. */
+export interface PricingTrendItem {
+  item: string;
+  direction: 'up' | 'down';
+  movement: 'short-term' | 'structural';
+  note: string;
+}
+
+/**
+ * The persisted editorial trends report, stored as the singleton doc
+ * `trend_reports/latest` so the last refresh survives a reload. Read-only
+ * editorial content — see the hard boundary in CLAUDE.md's Test Kitchen
+ * Phase B section. Replaces an old, unused `recipe_scores`-shaped
+ * `TrendReport` left over from an orphaned Base44-era analysis script
+ * (`src/services/analysis/TrendAnalyzer.js`, deleted) that wrote to this
+ * same collection name but was never wired into the app.
+ */
+export interface TrendReport {
+  generatedAt: string;
+  cards: TrendCard[];
+  pricingTrends: PricingTrendItem[];
+}
+
+/**
+ * `recipeId` is set only when this feature was created by picking a recipe
+ * — it's provenance, not a live reference. `name`/`description`/`price`/
+ * `cost` are copied from the recipe once at creation time and never
+ * resynced; editing the recipe later doesn't change an existing feature,
+ * same as a printed menu doesn't silently reprice itself. Both kinds
+ * (manual or recipe-derived) store identical fields and render
+ * identically everywhere — nothing downstream needs to know which is which.
+ */
 export interface Feature {
   id: string;
   course: string;
@@ -156,6 +208,7 @@ export interface Feature {
   activeFrom?: string;
   activeTo?: string;
   is86d?: boolean;
+  recipeId?: string;
 }
 
 export interface Employee {

@@ -3,12 +3,13 @@ import { Star, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
 import { db } from './firebaseConfig';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { useKitchenSelector } from './components/KitchenStateContext';
-import type { Feature } from './types';
+import { featureFieldsFromRecipe } from './lib/costEngine';
+import type { Feature, Recipe, Ingredient } from './types';
 
-const COURSES = ['Amuse', 'Appetizer', 'Soup', 'Fish', 'Intermezzo', 'Entrée', 'Cheese', 'Dessert', 'Mignardise'];
+export const COURSES = ['Amuse', 'Appetizer', 'Soup', 'Fish', 'Intermezzo', 'Entrée', 'Cheese', 'Dessert', 'Mignardise'];
 const COURSE_ORDER = Object.fromEntries(COURSES.map((c, i) => [c, i]));
 
-interface FormState {
+export interface FormState {
   course: string;
   name: string;
   description: string;
@@ -17,9 +18,10 @@ interface FormState {
   activeFrom: string;
   activeTo: string;
   is86d: boolean;
+  recipeId?: string;
 }
 
-const BLANK: FormState = {
+export const BLANK: FormState = {
   course: 'Entrée',
   name: '',
   description: '',
@@ -39,9 +41,10 @@ const toForm = (f: Feature): FormState => ({
   activeFrom: f.activeFrom ?? '',
   activeTo: f.activeTo ?? '',
   is86d: f.is86d ?? false,
+  recipeId: f.recipeId,
 });
 
-const toDoc = (f: FormState) => ({
+export const toDoc = (f: FormState) => ({
   course: f.course,
   name: f.name.trim(),
   ...(f.description.trim() && { description: f.description.trim() }),
@@ -50,6 +53,7 @@ const toDoc = (f: FormState) => ({
   ...(f.activeFrom && { activeFrom: f.activeFrom }),
   ...(f.activeTo && { activeTo: f.activeTo }),
   is86d: f.is86d,
+  ...(f.recipeId && { recipeId: f.recipeId }),
 });
 
 const fcColor = (fc: number) => fc < 28 ? 'text-emerald-400' : fc < 34 ? 'text-amber-400' : 'text-red-400';
@@ -166,16 +170,34 @@ const FeatureForm: React.FC<{
 
 const Features: React.FC = () => {
   const allFeatures = (useKitchenSelector((s: any) => s.features) as Feature[]) ?? [];
+  const allRecipes = (useKitchenSelector((s: any) => s.recipes) as Recipe[]) ?? [];
+  const allIngredients = (useKitchenSelector((s: any) => s.ingredients) as Ingredient[]) ?? [];
+  const menuRecipes = allRecipes.filter(r => r.recipeType === 'menu').sort((a, b) => a.name.localeCompare(b.name));
   const features = [...allFeatures].sort(
     (a, b) => (COURSE_ORDER[a.course] ?? 99) - (COURSE_ORDER[b.course] ?? 99)
   );
 
   const [showAdd, setShowAdd] = useState(false);
   const [addForm, setAddForm] = useState<FormState>({ ...BLANK });
+  const [addKind, setAddKind] = useState<'manual' | 'recipe'>('manual');
   const [editId, setEditId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<FormState>({ ...BLANK });
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const pickRecipeForAdd = (recipeId: string) => {
+    const recipe = menuRecipes.find(r => r.id === recipeId);
+    if (!recipe) return;
+    const fields = featureFieldsFromRecipe(recipe, allIngredients, allRecipes);
+    setAddForm({
+      ...addForm,
+      recipeId: recipe.id,
+      name: fields.name,
+      description: fields.description,
+      price: fields.price != null ? String(fields.price) : '',
+      cost: String(fields.cost),
+    });
+  };
 
   const handleAdd = async () => {
     if (!addForm.name.trim() || saving) return;
@@ -183,6 +205,7 @@ const Features: React.FC = () => {
     try {
       await addDoc(collection(db, 'features'), toDoc(addForm));
       setAddForm({ ...BLANK });
+      setAddKind('manual');
       setShowAdd(false);
     } finally {
       setSaving(false);
@@ -229,7 +252,7 @@ const Features: React.FC = () => {
         </div>
         {!showAdd && (
           <button
-            onClick={() => { setShowAdd(true); setAddForm({ ...BLANK }); setEditId(null); }}
+            onClick={() => { setShowAdd(true); setAddForm({ ...BLANK }); setAddKind('manual'); setEditId(null); }}
             className={`${BTN_PRIMARY} flex items-center gap-[8px]`}
           >
             <Plus className="w-3.5 h-3.5" />
@@ -241,6 +264,20 @@ const Features: React.FC = () => {
       {showAdd && (
         <div className="bg-zinc-950 border border-zinc-800 rounded-[13px] p-[21px] mb-[21px]">
           <p className="text-[10px] font-black uppercase tracking-[0.15em] text-emerald-400 mb-[13px]">New Feature</p>
+          <div className="flex gap-[8px] mb-[13px]">
+            <button onClick={() => setAddKind('manual')} className={addKind === 'manual' ? BTN_PRIMARY : BTN_GHOST}>Manual Entry</button>
+            <button onClick={() => setAddKind('recipe')} className={addKind === 'recipe' ? BTN_PRIMARY : BTN_GHOST}>From Recipe</button>
+          </div>
+          {addKind === 'recipe' && (
+            <div className="mb-[13px]">
+              <label className={FIELD_LABEL}>Recipe</label>
+              <select value={addForm.recipeId ?? ''} onChange={e => pickRecipeForAdd(e.target.value)} className={INPUT}>
+                <option value="">— Select a menu recipe —</option>
+                {menuRecipes.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+              <p className="text-[10px] text-zinc-600 mt-[5px]">Fills in the fields below — a one-time copy, not a live link. Edit anything before saving.</p>
+            </div>
+          )}
           <FeatureForm
             form={addForm}
             setForm={setAddForm}
@@ -274,6 +311,11 @@ const Features: React.FC = () => {
                 {isEditing ? (
                   <>
                     <p className="text-[10px] font-black uppercase tracking-[0.15em] text-zinc-400 mb-[13px]">Edit Feature</p>
+                    {f.recipeId && (
+                      <p className="text-[10px] text-zinc-600 mb-[8px] italic">
+                        Originally linked from: {allRecipes.find(r => r.id === f.recipeId)?.name ?? 'a recipe no longer in the pantry'}
+                      </p>
+                    )}
                     <FeatureForm
                       form={editForm}
                       setForm={setEditForm}

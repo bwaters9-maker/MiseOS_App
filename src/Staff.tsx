@@ -3,9 +3,9 @@ import { Users, CalendarClock, Plus, Pencil, Trash2, X, Check, DollarSign } from
 import { db } from './firebaseConfig';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { useKitchenSelector } from './components/KitchenStateContext';
+import { useStationPresets } from './hooks/useStationPresets';
 import type { Employee, Shift, PrepStation } from './types';
 
-const STATIONS: PrepStation[] = ['Sauté', 'Grill', 'Garde Manger', 'Pastry'];
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
 const formatDate = (dateStr: string) =>
@@ -313,6 +313,7 @@ const ShiftForm: React.FC<{
   onCancel: () => void;
   saving: boolean;
 }> = ({ form, setForm, employees, onSave, onCancel, saving }) => {
+  const { presets: stationPresets } = useStationPresets();
   const set = <K extends keyof ShiftFormState>(k: K, v: ShiftFormState[K]) =>
     setForm({ ...form, [k]: v });
 
@@ -370,7 +371,7 @@ const ShiftForm: React.FC<{
             className={INPUT}
           >
             <option value="">— None —</option>
-            {STATIONS.map(s => <option key={s} value={s}>{s}</option>)}
+            {stationPresets.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
         <div>

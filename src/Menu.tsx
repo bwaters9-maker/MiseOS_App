@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { UtensilsCrossed, AlertTriangle, ChevronRight, Eye } from 'lucide-react';
 import { useKitchenSelector } from './components/KitchenStateContext';
 import { useRecipeCategories } from './hooks/useRecipeCategories';
-import { costPerPortion, fcPercent, fcColor, recipeUsesEstimatedPricing } from './lib/costEngine';
+import { costPerPortion, fcPercent, fcColor, recipeUsesEstimatedPricing, isRecipeOnMenu } from './lib/costEngine';
 import GuestMenuPreview, { type GuestMenuGroup } from './components/GuestMenuPreview';
 import type { Ingredient, Recipe, MenuTemplate, RestaurantProfile } from './types';
 
@@ -37,7 +37,7 @@ const Menu: React.FC<MenuProps> = ({ targetFcPercent = 30, onOpenRecipe, menuTem
   const { categories } = useRecipeCategories();
   const [previewMode, setPreviewMode] = useState(false);
 
-  const menuRecipes = useMemo(() => allRecipes.filter(r => r.recipeType === 'menu'), [allRecipes]);
+  const menuRecipes = useMemo(() => allRecipes.filter(isRecipeOnMenu), [allRecipes]);
 
   const rows = useMemo<MenuRow[]>(() => menuRecipes.map(recipe => {
     try {
