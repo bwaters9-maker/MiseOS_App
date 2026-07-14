@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, doc, onSnapshot, DocumentData, DocumentSnapshot, QuerySnapshot, QueryDocumentSnapshot, FirestoreError } from 'firebase/firestore';
-import type { Feature, Employee, Shift, KitchenEvent, KitchenAlert, CribNote, Ingredient, Recipe, Client, Vendor, RestaurantProfile } from '../types';
+import type { Feature, Employee, Shift, KitchenEvent, KitchenAlert, CribNote, Ingredient, Recipe, Client, Vendor, RestaurantProfile, TrendReport } from '../types';
 
 // Based on firebase-blueprint.json
 export interface PrepItem {
@@ -40,6 +40,8 @@ export const useKitchenState = () => {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [restaurantProfile, setRestaurantProfile] = useState<RestaurantProfile | null>(null);
   const [restaurantProfileLoaded, setRestaurantProfileLoaded] = useState(false);
+  const [trendReport, setTrendReport] = useState<TrendReport | null>(null);
+  const [trendReportLoaded, setTrendReportLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<FirestoreError | null>(null);
 
@@ -163,6 +165,18 @@ export const useKitchenState = () => {
       }
     );
 
+    const unsubTrendReport = onSnapshot(
+      doc(db, 'trend_reports', 'latest'),
+      (snap: DocumentSnapshot<DocumentData>) => {
+        setTrendReport(snap.exists() ? (snap.data() as TrendReport) : null);
+        setTrendReportLoaded(true);
+      },
+      (err: FirestoreError) => {
+        setError(err);
+        setTrendReportLoaded(true);
+      }
+    );
+
     return () => {
       unsubPrep();
       unsubRecipes();
@@ -177,8 +191,9 @@ export const useKitchenState = () => {
       unsubIngredients();
       unsubVendors();
       unsubProfile();
+      unsubTrendReport();
     };
   }, []);
 
-  return { prepItems, setPrepItems, recipes, setRecipes, items86, features, staff, shifts, events, clients, alerts, cribNotes, ingredients, vendors, restaurantProfile, restaurantProfileLoaded, loading, error };
+  return { prepItems, setPrepItems, recipes, setRecipes, items86, features, staff, shifts, events, clients, alerts, cribNotes, ingredients, vendors, restaurantProfile, restaurantProfileLoaded, trendReport, trendReportLoaded, loading, error };
 };

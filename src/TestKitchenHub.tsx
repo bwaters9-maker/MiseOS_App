@@ -1,9 +1,13 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, RefreshCw, Send, AlertCircle, Flame, Lightbulb, Zap } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Sparkles, RefreshCw, Send, AlertCircle, ExternalLink, Flame, TrendingUp, TrendingDown, ChevronDown, CalendarDays } from 'lucide-react';
 import { SOUS_SYSTEM_PROMPT } from './lib/sousPersona';
 import { withRegionContext } from './lib/regionContext';
+import { callAi, parseAiJson } from './lib/ai';
 import { useKitchenSelector } from './components/KitchenStateContext';
-import type { RestaurantProfile } from './types';
+import { db } from './firebaseConfig';
+import { doc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
+import { regionForState, itemsForRegion, type SeasonalItemForRegion } from './lib/seasonalData';
+import type { RestaurantProfile, TrendReport, TrendCard, PricingTrendItem } from './types';
 
 interface Message {
   role: 'user' | 'model';
@@ -11,25 +15,217 @@ interface Message {
 }
 
 const MarkdownContent = ({ content }: { content: string }) => (
-  <div className="text-xs whitespace-pre-wrap font-mono">{content}</div>
+  <div className="text-xs whitespace-pre-wrap font-body leading-relaxed text-navy">{content}</div>
 );
 
-const TREND_CARDS = [
-  { img: 'photo-1544025162-d76694265947', label: 'Protein Component', title: 'Regenerative Agriculture Proteins' },
-  { img: 'photo-1512621776951-a57141f2eefd', label: 'Sourcing Matrix', title: 'Hyper-localized Heirloom Vegetables' },
-  { img: 'photo-1547592180-85f173990554', label: 'Kitchen Operations', title: 'Zero-Waste Fermented Garnishes' },
-  { img: 'photo-1600891964599-f61ba0e24092', label: 'Saucier Station', title: 'Modernized 19th Century French Sauces' },
-  { img: 'photo-1534422298391-e4f8c172dddb', label: 'Pantry Imports', title: 'Tinned Fish and Gourmet Conservas' },
-];
+// ===================================================================
+// TRENDS — AI PROMPT + RESPONSE NORMALIZATION
+// ===================================================================
+
+const TREND_CATEGORIES = ['Technique', 'Ingredient', 'Sourcing', 'Format', 'Hospitality', 'Flavor'];
+
+const TRENDS_SYSTEM_PROMPT = `You are a culinary trend analyst briefing a fine-dining executive chef on what is genuinely happening at the leading edge of the industry right now — trail-blazing chefs, serious kitchens, real culinary movement. You are explicitly not reporting on social-media volume or TikTok trend counts for their own sake.
+
+Respond with ONLY valid JSON, no markdown, no commentary, in exactly this shape:
+{"cards":[{"headline":"...","description":"...","category":"...","isViralBridge":false}],"pricingTrends":[{"item":"...","direction":"up","movement":"structural","note":"..."}]}
+
+Rules for "cards":
+- Return exactly 6 cards.
+- 5 of the 6 report genuine high-end/fine-dining trends: techniques, formats, sourcing philosophies, or flavor directions serious kitchens are pursuing right now. Ground these in real culinary movement, not speculation or generic food-blog language.
+- Exactly 1 of the 6 is the "Viral Bridge" card — the single most significant trend that has broken into mainstream/viral popularity. Frame it as an opportunity: how could an ambitious kitchen build a credible, elevated version of it to draw in new guests, without chasing the trend wholesale? Set "isViralBridge": true on this card only; false on every other card.
+- "headline" is under 10 words, no ending punctuation.
+- "description" is 2-3 sentences, specific and concrete.
+- "category" is exactly one of: "Technique", "Ingredient", "Sourcing", "Format", "Hospitality", "Flavor".
+
+Rules for "pricingTrends":
+- Return 5 to 8 items.
+- "item" is a plain ingredient or category name (e.g. "Olive oil", "Wild-caught salmon").
+- "direction" is "up" or "down".
+- "movement" is "short-term" (a weather event, a temporary supply hiccup) or "structural" (a lasting shift — tariffs, climate, demand shift).
+- "note" is one short sentence explaining why, in plain language.
+
+This is editorial commentary for a chef's own awareness only — not sourced from live market data, and never tied to this restaurant's actual pantry, ingredient costs, or invoices.`;
+
+const searchUrlFor = (headline: string) => `https://www.google.com/search?q=${encodeURIComponent(headline)}`;
+
+/** Defensive normalization — the AI is asked for exactly one Viral Bridge
+ * card, but the UI invariant is enforced here rather than trusted blindly. */
+const normalizeTrendResponse = (parsed: any): { cards: TrendCard[]; pricingTrends: PricingTrendItem[] } => {
+  const rawCards = Array.isArray(parsed?.cards) ? parsed.cards : [];
+  let cards: TrendCard[] = rawCards
+    .filter((c: any) => c && typeof c.headline === 'string' && c.headline.trim() && typeof c.description === 'string' && c.description.trim())
+    .map((c: any) => ({
+      headline: c.headline.trim(),
+      description: c.description.trim(),
+      category: TREND_CATEGORIES.includes(c.category) ? c.category : 'Technique',
+      isViralBridge: c.isViralBridge === true,
+    }));
+
+  const bridgeCount = cards.filter(c => c.isViralBridge).length;
+  if (bridgeCount === 0 && cards.length > 0) {
+    cards = cards.map((c, i) => i === cards.length - 1 ? { ...c, isViralBridge: true } : c);
+  } else if (bridgeCount > 1) {
+    let seen = false;
+    cards = cards.map(c => {
+      if (c.isViralBridge && !seen) { seen = true; return c; }
+      return { ...c, isViralBridge: false };
+    });
+  }
+
+  const rawPricing = Array.isArray(parsed?.pricingTrends) ? parsed.pricingTrends : [];
+  const pricingTrends: PricingTrendItem[] = rawPricing
+    .filter((p: any) =>
+      p && typeof p.item === 'string' && p.item.trim() &&
+      (p.direction === 'up' || p.direction === 'down') &&
+      (p.movement === 'short-term' || p.movement === 'structural') &&
+      typeof p.note === 'string' && p.note.trim())
+    .map((p: any) => ({ item: p.item.trim(), direction: p.direction, movement: p.movement, note: p.note.trim() }));
+
+  return { cards, pricingTrends };
+};
+
+interface TrendCitation { url: string; title: string }
+
+/** Only ever reads citations the API attached from real search results —
+ * never trusts model-written URLs, same principle as searchUrlFor below. */
+const extractCitations = (content: any[]): TrendCitation[] => {
+  const seen = new Map<string, string>();
+  for (const block of content ?? []) {
+    if (block?.type === 'text') {
+      for (const c of block.citations ?? []) {
+        if (c?.url && !seen.has(c.url)) seen.set(c.url, c.title || c.url);
+      }
+    }
+  }
+  return [...seen.entries()].map(([url, title]) => ({ url, title }));
+};
+
+const TREND_VERIFY_SYSTEM_PROMPT = `You are fact-checking one culinary trend claim before it ships in a fine-dining trend briefing. Use web search to look for real, current, specific coverage — trade press, chef interviews, restaurant reviews, industry publications — that genuinely supports this exact claim.
+
+If you find genuine supporting coverage, confirm it in one short sentence. If you find nothing that specifically supports this claim, say plainly that no supporting coverage was found. Never stretch a tangential or unrelated result into support, and never fabricate a source.`;
+
+/** Verify pass: drops any card with no supporting search citation. Never
+ * pads an unverified trend back in to hit a target count. */
+const verifyTrendCard = async (card: TrendCard): Promise<TrendCard | null> => {
+  try {
+    const response = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        max_tokens: 1024,
+        system: TREND_VERIFY_SYSTEM_PROMPT,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        messages: [{ role: 'user', content: `Trend claim: "${card.headline}" — ${card.description}` }],
+      }),
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    const citations = extractCitations(data.content);
+    if (citations.length === 0) return null;
+    return { ...card, sourceUrl: citations[0].url, sourceName: citations[0].title };
+  } catch {
+    return null;
+  }
+};
+
+const CATEGORY_STYLE: Record<string, string> = {
+  Technique: 'text-teal border-teal/30 bg-teal/10',
+  Ingredient: 'text-saffron-text border-saffron/40 bg-saffron-soft',
+  Sourcing: 'text-navy border-navy/20 bg-navy/5',
+  Format: 'text-slate border-slate/30 bg-slate/10',
+  Hospitality: 'text-teal border-teal/30 bg-teal/10',
+  Flavor: 'text-saffron-text border-saffron/40 bg-saffron-soft',
+};
+
+const formatReportDate = (iso: string): string => {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+};
+
+// ===================================================================
+// SEASONAL MATRIX
+// ===================================================================
+
+const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+type SeasonStatus = 'rampUp' | 'prime' | 'tailOff' | null;
+
+const monthStatus = (item: SeasonalItemForRegion, month: number): SeasonStatus => {
+  if (item.prime.includes(month)) return 'prime';
+  if (item.rampUp.includes(month)) return 'rampUp';
+  if (item.tailOff.includes(month)) return 'tailOff';
+  return null;
+};
+
+const STATUS_LABEL: Record<Exclude<SeasonStatus, null>, string> = {
+  rampUp: 'Ramping Up', prime: 'Prime', tailOff: 'Tail End',
+};
+
+const isStartingWithinWeeks = (item: SeasonalItemForRegion, currentMonth: number, weeks: number): boolean => {
+  const monthsAhead = Math.ceil(weeks / 4.345);
+  for (let i = 1; i <= monthsAhead; i++) {
+    const m = ((currentMonth - 1 + i) % 12) + 1;
+    if (item.rampUp.includes(m) || item.prime.includes(m)) return true;
+  }
+  return false;
+};
+
+// ===================================================================
+// TRENDS — HISTORY + WEEKLY CADENCE
+// ===================================================================
+
+const TREND_HISTORY_CAP = 12;
+const TREND_STALE_MS = 7 * 24 * 60 * 60 * 1000;
+
+const todayDateKey = (): string => new Date().toLocaleDateString('en-CA');
+
+const formatHistoryLabel = (dateKey: string): string => {
+  const d = new Date(`${dateKey}T00:00:00`);
+  if (isNaN(d.getTime())) return dateKey;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+/** Keeps only the 12 most recent dated reports — runs after every
+ * successful refresh so history never grows unbounded. */
+const pruneTrendHistory = async () => {
+  const snap = await getDocs(collection(db, 'trend_reports'));
+  const dated = snap.docs.filter(d => d.id !== 'latest').sort((a, b) => b.id.localeCompare(a.id));
+  const stale = dated.slice(TREND_HISTORY_CAP);
+  await Promise.all(stale.map(d => deleteDoc(d.ref)));
+};
+
+// ===================================================================
+// MAIN VIEW
+// ===================================================================
 
 export default function TestKitchenHub() {
   const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
+  const trendReport = useKitchenSelector((s: any) => s.trendReport) as TrendReport | null;
+  const trendReportLoaded = useKitchenSelector((s: any) => s.trendReportLoaded) as boolean;
   const [activeSubTab, setActiveSubTab] = useState<'trends' | 'optimizer'>('trends');
   const [userInput, setUserInput] = useState('');
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  const [trendsLoading, setTrendsLoading] = useState(false);
+  const [trendsError, setTrendsError] = useState<string | null>(null);
+  const [seasonalExpanded, setSeasonalExpanded] = useState(false);
+  const [historyReports, setHistoryReports] = useState<{ id: string; report: TrendReport }[]>([]);
+  const [viewingHistoryId, setViewingHistoryId] = useState<string | null>(null);
+  const autoRefreshTriggeredRef = useRef(false);
+
+  const region = regionForState(restaurantProfile?.state);
+  const seasonalItems = useMemo(() => itemsForRegion(region), [region]);
+  const currentMonth = new Date().getMonth() + 1;
+  const inSeasonNow = useMemo(() => seasonalItems.filter(i => monthStatus(i, currentMonth) !== null), [seasonalItems, currentMonth]);
+  const comingSoon = useMemo(
+    () => seasonalItems.filter(i => monthStatus(i, currentMonth) === null && isStartingWithinWeeks(i, currentMonth, 8)),
+    [seasonalItems, currentMonth],
+  );
 
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -80,102 +276,410 @@ export default function TestKitchenHub() {
     }
   };
 
+  const handleRefreshTrends = async () => {
+    if (trendsLoading) return;
+    setTrendsLoading(true);
+    setTrendsError(null);
+    try {
+      const raw = await callAi(
+        withRegionContext(TRENDS_SYSTEM_PROMPT, restaurantProfile),
+        'Give me the current culinary trend briefing.',
+        2500,
+      );
+      const parsed = parseAiJson(raw);
+      const { cards: draftCards, pricingTrends } = normalizeTrendResponse(parsed);
+      if (draftCards.length === 0) throw new Error('The AI did not return any trend cards. Try again.');
+
+      // VERIFY PASS: each drafted trend must clear a web-search-grounded
+      // check before it ships. Unverified trends are dropped — the report
+      // may end up with fewer than 6 cards, or none; never padded back in.
+      const verified = (await Promise.all(draftCards.map(verifyTrendCard)))
+        .filter((c): c is TrendCard => c !== null);
+
+      const report: TrendReport = { generatedAt: new Date().toISOString(), cards: verified, pricingTrends };
+      // Dated doc preserves history; 'latest' keeps existing readers working.
+      await setDoc(doc(db, 'trend_reports', todayDateKey()), report);
+      await setDoc(doc(db, 'trend_reports', 'latest'), report);
+      await pruneTrendHistory();
+    } catch (e: any) {
+      setTrendsError(e?.message || 'Could not refresh trends. Try again.');
+    } finally {
+      setTrendsLoading(false);
+    }
+  };
+
+  // Weekly cadence: check once per mount whether the latest report is
+  // missing or stale, and trigger a background refresh if so. The ref
+  // guard ensures this can only fire once per mount — never double-
+  // triggers even if trendReport updates again afterwards (e.g. from the
+  // refresh this same effect just kicked off).
+  useEffect(() => {
+    if (!trendReportLoaded || autoRefreshTriggeredRef.current) return;
+    autoRefreshTriggeredRef.current = true;
+    const isStale = !trendReport || (Date.now() - new Date(trendReport.generatedAt).getTime()) > TREND_STALE_MS;
+    if (isStale) handleRefreshTrends();
+  }, [trendReportLoaded]);
+
+  // Keeps the "Previous weeks" list current — refetches after every
+  // successful refresh writes a new dated doc. Read-only: never writes.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDocs(collection(db, 'trend_reports'));
+        const dated = snap.docs
+          .filter(d => d.id !== 'latest')
+          .map(d => ({ id: d.id, report: d.data() as TrendReport }))
+          .sort((a, b) => b.id.localeCompare(a.id));
+        if (!cancelled) setHistoryReports(dated);
+      } catch {
+        // History is a nice-to-have; a failed fetch just leaves the list empty.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [trendReport]);
+
+  const displayedReport = viewingHistoryId
+    ? historyReports.find(h => h.id === viewingHistoryId)?.report ?? null
+    : trendReport;
+
+  const bridgeCard = displayedReport?.cards.find(c => c.isViralBridge);
+  const regularCards = displayedReport?.cards.filter(c => !c.isViralBridge) ?? [];
+
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto font-mono text-zinc-100">
-      <div className="border-b border-zinc-900 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+    <div className="max-w-[1597px] mx-auto px-[21px] py-[34px] font-body">
+      <div className="border-b border-line pb-[21px] flex flex-col sm:flex-row justify-between items-start sm:items-end gap-[21px]">
         <div>
-          <h1 className="text-xl font-extrabold tracking-wider uppercase">Test Kitchen</h1>
-          <p className="text-[11px] text-zinc-500 uppercase tracking-widest mt-1">Develop new dishes with real-time AI assistance</p>
+          <h1 className="text-xl font-display font-bold tracking-tight text-navy">Test Kitchen</h1>
+          <p className="text-xs text-slate mt-[5px]">Develop new dishes with real-time AI assistance</p>
         </div>
-        <div className="flex gap-2 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
-          <button onClick={() => setActiveSubTab('trends')} className={`px-4 py-2 text-xs font-extrabold uppercase tracking-wider rounded-lg transition-all border ${activeSubTab === 'trends' ? 'bg-zinc-900 text-emerald-400 border-zinc-700' : 'bg-transparent text-zinc-500 border-transparent'}`}>Culinary Trends & Forecasts</button>
-          <button onClick={() => setActiveSubTab('optimizer')} className={`px-4 py-2 text-xs font-extrabold uppercase tracking-wider rounded-lg transition-all flex items-center gap-2 border ${activeSubTab === 'optimizer' ? 'bg-zinc-900 text-emerald-400 border-zinc-700' : 'bg-transparent text-zinc-500 border-transparent'}`}><Sparkles className="w-3.5 h-3.5" /> The Menu Development Playground</button>
+        <div className="flex gap-[3px] bg-bg-cool p-[3px] rounded-tile border border-line">
+          <button onClick={() => setActiveSubTab('trends')} className={`px-[13px] py-[8px] text-xs font-bold tracking-tight rounded-card transition-colors duration-[144ms] ${activeSubTab === 'trends' ? 'bg-surface text-navy shadow-sm' : 'bg-transparent text-slate hover:text-navy'}`}>Culinary Trends & Forecasts</button>
+          <button onClick={() => setActiveSubTab('optimizer')} className={`px-[13px] py-[8px] text-xs font-bold tracking-tight rounded-card transition-colors duration-[144ms] flex items-center gap-[8px] ${activeSubTab === 'optimizer' ? 'bg-surface text-navy shadow-sm' : 'bg-transparent text-slate hover:text-navy'}`}><Sparkles className="w-3.5 h-3.5" /> The Menu Development Playground</button>
         </div>
       </div>
 
       {activeSubTab === 'trends' && (
-        <div className="space-y-6 font-mono tracking-tight">
-          <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-6 space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-2"><Lightbulb className="w-4 h-4 text-amber-500" /> Sector Market Summary</h3>
-            <p className="text-xs text-zinc-400 leading-relaxed max-w-5xl">The upscale wine bar segment is driven by luxury-lite experiences, where guests prioritize visually intricate appetizers and high-provenance proteins. Sustainability and transparency in sourcing have become mandatory for the 2026 luxury consumer.</p>
+        <div className="space-y-[34px] mt-[21px]">
+
+          {/* REFRESH HEADER */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-[13px]">
+            <div>
+              <h2 className="text-sm font-display font-bold text-navy">
+                {displayedReport ? `This Week's Culinary Trends for ${formatReportDate(displayedReport.generatedAt)}` : "This Week's Culinary Trends"}
+              </h2>
+              <p className="text-[10px] text-slate/80 italic mt-[3px]">
+                AI-generated editorial commentary — read-only, never writes to your pantry, recipes, or costing. Refreshes automatically once a week.
+              </p>
+            </div>
+            <div className="flex items-center gap-[13px] shrink-0">
+              {trendsLoading && (
+                <div className="flex items-center gap-[8px] text-[10px] font-bold uppercase tracking-wider text-teal">
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  Updating this week's trends…
+                </div>
+              )}
+              {historyReports.length > 0 && (
+                <select
+                  value={viewingHistoryId ?? ''}
+                  onChange={e => setViewingHistoryId(e.target.value || null)}
+                  className="bg-bg-cool border border-line rounded-[8px] px-[8px] py-[5px] text-[10px] font-bold uppercase tracking-wider text-navy focus:outline-none focus:border-teal"
+                >
+                  <option value="">Current</option>
+                  {historyReports.map(h => (
+                    <option key={h.id} value={h.id}>Week of {formatHistoryLabel(h.id)}</option>
+                  ))}
+                </select>
+              )}
+            </div>
           </div>
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-400"><Flame className="w-4 h-4 text-orange-500" /> Hot Consumer Vectors</div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {TREND_CARDS.map((card) => (
-                <div key={card.title} className="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden hover:border-zinc-700 transition-colors">
-                  <div className="h-44 relative flex items-center justify-center border-b border-zinc-800">
-                    <span className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url('https://images.unsplash.com/${card.img}?auto=format&fit=crop&w=600&q=80')` }}></span>
-                    <span className="relative z-10 bg-zinc-950/80 px-3 py-1.5 rounded text-xs font-mono border border-zinc-800 text-zinc-400">{card.label}</span>
+
+          {viewingHistoryId && (
+            <div className="bg-saffron-soft border border-saffron/40 rounded-card p-[13px] flex flex-wrap items-center justify-between gap-[13px]">
+              <p className="text-[11px] text-saffron-text font-bold">
+                Viewing archived report — Week of {formatHistoryLabel(viewingHistoryId)}. Read-only, not the live briefing.
+              </p>
+              <button
+                onClick={() => setViewingHistoryId(null)}
+                className="text-[10px] font-bold uppercase text-saffron-text hover:text-navy px-[8px] py-[3px] rounded-[5px] border border-saffron/40 shrink-0"
+              >
+                Back to Current
+              </button>
+            </div>
+          )}
+
+          {trendsError && (
+            <div className="bg-surface border border-red-400 rounded-card p-[13px] flex justify-between items-center">
+              <div className="flex items-center gap-[8px] text-red-400 text-xs font-bold">
+                <AlertCircle className="w-4 h-4 shrink-0" /><span>{trendsError}</span>
+              </div>
+              <button onClick={() => setTrendsError(null)} className="text-[10px] font-bold uppercase text-slate hover:text-navy px-[8px] py-[3px] rounded-[5px] border border-line">Dismiss</button>
+            </div>
+          )}
+
+          {/* EDITORIAL CARDS */}
+          {!trendReportLoaded ? null : displayedReport === null ? (
+            <div className="bg-surface border border-dashed border-line rounded-card p-[55px] text-center">
+              <Sparkles className="w-8 h-8 text-slate/40 mx-auto mb-[13px]" />
+              <p className="text-xs text-slate">
+                {viewingHistoryId
+                  ? 'That archived report could not be found.'
+                  : trendsLoading
+                    ? "Generating this week's trend briefing…"
+                    : 'No trend briefing yet — one generates automatically each week.'}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[21px]">
+              {bridgeCard && (
+                <div className="bg-surface border-2 border-saffron rounded-card p-[21px] flex flex-col gap-[13px] lg:col-span-1">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-[5px] px-[8px] py-[3px] rounded-[5px] text-[10px] font-bold uppercase tracking-wider bg-saffron text-white">
+                      <Flame className="w-3 h-3" /> Viral Bridge
+                    </span>
+                    <span className={`px-[8px] py-[3px] rounded-[5px] text-[10px] font-bold uppercase tracking-wider border ${CATEGORY_STYLE[bridgeCard.category] ?? CATEGORY_STYLE.Technique}`}>{bridgeCard.category}</span>
                   </div>
-                  <div className="p-4 bg-zinc-950">
-                    <h4 className="text-xs font-bold uppercase text-zinc-200 tracking-wider">{card.title}</h4>
-                  </div>
+                  <h3 className="text-sm font-display font-bold text-navy leading-snug">{bridgeCard.headline}</h3>
+                  <p className="text-xs text-slate leading-relaxed flex-1">{bridgeCard.description}</p>
+                  <a href={bridgeCard.sourceUrl ?? searchUrlFor(bridgeCard.headline)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-[5px] text-[10px] font-bold uppercase tracking-wider text-teal hover:text-navy transition-colors duration-[144ms]">
+                    <ExternalLink className="w-3 h-3" /> {bridgeCard.sourceUrl ? (bridgeCard.sourceName ?? 'View source') : 'Search for coverage'}
+                  </a>
+                </div>
+              )}
+              {regularCards.map((card, i) => (
+                <div key={i} className="bg-surface border border-line rounded-card p-[21px] flex flex-col gap-[13px]">
+                  <span className={`self-start px-[8px] py-[3px] rounded-[5px] text-[10px] font-bold uppercase tracking-wider border ${CATEGORY_STYLE[card.category] ?? CATEGORY_STYLE.Technique}`}>{card.category}</span>
+                  <h3 className="text-sm font-display font-bold text-navy leading-snug">{card.headline}</h3>
+                  <p className="text-xs text-slate leading-relaxed flex-1">{card.description}</p>
+                  <a href={card.sourceUrl ?? searchUrlFor(card.headline)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-[5px] text-[10px] font-bold uppercase tracking-wider text-teal hover:text-navy transition-colors duration-[144ms]">
+                    <ExternalLink className="w-3 h-3" /> {card.sourceUrl ? (card.sourceName ?? 'View source') : 'Search for coverage'}
+                  </a>
                 </div>
               ))}
             </div>
+          )}
+
+          {/* PRICING TRENDS */}
+          <div className="bg-surface border border-line rounded-card p-[21px] space-y-[13px]">
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-widest text-navy">Pricing Trends</h3>
+              <p className="text-[10px] text-slate/80 italic mt-[3px]">
+                AI commentary only — informational, never linked to your actual ingredient costs. Update real prices from Ingredients, never here.
+              </p>
+            </div>
+            {!trendReportLoaded || displayedReport === null ? (
+              <p className="text-xs text-slate italic py-[8px]">No pricing commentary yet — it refreshes automatically each week.</p>
+            ) : displayedReport.pricingTrends.length === 0 ? (
+              <p className="text-xs text-slate italic py-[8px]">That refresh returned no pricing commentary.</p>
+            ) : (
+              <div className="divide-y divide-line">
+                {displayedReport.pricingTrends.map((p, i) => (
+                  <div key={i} className="flex items-start gap-[13px] py-[8px]">
+                    {p.direction === 'up' ? (
+                      <TrendingUp className="w-4 h-4 text-red-400 shrink-0 mt-[1px]" />
+                    ) : (
+                      <TrendingDown className="w-4 h-4 text-teal shrink-0 mt-[1px]" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-[8px] flex-wrap">
+                        <span className="text-xs font-bold text-navy">{p.item}</span>
+                        <span className="px-[8px] py-[1px] rounded-[5px] text-[9px] font-bold uppercase tracking-wider border border-line text-slate">{p.movement}</span>
+                      </div>
+                      <p className="text-[11px] text-slate mt-[2px]">{p.note}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* SEASONAL MATRIX */}
+          <div className="bg-surface border border-line rounded-card p-[21px] space-y-[21px]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-[8px]">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-widest text-navy flex items-center gap-[8px]">
+                  <CalendarDays className="w-4 h-4 text-saffron" /> Seasonal Matrix
+                </h3>
+                <p className="text-[10px] text-slate mt-[3px]">
+                  {region} region{!restaurantProfile?.state && ' — no state set in Restaurant Profile, defaulting to Northeast'}. Static reference, not a live feed.
+                </p>
+              </div>
+              <button
+                onClick={() => setSeasonalExpanded(x => !x)}
+                className="flex items-center gap-[5px] text-[10px] font-bold uppercase tracking-wider text-teal hover:text-navy transition-colors duration-[144ms] shrink-0"
+              >
+                {seasonalExpanded ? 'Hide' : 'View'} Full-Year Calendar
+                <ChevronDown className={`w-3 h-3 transition-transform duration-[144ms] ${seasonalExpanded ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
+
+            {!seasonalExpanded ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-[21px]">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[8px]">In Season Now — {MONTH_NAMES[currentMonth - 1]}</p>
+                  {inSeasonNow.length === 0 ? (
+                    <p className="text-xs text-slate italic">Nothing in this dataset peaks in {MONTH_NAMES[currentMonth - 1]} for {region}.</p>
+                  ) : (
+                    <div className="space-y-[5px]">
+                      {inSeasonNow.map(item => {
+                        const status = monthStatus(item, currentMonth)!;
+                        return (
+                          <div key={item.name} className="flex items-center justify-between gap-[8px] text-xs">
+                            <span className="text-navy">{item.name}</span>
+                            <span className={`px-[8px] py-[1px] rounded-[5px] text-[9px] font-bold uppercase tracking-wider border ${status === 'prime' ? 'text-saffron-text border-saffron/40 bg-saffron-soft' : 'text-slate border-line'}`}>{STATUS_LABEL[status]}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[8px]">Coming Up — Next 8 Weeks</p>
+                  {comingSoon.length === 0 ? (
+                    <p className="text-xs text-slate italic">Nothing new on deck in the next 8 weeks for {region}.</p>
+                  ) : (
+                    <div className="space-y-[5px]">
+                      {comingSoon.map(item => (
+                        <div key={item.name} className="text-xs text-navy">{item.name}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-left text-[11px] min-w-[800px]">
+                  <thead>
+                    <tr>
+                      <th className="px-[8px] py-[5px] text-[10px] font-bold uppercase tracking-wider text-slate text-left">Item</th>
+                      {MONTH_ABBR.map((m, i) => (
+                        <th key={m} className={`px-[3px] py-[5px] text-[9px] font-bold uppercase tracking-wider text-center ${i + 1 === currentMonth ? 'text-saffron-text' : 'text-slate'}`}>{m}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {seasonalItems.map(item => (
+                      <tr key={item.name} className="border-t border-line">
+                        <td className="px-[8px] py-[5px] text-navy whitespace-nowrap">{item.name}</td>
+                        {MONTH_ABBR.map((_, i) => {
+                          const status = monthStatus(item, i + 1);
+                          const cellStyle = status === 'prime'
+                            ? 'bg-saffron'
+                            : status === 'rampUp' || status === 'tailOff'
+                              ? 'bg-saffron-soft'
+                              : 'bg-bg-cool';
+                          return (
+                            <td key={i} className="px-[3px] py-[5px] text-center">
+                              <span className={`inline-block w-full h-[13px] rounded-[3px] ${cellStyle}`} title={status ? `${STATUS_LABEL[status]} in ${MONTH_NAMES[i]}` : undefined} />
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="flex items-center gap-[13px] mt-[13px] text-[10px] text-slate">
+                  <span className="flex items-center gap-[5px]"><span className="w-[13px] h-[13px] rounded-[3px] bg-saffron inline-block" /> Prime</span>
+                  <span className="flex items-center gap-[5px]"><span className="w-[13px] h-[13px] rounded-[3px] bg-saffron-soft inline-block" /> Ramping up / tailing off</span>
+                  <span className="flex items-center gap-[5px]"><span className="w-[13px] h-[13px] rounded-[3px] bg-bg-cool border border-line inline-block" /> Out of season</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {activeSubTab === 'optimizer' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start font-mono tracking-tight">
-          <div className="lg:col-span-2 space-y-4">
-            <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-5 min-h-[350px] flex flex-col justify-between">
-              <div className="flex justify-between items-center border-b border-zinc-900 pb-3">
-                <div className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Interactive Formula Engineering Shell</div>
-                <button onClick={handleNewSession} className="text-[10px] font-bold uppercase text-zinc-500 hover:text-zinc-300 flex items-center gap-1">
-                  <RefreshCw className="w-3 h-3" /> New Session
-                </button>
-              </div>
-              <div ref={chatContainerRef} className="flex-1 p-4 my-4 overflow-y-auto h-96">
-                {messages.length === 0 && !isGenerating ? (
-                  <div className="flex items-center justify-center h-full text-center">
-                    <p className="text-xs text-zinc-600 uppercase max-w-md leading-relaxed tracking-wider">Brainstorm and develop brand-new dishes from scratch. Get AI guidance on trending ingredients, flavor pairings, and precise menu costing adjustments.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {messages.map((msg, index) => (
-                      <div key={index} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        {msg.role === 'model' && <div className="w-6 h-6 rounded-full bg-emerald-900/50 flex items-center justify-center text-emerald-400 shrink-0"><Sparkles className="w-3.5 h-3.5" /></div>}
-                        <div className={`max-w-xl p-3 rounded-xl ${msg.role === 'user' ? 'bg-zinc-800 text-zinc-200' : 'bg-transparent'}`}>
-                          <MarkdownContent content={msg.content} />
-                        </div>
-                      </div>
-                    ))}
-                    {isGenerating && (
-                      <div className="flex gap-3 justify-start">
-                        <div className="w-6 h-6 rounded-full bg-emerald-900/50 flex items-center justify-center text-emerald-400 shrink-0"><Sparkles className="w-3.5 h-3.5" /></div>
-                        <div className="p-3"><span className="animate-pulse text-zinc-500">...</span></div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-              <form onSubmit={handleSubmit} className="pt-3">
-                <div className="relative">
-                  <input type="text" value={userInput} onChange={(e) => setUserInput(e.target.value)} placeholder="Describe a dish concept you want to develop..." className="w-full bg-zinc-950 border border-zinc-800 p-3.5 pr-12 rounded-xl text-xs focus:outline-none focus:border-zinc-700 text-zinc-200 placeholder:text-zinc-700 font-mono disabled:opacity-50" disabled={isGenerating} />
-                  <button type="submit" disabled={isGenerating} className="absolute right-3 top-3 text-zinc-700 hover:text-emerald-500 transition-colors disabled:opacity-50"><Send className="w-4 h-4" /></button>
+        <div className="space-y-6 mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+            {/* LEFT COLUMN, FULL HEIGHT: existing chat — relocated, logic untouched */}
+            <div className="lg:col-span-1 lg:self-stretch flex flex-col gap-4">
+              <div className="bg-surface border border-line rounded-card p-5 flex-1 min-h-[350px] flex flex-col justify-between">
+                <div className="flex justify-between items-center border-b border-line pb-3">
+                  {/* "Chef Matthew" is a placeholder persona name pending a future onboarding customization setting */}
+                  <div className="text-xs font-bold uppercase tracking-widest text-navy">Chef Matthew — Sous Chef</div>
+                  <button onClick={handleNewSession} className="text-[10px] font-bold uppercase text-slate hover:text-navy flex items-center gap-1">
+                    <RefreshCw className="w-3 h-3" /> New Session
+                  </button>
                 </div>
-              </form>
+                <div ref={chatContainerRef} className="flex-1 p-4 my-4 overflow-y-auto h-96">
+                  {messages.length === 0 && !isGenerating ? (
+                    <div className="flex items-center justify-center h-full text-center">
+                      <p className="text-xs text-slate max-w-md leading-relaxed">Brainstorm and develop brand-new dishes from scratch. Get AI guidance on trending ingredients, flavor pairings, and precise menu costing adjustments.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {messages.map((msg, index) => (
+                        <div key={index} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                          {msg.role === 'model' && <div className="w-6 h-6 rounded-full bg-teal/15 flex items-center justify-center text-teal shrink-0"><Sparkles className="w-3.5 h-3.5" /></div>}
+                          <div className={`max-w-xl p-3 rounded-card text-navy ${msg.role === 'user' ? 'bg-bg-cool' : 'bg-surface border border-line'}`}>
+                            <MarkdownContent content={msg.content} />
+                          </div>
+                        </div>
+                      ))}
+                      {isGenerating && (
+                        <div className="flex gap-3 justify-start">
+                          <div className="w-6 h-6 rounded-full bg-teal/15 flex items-center justify-center text-teal shrink-0"><Sparkles className="w-3.5 h-3.5" /></div>
+                          <div className="p-3"><span className="animate-pulse text-slate">...</span></div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <form onSubmit={handleSubmit} className="pt-3">
+                  <div className="relative">
+                    <input type="text" value={userInput} onChange={(e) => setUserInput(e.target.value)} placeholder="Describe a dish concept you want to develop..." className="w-full bg-bg-cool border border-line p-3.5 pr-12 rounded-card text-xs focus:outline-none focus:border-teal text-navy placeholder:text-slate/60 font-body disabled:opacity-50" disabled={isGenerating} />
+                    <button type="submit" disabled={isGenerating} className="absolute right-3 top-3 text-slate hover:text-teal transition-colors disabled:opacity-50"><Send className="w-4 h-4" /></button>
+                  </div>
+                </form>
+              </div>
+              {sessionError && (
+                <div className="bg-surface border border-red-400 rounded-card p-3 flex justify-between items-center">
+                  <div className="flex items-center gap-2.5 text-red-400 text-xs font-bold"><AlertCircle className="w-4 h-4 shrink-0" /><span>{sessionError}</span></div>
+                  <button onClick={() => setSessionError(null)} className="text-[9px] uppercase font-bold text-slate hover:text-navy px-2 py-1 rounded border border-line">Clear Status</button>
+                </div>
+              )}
             </div>
-            {sessionError && (
-              <div className="bg-zinc-950 border border-red-950 rounded-xl p-3 flex justify-between items-center">
-                <div className="flex items-center gap-2.5 text-red-400 text-xs font-bold"><AlertCircle className="w-4 h-4 shrink-0 text-red-500" /><span className="uppercase tracking-wider">{sessionError}</span></div>
-                <button onClick={() => setSessionError(null)} className="text-[9px] uppercase font-bold bg-zinc-900 hover:bg-zinc-800 text-zinc-500 px-2 py-1 rounded border border-zinc-800">Clear Status</button>
+
+            {/* CENTER: Plate Design — largest zone, contains Ingredient Palette sub-section */}
+            <div className="lg:col-span-2">
+              <div className="bg-surface border border-line rounded-card p-5 min-h-[350px] flex flex-col">
+                <div className="border-b border-line pb-3 mb-4">
+                  <p className="text-[10px] text-slate uppercase tracking-wider">Working Dish</p>
+                  <h2 className="text-lg font-display font-bold text-navy">Untitled Dish</h2>
+                </div>
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="md:col-span-3 bg-bg-cool border border-line rounded-card flex items-center justify-center">
+                    <p className="text-xs text-slate italic">Plate Design — the plate builder will be embedded here in a later phase.</p>
+                  </div>
+                  <div className="md:col-span-1 bg-bg-cool border border-line rounded-card p-4">
+                    <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate mb-2">Ingredient Palette</h3>
+                    <p className="text-xs text-slate leading-relaxed italic">Placeholder — a searchable ingredient palette will live here in a later phase.</p>
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-          <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-5 space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 border-b border-zinc-900 pb-2 flex items-center gap-2"><Zap className="w-3.5 h-3.5 text-emerald-500" /> Co-Pilot Engineering Anchors</h3>
-            <div className="space-y-3 text-[11px] text-zinc-500 leading-relaxed uppercase">
-              <div className="p-3 bg-zinc-950 border border-zinc-900 rounded-lg">
-                <span className="font-bold text-zinc-400 block mb-1">Target Margin Guardrails</span>
-                Align ingredients against the custom 30% target ceiling matrix to maximize plate yields.
+            </div>
+
+            {/* RIGHT: Trends (top) + Recipe Build (below) */}
+            <div className="lg:col-span-1 space-y-6">
+              <div className="bg-surface border border-line rounded-card p-5">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-navy border-b border-line pb-2 mb-3">Trends for This Dish</h3>
+                <p className="text-xs text-slate leading-relaxed">Placeholder — dish-specific trend signals will surface here in a later phase.</p>
               </div>
-              <div className="p-3 bg-zinc-950 border border-zinc-900 rounded-lg">
-                <span className="font-bold text-zinc-400 block mb-1">Dynamic Saucier Assist</span>
-                Auto-calculate batch reductions and emulsion stability benchmarks during ingredient ingestion passes.
+              <div className="bg-surface border border-line rounded-card p-5 space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-navy border-b border-line pb-2">Recipe Build</h3>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-1">Yield</p>
+                  <p className="text-xs text-slate italic">Not yet specified.</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-1">Ingredients</p>
+                  <p className="text-xs text-slate italic">No ingredients added yet.</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-1">Method</p>
+                  <p className="text-xs text-slate italic">No method steps yet.</p>
+                </div>
               </div>
             </div>
           </div>
