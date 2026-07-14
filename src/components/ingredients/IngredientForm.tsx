@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { ChevronDown, AlertTriangle } from 'lucide-react';
+import { ChevronDown, AlertTriangle, Sparkles, Loader2 } from 'lucide-react';
 import { computeCostPerBaseUnit } from '../../lib/costEngine';
 import { toBase, fromBase, displayUnitsFor, defaultDisplayUnit, smartUnit, costPerDisplayUnit } from '../../lib/units';
+import { callAi, parseAiJson } from '../../lib/ai';
 import type { Ingredient, IngredientCategory, MeasureType, Allergen, NutritionPer100g, Vendor } from '../../types';
 import type { UnitSystem, DisplayUnit } from '../../lib/units';
 
@@ -14,6 +15,19 @@ export const ALLERGEN_LABELS: Record<Allergen, string> = {
   treeNuts: 'Tree Nuts', peanuts: 'Peanuts', wheat: 'Wheat', soybeans: 'Soybeans', sesame: 'Sesame',
   gluten: 'Gluten', sulfites: 'Sulfites',
 };
+
+const ALL_ALLERGEN_VALUES: Allergen[] = [...FDA_BIG_9, ...ADDITIONAL_DISCLOSURES];
+const isValidAllergenValue = (a: any): a is Allergen => ALL_ALLERGEN_VALUES.includes(a);
+
+const NUTRITION_BACKFILL_PROMPT = `You are providing standard nutrition-facts data for a named food ingredient already on a restaurant's Master Pantry, to backfill an FDA nutrition label. You will receive a single ingredient name.
+
+Respond with ONLY valid JSON, no markdown, no commentary, in exactly this shape:
+{"nutritionPer100g":{"calories":0,"totalFat":0,"saturatedFat":0,"transFat":0,"cholesterol":0,"sodium":0,"totalCarbs":0,"fiber":0,"sugars":0,"addedSugars":0,"protein":0},"allergens":["..."]}
+
+Rules:
+- "nutritionPer100g" gives typical values per 100g of the edible product (calories in kcal, all others in grams except cholesterol and sodium in mg). Omit a field entirely if genuinely unknown rather than guessing 0.
+- "allergens" is an array containing zero or more of: "milk", "eggs", "fish", "shellfish", "treeNuts", "peanuts", "wheat", "soybeans", "sesame", "gluten", "sulfites" — only ones this ingredient genuinely contains or commonly derives from. Empty array if none apply.
+- If the name is not a recognizable food or beverage ingredient, respond with {"error":"not a recognizable ingredient"} instead.`;
 
 export interface FormState {
   name: string;
@@ -30,6 +44,10 @@ export interface FormState {
   calories: string; totalFat: string; saturatedFat: string; transFat: string;
   cholesterol: string; sodium: string; totalCarbs: string; fiber: string;
   sugars: string; addedSugars: string; protein: string;
+  /** Provenance of the nutritionPer100g fields above — 'ai' only while an AI
+   * proposal (add-flow or edit-mode backfill) sits untouched; any manual edit
+   * to a nutrition field flips this back to 'manual'. */
+  nutritionSource: 'ai' | 'manual';
   allergens: Allergen[];
   vendorId: string;
 }
@@ -43,6 +61,7 @@ export const BLANK = (unitSystem: UnitSystem): FormState => ({
   calories: '', totalFat: '', saturatedFat: '', transFat: '',
   cholesterol: '', sodium: '', totalCarbs: '', fiber: '',
   sugars: '', addedSugars: '', protein: '',
+  nutritionSource: 'manual',
   allergens: [],
   vendorId: '',
 });
@@ -74,6 +93,10 @@ export const toForm = (ing: Ingredient, unitSystem: UnitSystem): FormState => {
     sugars: n.sugars != null ? String(n.sugars) : '',
     addedSugars: n.addedSugars != null ? String(n.addedSugars) : '',
     protein: n.protein != null ? String(n.protein) : '',
+    // Edit sessions start 'manual' regardless of the stored value — matches
+    // toDoc's pre-existing unconditional-manual-on-edit stamp. Only flips to
+    // 'ai' within this session via the Estimate Nutrition (AI) button below.
+    nutritionSource: 'manual',
     allergens: ing.allergens ?? [],
     vendorId: ing.vendorId ?? '',
   };
@@ -97,8 +120,11 @@ const buildNutrition = (f: FormState): NutritionPer100g => {
 };
 
 /** Manual-entry path (blank Add, or editing any existing ingredient) — always
- * a chef-typed, just-verified price, so priceSource/lastVerified/nutritionSource
- * are stamped unconditionally regardless of which fields were actually touched. */
+ * a chef-typed, just-verified price, so priceSource/lastVerified are stamped
+ * unconditionally regardless of which fields were actually touched.
+ * nutritionSource instead follows f.nutritionSource: 'manual' unless the
+ * Estimate Nutrition (AI) button filled the nutrition fields this session
+ * and the chef hasn't edited any of them since. */
 export const toDoc = (f: FormState): Omit<Ingredient, 'id'> => {
   const purchaseQtyBase = toBase(parseFloat(f.purchaseQtyDisplay) || 0, f.purchaseQtyUnit);
   const nutrition = buildNutrition(f);
@@ -113,7 +139,7 @@ export const toDoc = (f: FormState): Omit<Ingredient, 'id'> => {
     ...(f.measureType === 'weight' && parseFloat(f.pieceWeightDisplay) > 0 && {
       pieceWeightG: toBase(parseFloat(f.pieceWeightDisplay), f.pieceWeightUnit),
     }),
-    ...(Object.keys(nutrition).length > 0 && { nutritionPer100g: nutrition, nutritionSource: 'manual' }),
+    ...(Object.keys(nutrition).length > 0 && { nutritionPer100g: nutrition, nutritionSource: f.nutritionSource }),
     ...(f.allergens.length > 0 && { allergens: f.allergens }),
     ...(f.vendorId && { vendorId: f.vendorId }),
     lastVerified: new Date().toISOString().slice(0, 10),
@@ -157,15 +183,56 @@ export const BADGE = 'px-[8px] py-[3px] rounded-[5px] text-[10px] font-bold uppe
 export const NutritionAllergenSection: React.FC<{
   form: FormState;
   setForm: (f: FormState) => void;
-}> = ({ form, setForm }) => {
+  /** Shows the Estimate Nutrition (AI) button — only meaningful once an
+   * ingredient already exists to backfill; the Add/AI-lookup flows get their
+   * nutrition proposal from their own lookup call instead. */
+  isEditingExisting?: boolean;
+}> = ({ form, setForm, isEditingExisting }) => {
   const [open, setOpen] = useState(false);
-  const setN = (k: keyof FormState, v: string) => setForm({ ...form, [k]: v });
+  const [estimating, setEstimating] = useState(false);
+  const [estimateError, setEstimateError] = useState<string | null>(null);
+
+  // A manual edit to any nutrition field always means the value is no longer
+  // an untouched AI proposal, regardless of whether it ever was one.
+  const setN = (k: keyof FormState, v: string) => setForm({ ...form, [k]: v, nutritionSource: 'manual' });
 
   const toggleAllergen = (a: Allergen) => {
     const next = form.allergens.includes(a)
       ? form.allergens.filter(x => x !== a)
       : [...form.allergens, a];
     setForm({ ...form, allergens: next });
+  };
+
+  const handleEstimate = async () => {
+    if (!form.name.trim() || estimating) return;
+    setEstimating(true);
+    setEstimateError(null);
+    try {
+      const raw = await callAi(NUTRITION_BACKFILL_PROMPT, form.name.trim(), 1200);
+      const parsed = parseAiJson(raw);
+      if (parsed?.error) {
+        throw new Error(`Could not estimate nutrition for "${form.name.trim()}".`);
+      }
+      const n = parsed?.nutritionPer100g && typeof parsed.nutritionPer100g === 'object' ? parsed.nutritionPer100g : {};
+      const numStr = (v: any): string => {
+        const num = typeof v === 'number' && isFinite(v) ? v : undefined;
+        return num != null ? String(num) : '';
+      };
+      const allergens = Array.isArray(parsed?.allergens) ? parsed.allergens.filter(isValidAllergenValue) : form.allergens;
+      setForm({
+        ...form,
+        calories: numStr(n.calories), totalFat: numStr(n.totalFat), saturatedFat: numStr(n.saturatedFat), transFat: numStr(n.transFat),
+        cholesterol: numStr(n.cholesterol), sodium: numStr(n.sodium), totalCarbs: numStr(n.totalCarbs), fiber: numStr(n.fiber),
+        sugars: numStr(n.sugars), addedSugars: numStr(n.addedSugars), protein: numStr(n.protein),
+        allergens,
+        nutritionSource: 'ai',
+      });
+      setOpen(true);
+    } catch (e: any) {
+      setEstimateError(e?.message || 'Could not reach the AI service.');
+    } finally {
+      setEstimating(false);
+    }
   };
 
   const NROW = [
@@ -184,14 +251,33 @@ export const NutritionAllergenSection: React.FC<{
 
   return (
     <div className="border border-zinc-800 rounded-[8px] overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-[13px] py-[8px] text-[10px] font-bold uppercase tracking-wider text-zinc-500 hover:text-zinc-300 transition-colors duration-[144ms] bg-zinc-900/40"
-      >
-        Nutrition & Allergens (optional)
-        <ChevronDown className={`w-3 h-3 transition-transform duration-[144ms] ${open ? 'rotate-180' : ''}`} />
-      </button>
+      <div className="flex items-center justify-between px-[13px] py-[8px] bg-zinc-900/40">
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          className="flex items-center gap-[5px] text-[10px] font-bold uppercase tracking-wider text-zinc-500 hover:text-zinc-300 transition-colors duration-[144ms]"
+        >
+          Nutrition & Allergens (optional)
+          <ChevronDown className={`w-3 h-3 transition-transform duration-[144ms] ${open ? 'rotate-180' : ''}`} />
+        </button>
+        {isEditingExisting && (
+          <button
+            type="button"
+            onClick={handleEstimate}
+            disabled={estimating || !form.name.trim()}
+            className="flex items-center gap-[5px] text-[10px] font-bold uppercase tracking-wider text-emerald-400 hover:text-emerald-300 transition-colors duration-[144ms] disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {estimating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+            {estimating ? 'Estimating…' : 'Estimate Nutrition (AI)'}
+          </button>
+        )}
+      </div>
+      {estimateError && (
+        <div className="flex items-start gap-[8px] px-[13px] py-[8px] bg-red-950/20 border-t border-red-900">
+          <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0 mt-[1px]" />
+          <p className="text-[11px] text-red-300">{estimateError}</p>
+        </div>
+      )}
       {open && (
         <div className="p-[13px] space-y-[13px] bg-zinc-950/50">
           <p className="text-[10px] text-zinc-600 uppercase tracking-wider">Per 100g</p>
@@ -276,7 +362,11 @@ export const IngredientForm: React.FC<{
   showManualCaution?: boolean;
   /** AI-lookup review — cost is a proposed estimate until the chef edits it. */
   costEstimateBadge?: boolean;
-}> = ({ form, setForm, onSave, onCancel, saving, unitSystem, vendors, showManualCaution, costEstimateBadge }) => {
+  /** Editing an ingredient that already exists in Firestore — shows the
+   * Estimate Nutrition (AI) backfill button. Add/AI-lookup flows get their
+   * nutrition proposal from their own lookup call instead. */
+  isEditingExisting?: boolean;
+}> = ({ form, setForm, onSave, onCancel, saving, unitSystem, vendors, showManualCaution, costEstimateBadge, isEditingExisting }) => {
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm({ ...form, [k]: v });
 
   const handleMeasureTypeChange = (mt: MeasureType) => {
@@ -471,7 +561,7 @@ export const IngredientForm: React.FC<{
         </span>
       </div>
 
-      <NutritionAllergenSection form={form} setForm={setForm} />
+      <NutritionAllergenSection form={form} setForm={setForm} isEditingExisting={isEditingExisting} />
 
       <div className="flex gap-[8px] justify-end pt-[5px]">
         <button type="button" onClick={onCancel} className={BTN_GHOST}>Cancel</button>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Package, Plus, Pencil, Trash2, X, Check, ChevronDown, ChevronUp, Search, ChevronsUpDown, AlertTriangle, Receipt } from 'lucide-react';
+import { Package, Plus, Pencil, Trash2, X, Check, ChevronDown, ChevronUp, Search, ChevronsUpDown, AlertTriangle, Receipt, Compass } from 'lucide-react';
 import { db } from './firebaseConfig';
 import { updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { useKitchenSelector } from './components/KitchenStateContext';
@@ -7,6 +7,7 @@ import { computeCostPerBaseUnit } from './lib/costEngine';
 import { costPerDisplayUnit } from './lib/units';
 import { InvoicePriceUpdate } from './components/ingredients/InvoicePriceUpdate';
 import { AiIngredientLookup } from './components/ingredients/AiIngredientLookup';
+import { IngredientAdvisor } from './components/ingredients/IngredientAdvisor';
 import {
   IngredientForm, BLANK, toForm, toDoc,
   BTN_PRIMARY, BTN_GHOST, BADGE,
@@ -53,6 +54,13 @@ const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) =>
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [showInvoiceUpdate, setShowInvoiceUpdate] = useState(false);
+  const [advisorOpen, setAdvisorOpen] = useState(false);
+  const [advisorQuery, setAdvisorQuery] = useState<string | undefined>(undefined);
+
+  const openAdvisor = (name?: string) => {
+    setAdvisorQuery(name);
+    setAdvisorOpen(true);
+  };
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -140,6 +148,13 @@ const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) =>
             />
           </div>
           <button
+            onClick={() => openAdvisor()}
+            className={`${BTN_GHOST} flex items-center gap-[8px] whitespace-nowrap`}
+          >
+            <Compass className="w-3.5 h-3.5" />
+            Advisor
+          </button>
+          <button
             onClick={() => setShowInvoiceUpdate(true)}
             className={`${BTN_GHOST} flex items-center gap-[8px] whitespace-nowrap`}
           >
@@ -157,6 +172,12 @@ const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) =>
           )}
         </div>
       </div>
+
+      <IngredientAdvisor
+        isOpen={advisorOpen}
+        onClose={() => setAdvisorOpen(false)}
+        initialQuery={advisorQuery}
+      />
 
       <InvoicePriceUpdate
         isOpen={showInvoiceUpdate}
@@ -227,6 +248,7 @@ const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) =>
                             unitSystem={unitSystem}
                             vendors={sortedVendors}
                             showManualCaution
+                            isEditingExisting
                           />
                         </td>
                       </tr>
@@ -281,6 +303,13 @@ const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) =>
                             </>
                           ) : (
                             <>
+                              <button
+                                onClick={() => openAdvisor(ing.name)}
+                                className="p-[5px] text-zinc-600 hover:text-zinc-300 transition-colors duration-[144ms]"
+                                title="Ingredient Advisor"
+                              >
+                                <Compass className="w-3.5 h-3.5" />
+                              </button>
                               <button
                                 onClick={() => startEdit(ing)}
                                 className="p-[5px] text-zinc-600 hover:text-zinc-300 transition-colors duration-[144ms]"

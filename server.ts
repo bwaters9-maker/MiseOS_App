@@ -26,10 +26,19 @@ app.post('/api/ai', async (req, res) => {
     return;
   }
 
-  const { system, messages, max_tokens } = req.body ?? {};
+  const { system, messages, max_tokens, tools } = req.body ?? {};
   if (!Array.isArray(messages)) {
     res.status(400).json({ error: { message: 'Request body must include a "messages" array.' } });
     return;
+  }
+
+  let allowedTools;
+  if (tools !== undefined) {
+    if (!Array.isArray(tools) || !tools.every((t) => t && t.type === 'web_search_20250305' && t.name === 'web_search')) {
+      res.status(400).json({ error: { message: 'Only the web_search tool may be requested through this proxy.' } });
+      return;
+    }
+    allowedTools = tools;
   }
 
   try {
@@ -44,6 +53,7 @@ app.post('/api/ai', async (req, res) => {
         model: ANTHROPIC_MODEL,
         max_tokens: max_tokens ?? 1024,
         ...(system ? { system } : {}),
+        ...(allowedTools ? { tools: allowedTools } : {}),
         messages,
       }),
     });
