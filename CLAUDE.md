@@ -67,6 +67,7 @@ src/
   Vendors.tsx                    Vendor directory — supplier contacts, lead time, order days, linked-ingredients view; feeds Ingredient.vendorId
   Recipes.tsx                    Recipe Builder — list (Menu Recipes / Sub-Recipes) + editor + Live Cost Analysis
   Menu.tsx                       Menu view — operational (FC%/cost) table + Guest Preview toggle
+  RecipeCollections.tsx          Recipe Collections — seasonal groupings of menu recipes, one active at a time (RecipesHub sub-tab, brand kit)
 
   components/
     AppHeader.tsx                Nav bar — edit navItems[] to add/remove tabs
@@ -95,6 +96,7 @@ src/
     useKitchenState.ts           Firestore listeners for all collections
     useStationPresets.ts         Firestore listener for station_presets collection
     useRecipeCategories.ts       Firestore listener for recipe_categories collection, seeds defaults if empty
+    useRecipeCollections.ts      Firestore listener for recipe_collections collection, exposes activeCollection (no seeding)
 
   lib/
     costEngine.ts                recipeCost / costPerPortion / fcPercent / suggestedPrice / wouldCreateCycle + computeCostPerBaseUnit
@@ -117,7 +119,7 @@ Current nav tabs (in order): Dashboard · Staff · Events & Clients · Recipes �
 
 **Recipes** (`view: 'recipes'`, `src/RecipesHub.tsx`) is a merged entry point over three previously-separate top-level views — Recipes, Menu, and Features (nightly specials) — each still its own untouched component with its own internal heading; `RecipesHub` is a thin sub-tab switcher (Recipe Builder / Menu / Features) with no logic of its own beyond keeping the sub-tab in sync with `selectedRecipeId` (so jumping to a specific recipe from Menu or Events & Clients always lands on the Recipe Builder sub-tab).
 
-Features later moved out of `RecipesHub` entirely (Chef's Dashboard split, part two) — `RecipesHub` is now just Recipe Builder / Menu.
+Features later moved out of `RecipesHub` entirely (Chef's Dashboard split, part two) — `RecipesHub` is now Recipe Builder / Menu / Collections (the Collections sub-tab added with build order item 16, `src/RecipeCollections.tsx`).
 
 The Recipe Builder sub-tab also carries a "View Menu" button (`onViewMenu` prop) that jumps straight to the Menu sub-tab.
 
@@ -152,6 +154,7 @@ The Recipe Builder sub-tab also carries a "View Menu" button (`onViewMenu` prop)
 | `restaurant_profile` | `useKitchenState`, `App.tsx`, `Settings.tsx` — singleton doc at the fixed id `main` (not a growing collection); every field optional, missing doc is a valid state |
 | `trend_reports` | `useKitchenState`, `TestKitchenHub.tsx` — singleton doc at the fixed id `latest` (not a growing collection); read-only editorial content, written only by the chef-triggered "Refresh Trends" action — see the Test Kitchen Phase B hard boundary below |
 | `recipe_categories` | `useRecipeCategories`, `Settings.tsx`, `Recipes.tsx` — seeded with Sides/Sauces/Salads/Soups/Proteins/Desserts if empty |
+| `recipe_collections` | `useRecipeCollections`, `RecipeCollections.tsx`, `Menu.tsx` — seasonal menu-recipe groupings; at most one doc has `active: true` (activation is a batch write flipping every doc); not seeded |
 | `event_types` | `useEventTypes`, `Settings.tsx`, `EventCalendar` — seeded with Wedding/Private Dining/Buyout/Bridal Shower/Corporate/Celebration of Life/Special Event if empty |
 
 `alerts`: crib sheet shows `resolved === false` only; Alert History shows all.
@@ -182,6 +185,7 @@ The Recipe Builder sub-tab also carries a "View Menu" button (`onViewMenu` prop)
 | `TrendReport` | Singleton doc at `trend_reports/latest`: `{ generatedAt, cards: TrendCard[], pricingTrends: PricingTrendItem[] }` — replaces an old, unused `recipe_scores`-shaped type left over from an orphaned Base44 script that wrote to the same collection name but was never wired into the app (deleted, see Orphaned files below) |
 | `Ingredient` | Master Pantry item: name, category, measureType, purchaseUnit, purchaseCost, purchaseQty, yieldPercent, pieceWeightG? (ordered portion spec in grams for portioned weight product, e.g. 6 oz breasts — drives piece-true costing in costEngine [cost ÷ floor(pack/spec) pieces, shortfall treated as unusable pack-out], pieces-per-case, cost-per-piece, and each-yield derivation in the Recipe Builder; absent for bulk/randoms), nutritionPer100g?, allergens?, vendorId?, lastVerified, priceSource, nutritionSource? ('ai' \| 'manual') |
 | `RecipeCategory` | Chef-managed recipe category (id, name), CRUD'd from Settings — referenced by `Recipe.categoryId` |
+| `RecipeCollection` | Seasonal grouping of menu recipes: id, name, recipeIds: string[], active. One active at a time; when active it defines the menu set (see the Recipe Collections section). Stale recipeIds (deleted recipes) are ignored at read time |
 | `IngredientCategory` | `'Produce' \| 'Protein' \| 'Dairy' \| 'Dry Goods' \| 'Frozen' \| 'Beverage' \| 'Other'` |
 | `MeasureType` | `'weight' \| 'volume' \| 'each'` — determines base unit (g, ml, each) |
 | `Allergen` | FDA Big-9 plus two kitchen-tracked extras: `'milk' \| 'eggs' \| 'fish' \| 'shellfish' \| 'treeNuts' \| 'peanuts' \| 'wheat' \| 'soybeans' \| 'sesame' \| 'gluten' \| 'sulfites'` — gluten/sulfites are tracked app-wide but are NOT FALCPA major allergens; the FDA label's "Contains:" line must render Big-9 only, with gluten/sulfites surfaced as a separate advisory note |
@@ -264,6 +268,15 @@ Two modes on one screen, toggled by the "Guest Preview" button — no separate n
 - Template choice is `menuTemplate` (`'classic' | 'clean'`, type in `src/types.ts`), owned by `RestaurantProfile.menuTemplate` (default `'clean'` when unset) — App.tsx still surfaces it as a `menuTemplate`/`setMenuTemplate` prop pair, so this file and `Menu.tsx` are otherwise unchanged. Both templates render the restaurant name from `RestaurantProfile.name` in the header when set, falling back to the generic "Menu" header when the profile is blank — a guest menu never shows a fabricated name.
 - Print: both templates carry their own `@media print` rules (page size/margins, hides app chrome and the toolbar, forces background-color printing via `print-color-adjust`). The Classic template's two-column layout uses CSS `column-count`, which also paginates correctly across printed pages.
 
+## Recipe Collections (RecipeCollections.tsx)
+
+Build order item 16, part 1 (Sharing is part 2, not yet designed — it needs a public-read security-rules discussion first and is deliberately deferred). A Collections sub-tab in RecipesHub, built directly on the brand kit (`bg-surface` cards, navy/slate, teal accent, saffron as signal).
+
+- A collection is a named set of menu recipes (`recipe_collections`, see the Firestore table). Cards expand to a checklist picker of all menu recipes; membership toggles write `recipeIds` directly. Two-step delete, same convention as Vendors/Staff.
+- **At most one collection is active.** Activate runs a single `writeBatch` setting `active: c.id === target.id` across every doc — no window where two are active. Deactivate is a plain single-doc update.
+- **Active collection defines the menu**: `isRecipeOnMenu(recipe, activeCollection?)` (costEngine.ts) — when an active collection is passed, the recipe must be a member AND pass its own `onMenu` toggle, so the toggle survives as a one-off off-switch within the season (a member with the toggle off shows a saffron "Off Menu toggle" note in the picker). With no active collection (or the argument omitted), behavior is exactly the pre-collections rule — every existing caller is unchanged. `Menu.tsx` is the only caller passing it, and shows an "Active collection: {name}" line under the header while one is active.
+- The Recipes library's On Menu badge deliberately still reflects only the recipe's own toggle, not collection membership — the Menu view is where the collection filter is visible. Revisit if this misleads in practice.
+
 ## Chef's Dashboard (ChefDashboard.tsx)
 
 The app's landing page and command center — default view on sign-in (`view: 'dashboard-home'`, first nav position, labeled "Dashboard"). Today only; read-only with one deliberate exception (Add Feature — see below), purely a snapshot derived from `useKitchenState`. Crib Sheet remains a separate, unchanged top-level view (`view: 'dashboard'`, reached only via the Quick Actions button now, not the nav) — the two will diverge further once Crib Sheet becomes print-only.
@@ -274,7 +287,7 @@ The app's landing page and command center — default view on sign-in (`view: 'd
 - **Tonight's Features**: read-only list of today's active (not 86'd, within `activeFrom`/`activeTo`) features — the exact same filter `DailyCribSheet.tsx`'s own "Features Tonight" card uses. No inline 86-toggle here (see the write-exception note above); a "Manage Features" link navigates to the full `Features.tsx` view for that.
 - **Quick Actions**: buttons to Kitchen Timers and Crib Sheet (`onNavigate`, threaded down from `App.tsx`'s `setActiveView`), plus "Add Feature" — opens an inline form (Manual Entry or From Recipe) that writes a new `features` doc via the shared `toDoc`/`FormState`/`BLANK` exported from `Features.tsx`, so the write shape can never drift between the two entry points.
 - **Alerts indicator**: a compact icon+count in the header, not a full card — links to Alert History. Red when there's at least one active (unresolved) alert, neutral otherwise.
-- Today's date is computed via `toLocaleDateString('en-CA')` (local time), not `toISOString()` — the same UTC-vs-local fix applied to Test Kitchen's trends cadence. Note this means `ChefDashboard.tsx` and `DailyCribSheet.tsx` can disagree on what counts as "today" right around local midnight in a non-UTC timezone, since Crib Sheet's own date computation is unchanged (out of scope for this pass — "Crib Sheet stays top-level and unchanged for now").
+- Today's date is computed via the shared `todayDateKey()` helper (`src/utils.ts`) — see the app-wide date/time convention below.
 
 ## Vendor Management (Vendors.tsx)
 
@@ -320,6 +333,12 @@ Build order item 13. A read-only, web-search-grounded advisory modal on the Mast
 - `src/lib/regionContext.ts` exports `buildRegionContext(profile)` (returns a compact `"Restaurant context:\n..."` block, or `''` if the profile has nothing worth surfacing) and `withRegionContext(basePrompt, profile)` (prepends the block, or returns `basePrompt` unchanged when there's no context — so every AI feature works identically with zero profile data).
 - Injected into every `/api/ai` system prompt where it's genuinely relevant: the Sous persona (`TestKitchenHub.tsx` Playground chat), the AI ingredient lookup's price/pack estimate (`AiIngredientLookup.tsx`), the invoice add-unmatched-to-pantry suggestion pass (`InvoicePriceUpdate.tsx`), and both Recipe Builder AI buttons — "Build From Pantry" and "Draft Method" (`Recipes.tsx`). Deliberately **not** injected into `InvoicePriceUpdate.tsx`'s raw invoice line-item extraction prompt — that pass's only job is reading text off a photographed invoice accurately, and region context has no legitimate application there (worse, it risks nudging the model toward region-typical items instead of what's actually printed).
 
+## Date/time convention
+
+Every "what day is today" comparison in the app must go through `todayDateKey()` (`src/utils.ts`) — `new Date().toLocaleDateString('en-CA')`, local time, `YYYY-MM-DD`. Never use `new Date().toISOString().slice(0, 10)` for this: it's UTC-based and rolls to tomorrow's date hours before local midnight (for Pacific time, starting mid-afternoon — most of dinner service). `ChefDashboard.tsx` and `TestKitchenHub.tsx` originated this pattern; `DailyCribSheet.tsx`, `Staff.tsx`, `EventCalendar.tsx`, `EventDetailView.tsx`, and the ingredient `lastVerified` stamps (`IngredientForm.tsx`, `InvoicePriceUpdate.tsx`) were audited and migrated to the shared helper, closing the divergence this file used to document between ChefDashboard and Crib Sheet. `toISOString()`/`toLocaleTimeString()` remain fine for full instants (`updatedAt`, `generatedAt`) and pure display formatting where no "is this today" comparison is involved.
+
+Shift/event/milestone times (`Shift.startTime`/`endTime`, `KitchenEvent.time`, `EventMilestone.time`) are stored as native `<input type="time">` 24-hour strings — storage and chronological sorting (`.localeCompare` on the raw string) stay on that format, since it sorts correctly as-is. Display always goes through `formatTime12h()` (`src/utils.ts`), which renders 12-hour "H:MM AM/PM" — used in `Staff.tsx`, `DailyCribSheet.tsx`, `ChefDashboard.tsx`, `EventDetailView.tsx`, and `EventCalendar.tsx`. The unrelated "printed at" wall-clock timestamps in `DailyCribSheet.tsx`/`GuestMenuPreview.tsx` already used `toLocaleTimeString` with AM/PM and are unchanged.
+
 ## Known issues
 
 - None currently tracked. (`firestore.rules` was previously stale Base44-era and the app had no sign-in flow — both are resolved: rules now validate the canonical types in `src/types.ts` and gate every collection on `isAuthenticated()`; `src/components/AuthContext.tsx` + `SignIn.tsx` provide real Firebase email/password auth, single operator account, no self-registration.)
@@ -330,11 +349,23 @@ Build order item 13. A read-only, web-search-grounded advisory modal on the Mast
 
 ## Orphaned / notable files
 
-Several component files exist at both `src/*.tsx` (root) and `src/components/*.tsx`. App.tsx imports from `src/components/`. The root-level duplicates (`src/AlertDialog.tsx`, `src/AppHeader.tsx`, `src/CribComponents.tsx`, `src/ErrorBoundary.tsx`) are orphaned copies and are never imported.
+Base44-era cruft audit — complete (2026-07-14). Every file below was grep-verified as unreferenced from live code and deleted; `tsc --noEmit` passed clean afterward:
 
-`src/services/analysis/TrendAnalyzer.js` and `src/components/dashboard/TrendSidebar.tsx` were deleted (Test Kitchen Phase B) — both orphaned Base44-era code (unreferenced anywhere), and `TrendAnalyzer.js` wrote to a `trend_reports` collection with an incompatible snake_case schema that collided with the real one introduced in this pass.
+- `src/services/` (entire folder): `apiClient.js`, `apiService.js`, `collectionEngine.js`, stray `apiClient.js# Create the service handler.txt`
+- `src/components/dashboard/`: `MenuCollectionCard.jsx`, `menuService.js`, `recipeService.js`, `seedPantry.js`, `config.js` — the folder now holds only `LineTimerModule.tsx`, `MetricsHUD.tsx`, `PrepRegistrationForm.tsx`
+- Dead component chain: `src/Dashboard.jsx`, `src/components/KitchenDashboard.jsx` → `src/components/DailyCribSheet.jsx` (old .jsx copy, not the live `src/DailyCribSheet.tsx`) → `src/hooks/usePrepList.js` → `dashboard/config.js`
+- `src/components/BrainDumpModule.jsx` — Base44-era, never wired into the rebuild; deleted with explicit chef sign-off (any future Brain Dump gets rebuilt fresh on the current stack)
+- Root-level orphaned duplicates: `src/AlertDialog.tsx`, `src/AppHeader.tsx`, `src/CribComponents.tsx`, `src/ErrorBoundary.tsx` (App.tsx imports the `src/components/` versions)
 
-Not yet audited: `src/services/` still has `apiClient.js`, `apiService.js`, `collectionEngine.js`, and a stray `apiClient.js# Create the service handler.txt`; `src/components/dashboard/` still has `MenuCollectionCard.jsx`, `menuService.js`, `recipeService.js`, `seedPantry.js`, `config.js` beyond the four files in the project structure above. Noticed while investigating the `TrendAnalyzer.js` collision but out of scope for this pass — likely more Base44 cruft, unconfirmed.
+`src/services/analysis/TrendAnalyzer.js` and `src/components/dashboard/TrendSidebar.tsx` were deleted earlier (Test Kitchen Phase B) — both orphaned Base44-era code, and `TrendAnalyzer.js` wrote to a `trend_reports` collection with an incompatible snake_case schema that collided with the real one introduced in that pass.
+
+Gemini-era scaffold audit — complete (2026-07-15), same category as the cadc47a Base44 purge above: every file below was grep-verified as unreferenced from live code and deleted as part of the b8a1ba7 cleanup.
+
+- `docs/` (entire directory): `Firestore_Schema.txt`, `Master_Feature_Manifest.txt`, `MiseOS_Philosophy.txt`, `firebase-blueprint.json`
+- `functions/` (entire tree) — a standalone Firebase Functions codebase never wired into `server.ts`'s `/api/ai` proxy pattern; `firebase.json`'s `functions` codebase block and the emulators `functions` port entry were removed alongside it, since there's no functions codebase left to emulate or deploy
+- `src/modules/StationMatrix.js` — superseded by the live `station_presets` collection / `useStationPresets()` hook
+- `src/components/Dashboard.js` — superseded by `src/ChefDashboard.tsx`
+- `src/components/widgets/` (entire folder) — unwired scaffold components
 
 ---
 
@@ -549,4 +580,4 @@ only allowed state.
 15. ~~Restaurant Profile / Regional Intelligence~~ ✓ — built ahead of
     items 12-13 and Test Kitchen's seasonal work since they depend on
     it; logo upload still pending
-16. Recipe Collections + Sharing
+16. Recipe Collections + Sharing — part 1 (Collections) ✓: `src/RecipeCollections.tsx` RecipesHub sub-tab, `recipe_collections` collection, `isRecipeOnMenu` extended (see the Recipe Collections section). Part 2 (Sharing, read-only link) deferred pending a public-read security-rules design — current rules gate everything on `isAuthenticated()` and `server.ts` has no Firestore access, so a share link needs a deliberate architecture decision, not a quick add

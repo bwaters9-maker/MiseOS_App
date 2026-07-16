@@ -1,7 +1,0 @@
-﻿﻿ARCHIVED — superseded by /CLAUDE.md v3.0. Do not use as current project context.
-MiseOS Operational Philosophy:
-1. Chef-Led Integrity and Quiet Service: The integrity of the dish and the efficiency of the service are paramount; the operation is defined by precision and professionalism.
-2. Prep-Heavy, Service-Light: Operational excellence is achieved in the back-of-house through meticulous planning, not reactive service.
-3. Professional Integrity: Continuous learning, mentorship, and craftsmanship are non-negotiable.
-4. Milestone Moments: Every dining experience must be curated as a memorable, unforgettable milestone.
-5. Chef-Managed Data: Stability is prioritized over automation; human-verified data is the only reliable source of truth.
