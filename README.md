@@ -1,4 +1,4 @@
-# MiseOS — The Pass
+# IncendiumPhi — Culinary Chaos Decoded.
 
 Professional Back-of-House kitchen operations platform built for high-end culinary environments. Designed and built by a Certified Executive Chef.
 

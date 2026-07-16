@@ -1,8 +1,8 @@
-# MiseOS — CLAUDE.md
+# IncendiumPhi — CLAUDE.md
 
 ## What this is
 
-MiseOS ("The Pass") is a restaurant back-of-house management app. It is a single-page React app served by an Express server, with Firebase Firestore as the live database.
+IncendiumPhi ("Culinary Chaos Decoded.") is a restaurant back-of-house management app — working name MiseOS until the Brand v1.1 rename (2026-07-16). It is a single-page React app served by an Express server, with Firebase Firestore as the live database.
 
 ## Running the app
 
@@ -203,22 +203,27 @@ Note: `useKitchenState.ts` also defines `PrepItem` and `Item86` locally (pre-exi
 
 ## Design system
 
-MiseOS brand kit v1.0 — Cool tone / Rounded corners / Saffron signal. Tokens defined as a Tailwind v4 `@theme` block in `src/index.css`, mirrored in `design-tokens.json`'s `colors` and `border-radius` sections.
+**Brand v1.1 (IncendiumPhi)** — one token system, two surfaces: **Day** (default, light) and **Service** (dark, `data-surface="service"` on `<html>`, toggled from Settings' Surface card, state lives in `App.tsx`'s `AppShell`). Tokens defined as a Tailwind v4 `@theme` block in `src/index.css`, mirrored in `design-tokens.json`'s `colors` and `border-radius` sections. Migration source: a Claude Design project (`Migration Spec.dc.html`, imported 2026-07-16) — see the Brand v1.1 migration status note below for what's actually landed vs. still pending.
 
-- **Background:** `bg-bg-cool` (page), `bg-surface` (cards/panels — cream)
+- **Background:** `bg-bg-cool` (page — cream Day / navy-black Service), `bg-surface` (cards/panels — white Day / raised-dark Service)
 - **Borders:** `border-line`
-- **Text:** `text-navy` primary, `text-slate` muted
-- **Accent:** `text-teal` / `bg-teal` (active states), `text-saffron` / `bg-saffron` (signal/CTA)
-- **Danger:** `red-400` / `red-950` (unchanged — no brand-kit danger color defined)
-- **Font:** `font-display` (Quicksand — headings/brand), `font-body` (Nunito Sans — body copy)
+- **Text:** `text-navy` primary ink (navy Day / cream Service — flips per surface via the token cascade, component code never branches on the mode), `text-slate` muted
+- **Accent:** `text-teal` / `bg-teal` — interactive only (links, active nav, selected states). Never decorative, never for headings.
+- **Signal:** `text-saffron` / `bg-saffron` — the one thing that wants attention per view (primary CTA, warnings, "needs review"). Max one saffron element per screen.
+- **Danger:** `text-danger` / `bg-danger-wash` tokens now exist (destructive actions + active alerts only); legacy `red-400`/`red-950` usages are unchanged pending each screen's own migration pass
+- **Font:** `font-display` (Archivo, weights 600–800 — headings/nav/buttons), `font-body` (Source Sans 3 — everything else), `font-mono` (IBM Plex Mono — **every numeral that is data**: prices, unit costs, quantities, percentages, timers, times, counts; numerals inside prose stay in body)
 - **Cards:** `bg-surface border border-line rounded-card`
-- **Radius:** `rounded-card` (22px), `rounded-tile` (28px)
+- **Radius:** `rounded-card` (12px, was 22px). `rounded-tile` (28px) is **deprecated** — the new spec has no tile radius; kept defined only because `TestKitchenHub.tsx`'s sub-tab switcher still consumes it pending that screen's own migration, at which point delete the token.
+- **Wordmark:** the Study-A master lockup — `font-display` weight 800, `tracking-[-0.02em]`, "Incendium" in `text-saffron-text` + "Phi" in `text-navy`, no space, both halves identical size. Built with real Tailwind classes in `AppHeader.tsx`/`SignIn.tsx`, not copied as a one-off. Minimum width 120px; below that, drop the slogan ("Culinary Chaos Decoded.") — this is why the compact nav badge carries no tagline. See `public/brand/` below for the mark SVGs.
 - **Spacing:** Fibonacci-based tokens from `design-tokens.json` — use as Tailwind arbitrary values (`p-[21px]`, `gap-[34px]`, etc.)
-- No emojis. No comments explaining what code does.
+- No emojis. No comments explaining what code does. No exclamation marks, no "oops"-style error voice, no instructional/congratulatory tone — the user is a professional; the app states, it does not teach out loud.
 - No open free-text inputs except names, comments, and special requests — all
   other values come from structured selects, ideally user-customizable lists.
 
-**Brand-pass queue** — the brand kit above was only ever applied to the outer app shell (`App.tsx`'s `bg-bg-cool`/`text-navy`, `AppHeader.tsx`). Every content view still runs the older dark zinc/emerald "System Operator Matrix" aesthetic from before the brand kit existed, and gets migrated one view at a time as it comes up for other work (matching the "reskin it in this pass" instruction that shipped Test Kitchen's migration below), not as a dedicated sweep.
+**Brand v1.1 migration status (2026-07-16)** — infra landed in one pass; per-screen migration is separate follow-up work, not yet started beyond what was already brand-kit v1.0:
+- **Done:** token system (colors/fonts/radii) rewritten in `src/index.css`/`design-tokens.json`; Google Fonts swapped in `index.html`; Day/Service surface toggle wired end-to-end (`App.tsx` state → `data-surface` attribute → CSS cascade → Settings' Surface toggle) — every already-brand-kit-v1.0 screen re-colors correctly under Service mode automatically, with zero component-level changes, because those screens only ever referenced tokens; full product rename MiseOS → **IncendiumPhi** across all live code, docs, and config (slogan: "Culinary Chaos Decoded."); new Φ mark SVGs live at `public/brand/` (`phi-primary.svg` currentColor, `phi-tile.svg` app-icon/nav-badge, `phi-favicon.svg`, `phi-flame.svg` + `phi-flame-mono.svg` expressive-only ≥64px) — copied verbatim from the design project, never hand-redrawn; `AppHeader.tsx`/`SignIn.tsx` carry the new mark + Study-A wordmark lockup, replacing the old navy "M" square + "MISEOS"/"The Pass"/"System Operator Matrix" badge (that badge/tagline combo is retired — not part of any sanctioned lockup in the spec).
+- **Known compliance gaps on already-brand-kit screens** (token values are correct; component-level rules from the spec are not yet applied, since that requires per-component judgment calls the infra pass deliberately didn't make): `ChefDashboard.tsx`'s two solid `bg-navy` CTA buttons (Kitchen Timers quick action, Add Feature submit) don't yet follow the new "primary = saffron bg + navy text" button rule, and their `hover:bg-navy-deep` now resolves to a dark-teal accent hover rather than a darker navy (visually slightly off, not broken); rainbow category-badge treatments, cost-delta color rules (never green), and full numeral→`font-mono` scoping haven't been swept on these screens.
+- **Not started:** the ~24-screen legacy dark-zinc migration (unchanged list below) — those screens keep their existing `zinc-`/`emerald-` Tailwind classes untouched; the rename pass touched their strings only (e.g. `StationPassHeader.tsx`'s "IncendiumPhi" text, `ErrorBoundary.tsx`'s crash-recovery copy) without retheming them, so they remain visually on the old dark-zinc aesthetic until their own pass.
 - ~~Test Kitchen — Culinary Trends & Forecasts~~ ✓ (Phase B) — brand kit throughout: `bg-surface` cards, navy/slate text, saffron only as signal (Viral Bridge badge, category tags, seasonal "prime" highlight). The Menu Development Playground sub-tab is also on brand kit already (confirmed 2026-07-16: zero `zinc`/`slate`/`gray` classes anywhere in `TestKitchenHub.tsx`; the studio-layout redesign in `7d244ff` moved it onto `bg-surface`/`text-navy`/`text-slate`/`border-line` tokens) — this was previously mis-documented here as "dark-zinc" and pending. Note the Playground's Plate Design and Ingredient Palette panels are themed but still explicit placeholders ("...will be embedded here in a later phase") — a functional-completeness gap, not a theming one.
 - ~~Alert History~~ ✓ — rebuilt from placeholder into the real view (live `alerts` from kitchen state, severity + active/resolved filters, resolve/reopen writes) directly on the brand kit: `bg-surface` card, navy/slate text, navy filter pills, saffron as the warning signal, red-400 kept for critical per the kit's unchanged danger color.
 - Pending: Daily Crib Sheet, Features, Staff, Events & Clients, Ingredients (Master Pantry), Vendors, Recipes, Prep Checklist, Kitchen Timers, Settings, Menu.
@@ -388,7 +393,7 @@ Gemini-era scaffold audit — complete (2026-07-15), same category as the cadc47
 
 ## Product Vision & Standards
 
-### What MiseOS Is
+### What IncendiumPhi Is
 A refined, secure, minimalist rebuild of Kitchen Cost Pro (Base44).
 The Base44 version proved the concept. This is the professional
 engineering of that concept.

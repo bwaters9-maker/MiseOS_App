@@ -11,8 +11,8 @@ import Vendors from './Vendors';
 import type { RestaurantProfile, CuisineStyle, PricePoint } from './types';
 
 interface SettingsProps {
-  theme: 'light' | 'dark';
-  setTheme: (theme: 'light' | 'dark') => void;
+  theme: 'day' | 'service';
+  setTheme: (theme: 'day' | 'service') => void;
   unitSystem?: UnitSystem;
   setUnitSystem?: (u: UnitSystem) => void;
   targetFcPercent?: number;
@@ -461,30 +461,30 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
 
       <div className="mt-6 bg-zinc-900/40 p-5 rounded-xl border border-zinc-800/60 shadow-md">
         <h3 className="text-sm font-bold tracking-widest text-zinc-400 uppercase border-b border-zinc-800/80 pb-3 mb-4">
-          Theme
+          Surface
         </h3>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setTheme('light')}
+            onClick={() => setTheme('day')}
             className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-wider border transition-colors ${
-              theme === 'light'
+              theme === 'day'
                 ? 'bg-zinc-200 text-zinc-900 border-zinc-400'
                 : 'bg-zinc-800/50 text-zinc-400 border-zinc-700 hover:bg-zinc-700/50 hover:text-zinc-200'
             }`}
           >
             <Sun className="w-4 h-4" />
-            Light
+            Day
           </button>
           <button
-            onClick={() => setTheme('dark')}
+            onClick={() => setTheme('service')}
             className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-wider border transition-colors ${
-              theme === 'dark'
+              theme === 'service'
                 ? 'bg-emerald-700 text-white border-emerald-600'
                 : 'bg-zinc-800/50 text-zinc-400 border-zinc-700 hover:bg-zinc-700/50 hover:text-zinc-200'
             }`}
           >
             <Moon className="w-4 h-4" />
-            Dark
+            Service
           </button>
         </div>
       </div>

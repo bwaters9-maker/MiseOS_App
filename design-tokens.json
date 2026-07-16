@@ -1,22 +1,43 @@
 {
   "meta": {
-    "description": "MiseOS Fibonacci-based design token system",
+    "description": "IncendiumPhi Fibonacci-based design token system — Brand v1.1",
     "base-unit": "px",
     "golden-ratio": 1.618,
     "fibonacci-sequence": [1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144]
   },
   "colors": {
-    "navy":         "#1E3A5F",
-    "navy-deep":    "#14273D",
-    "teal":         "#0E9594",
-    "cream":        "#F7F4EF",
-    "slate":        "#5E6B7A",
-    "saffron":      "#E0994A",
-    "saffron-soft": "#FBEFD6",
-    "saffron-text": "#B9821B",
-    "bg-cool":      "#EEF2F6",
+    "navy":         "#1B2A41",
+    "navy-deep":    "#145A55",
+    "teal":         "#1E7A74",
+    "cream":        "#F2EDE2",
+    "slate":        "#5F6B7A",
+    "ink-faint":    "#8B97A6",
+    "saffron":      "#E8A13D",
+    "saffron-soft": "#FBF0DC",
+    "saffron-text": "#96650E",
+    "danger":       "#C0392B",
+    "danger-wash":  "#F9E8E5",
+    "bg-cool":      "#F7F3EA",
     "surface":      "#FFFFFF",
-    "line":         "#DCE4EC"
+    "surface-sunken": "#EFE9DB",
+    "line":         "#D8D2C4"
+  },
+  "colors-service-surface": {
+    "_comment": "Overrides applied via [data-surface=\"service\"] in src/index.css — not separate Tailwind tokens.",
+    "bg-cool":      "#10161F",
+    "surface":      "#182130",
+    "surface-sunken": "#0B1017",
+    "line":         "#232F42",
+    "navy":         "#F2EDE2",
+    "navy-deep":    "#5FC0B8",
+    "slate":        "#8B97A6",
+    "ink-faint":    "#5F6B7A",
+    "teal":         "#3FA8A0",
+    "saffron":      "#F0B254",
+    "saffron-soft": "rgba(240,178,84,0.14)",
+    "saffron-text": "#F0B254",
+    "danger":       "#E06052",
+    "danger-wash":  "rgba(224,96,82,0.14)"
   },
   "spacing": {
     "1":  "1px",
@@ -48,8 +69,9 @@
       "loose":  2.058
     },
     "fonts": {
-      "display": "'Quicksand', sans-serif",
-      "body": "'Nunito Sans', sans-serif"
+      "display": "'Archivo', sans-serif",
+      "body": "'Source Sans 3', sans-serif",
+      "mono": "'IBM Plex Mono', monospace"
     }
   },
   "layout": {
@@ -76,7 +98,7 @@
     "md":   "5px",
     "lg":   "8px",
     "xl":   "13px",
-    "card": "22px",
+    "card": "12px",
     "tile": "28px"
   },
   "borders": {

@@ -81,7 +81,11 @@ const AppShell: React.FC = () => {
   const restaurantProfileLoaded = useKitchenSelector((s: any) => s.restaurantProfileLoaded) as boolean;
 
   const [activeView, setActiveView] = useState('dashboard-home');
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+  // 'day' (default, light) | 'service' (dark) — Brand v1.1 surface toggle.
+  // Drives [data-surface="service"] token overrides in src/index.css; no
+  // component may branch on this value directly, only via CSS custom
+  // properties cascading from the attribute below.
+  const [theme, setTheme] = useState<'day' | 'service'>('day');
   const [unitSystem, setUnitSystemRaw] = useState<UnitSystem>(
     () => (localStorage.getItem('miseos_unit_system') as UnitSystem | null) ?? 'imperial'
   );
@@ -145,9 +149,7 @@ const AppShell: React.FC = () => {
   }, [restaurantProfileLoaded, restaurantProfile]);
 
   useEffect(() => {
-    const root = window.document.documentElement;
-    root.classList.remove('light', 'dark');
-    root.classList.add(theme);
+    window.document.documentElement.dataset.surface = theme;
   }, [theme]);
 
   return (

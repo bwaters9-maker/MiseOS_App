@@ -32,11 +32,10 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ activeView, onNavigate }) 
       <div className='max-w-7xl mx-auto px-4 min-h-16 py-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2'>
         <div className='flex items-center gap-6 min-w-0'>
           <div className='flex items-center gap-3 shrink-0'>
-              <div className='h-9 w-9 rounded-tile bg-navy flex items-center justify-center font-display font-bold text-cream text-lg'>M</div>
-              <div>
-                  <div className='flex items-center gap-2'><span className='font-display font-bold tracking-tight text-navy uppercase text-sm'>MISEOS</span><span className='px-1.5 py-0.5 rounded-full bg-saffron-soft text-[10px] font-bold text-saffron-text uppercase'>The Pass</span></div>
-                  <p className='text-[10px] text-slate font-medium'>System Operator Matrix</p>
-              </div>
+              <img src='/brand/phi-tile.svg' alt='' className='h-9 w-9' />
+              <span className='font-display font-extrabold tracking-[-0.02em] text-base whitespace-nowrap'>
+                <span className='text-saffron-text'>Incendium</span><span className='text-navy'>Phi</span>
+              </span>
           </div>
           <div className="hidden md:flex flex-wrap items-center gap-2 bg-bg-cool p-1 rounded-card border border-line shadow-inner">
             {navItems.map(item => (

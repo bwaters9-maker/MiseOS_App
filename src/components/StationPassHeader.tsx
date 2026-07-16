@@ -37,7 +37,7 @@ export default function StationPassHeader({
           </div>
           <div>
             <h1 className="text-lg font-mono font-black tracking-tighter text-white flex items-center gap-1.5 uppercase">
-              MiseOS <span className="text-red-500 font-bold text-xs bg-red-950 px-1.5 py-0.5 border border-red-900 rounded">THE PASS</span>
+              IncendiumPhi <span className="text-red-500 font-bold text-xs bg-red-950 px-1.5 py-0.5 border border-red-900 rounded">THE PASS</span>
             </h1>
             <p className="text-[10px] text-zinc-400 font-mono">
               Back-of-House Kitchen Coordination System

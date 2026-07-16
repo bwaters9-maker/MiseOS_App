@@ -37,13 +37,12 @@ export const SignIn: React.FC = () => {
     <div className="min-h-screen bg-bg-cool flex items-center justify-center p-[21px] font-body">
       <div className="w-full max-w-[377px]">
         <div className="flex items-center gap-[13px] justify-center mb-[34px]">
-          <div className="h-9 w-9 rounded-tile bg-navy flex items-center justify-center font-display font-bold text-cream text-lg">M</div>
+          <img src="/brand/phi-tile.svg" alt="" className="h-9 w-9" />
           <div>
-            <div className="flex items-center gap-[8px]">
-              <span className="font-display font-bold tracking-tight text-navy uppercase text-sm">MISEOS</span>
-              <span className="px-[5px] py-[2px] rounded-full bg-saffron-soft text-[10px] font-bold text-saffron-text uppercase">The Pass</span>
-            </div>
-            <p className="text-[10px] text-slate font-medium">System Operator Matrix</p>
+            <span className="font-display font-extrabold tracking-[-0.02em] text-lg whitespace-nowrap">
+              <span className="text-saffron-text">Incendium</span><span className="text-navy">Phi</span>
+            </span>
+            <p className="text-[10px] text-slate font-medium">Culinary Chaos Decoded.</p>
           </div>
         </div>
 

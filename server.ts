@@ -86,7 +86,7 @@ async function startServer() {
     app.get('*', (req, res) => {
       res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
     });
-    console.log('MiseOS is in PRODUCTION mode. Serving static assets from ./dist');
+    console.log('IncendiumPhi is in PRODUCTION mode. Serving static assets from ./dist');
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Production server running on http://localhost:${PORT}`);
     });
@@ -103,7 +103,7 @@ async function startServer() {
       appType: 'spa'
     });
     app.use(vite.middlewares);
-    console.log('MiseOS is in DEVELOPMENT mode. Integrating Vite middleware for HMR.');
+    console.log('IncendiumPhi is in DEVELOPMENT mode. Integrating Vite middleware for HMR.');
 
     server.listen(PORT, '0.0.0.0', () => {
       console.log(`Development server running on http://localhost:${PORT}`);

@@ -1,23 +1,68 @@
 @import "tailwindcss";
 
 @theme {
-  --color-navy:         #1E3A5F;
-  --color-navy-deep:    #14273D;
-  --color-teal:         #0E9594;
-  --color-cream:        #F7F4EF;
-  --color-slate:        #5E6B7A;
-  --color-saffron:      #E0994A;
-  --color-saffron-soft: #FBEFD6;
-  --color-saffron-text: #B9821B;
-  --color-bg-cool:      #EEF2F6;
-  --color-surface:      #FFFFFF;
-  --color-line:         #DCE4EC;
+  /* ---- Day surface (default) ---- */
+  --color-bg-cool:      #F7F3EA;  /* app background — cream (was #EEF2F6) */
+  --color-surface:      #FFFFFF;  /* cards, panels, modals */
+  --color-surface-sunken: #EFE9DB; /* wells, table stripes, code */
+  --color-line:         #D8D2C4;  /* border */
 
-  --radius-card: 22px;
-  --radius-tile: 28px;
+  --color-navy:         #1B2A41;  /* primary text/ink (was #1E3A5F) */
+  --color-navy-deep:    #145A55;  /* hover/pressed on accent — dark teal, not navy (see CLAUDE.md note) */
+  --color-slate:        #5F6B7A;  /* secondary/muted text */
+  --color-ink-faint:    #8B97A6;  /* placeholders, footnotes */
 
-  --font-display: 'Quicksand', sans-serif;
-  --font-body: 'Nunito Sans', sans-serif;
+  --color-teal:         #1E7A74;  /* accent — interactive ONLY (was #0E9594) */
+  --color-accent-wash:  #E7F2F1;  /* selected row, chip bg */
+
+  --color-saffron:      #E8A13D;  /* signal — CTA + attention ONLY (was #E0994A) */
+  --color-saffron-soft: #FBF0DC;  /* signal wash */
+  --color-saffron-text: #96650E;  /* signal-tinted text on wash */
+
+  --color-danger:       #C0392B;  /* destructive + alerts ONLY */
+  --color-danger-wash:  #F9E8E5;
+
+  --color-cream:        #F2EDE2;  /* light text-on-dark-element (buttons, tiles) */
+
+  /* ---- Type ---- */
+  --font-display: 'Archivo', sans-serif;         /* headings, nav, buttons (was Quicksand) */
+  --font-body:    'Source Sans 3', sans-serif;   /* everything else (was Nunito Sans) */
+  --font-mono:    'IBM Plex Mono', monospace;    /* ALL numerals-as-data: prices, costs,
+                                                     quantities, percentages, timers, times, counts */
+
+  /* ---- Geometry ---- */
+  --radius-card: 12px;   /* cards, panels, modals (was 22px) */
+  --radius-tile: 28px;   /* DEPRECATED — legacy-screen compat only, see CLAUDE.md.
+                             New spec has no tile radius; --radius-control (8px, not yet
+                             wired as a token) covers buttons/inputs/chips/badges instead. */
+}
+
+/*
+ * Service surface (dark) — Brand v1.1's second surface. Toggled via
+ * data-surface="service" on <html> (see AppShell in App.tsx). Every already
+ * brand-kit-tokenized screen re-colors automatically through this cascade;
+ * no component may branch on the mode.
+ */
+[data-surface="service"] {
+  --color-bg-cool:        #10161F;  /* navy-black, not zinc */
+  --color-surface:        #182130;
+  --color-surface-sunken: #0B1017;
+  --color-line:           #232F42;
+
+  --color-navy:           #F2EDE2;  /* ink flips to cream ink on dark */
+  --color-navy-deep:      #5FC0B8;
+  --color-slate:          #8B97A6;
+  --color-ink-faint:      #5F6B7A;
+
+  --color-teal:           #3FA8A0;
+  --color-accent-wash:    rgba(63,168,160,0.14);
+
+  --color-saffron:        #F0B254;
+  --color-saffron-soft:   rgba(240,178,84,0.14);
+  --color-saffron-text:   #F0B254;
+
+  --color-danger:         #E06052;
+  --color-danger-wash:    rgba(224,96,82,0.14);
 }
 
 @layer base {

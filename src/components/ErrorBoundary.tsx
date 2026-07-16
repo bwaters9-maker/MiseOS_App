@@ -24,7 +24,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('MiseOS Module Crash caught in ErrorBoundary:', error, errorInfo);
+    console.error('IncendiumPhi Module Crash caught in ErrorBoundary:', error, errorInfo);
     this.setState({ errorInfo });
   }
 
@@ -41,7 +41,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
           <div className="flex items-center gap-3 text-red-500 mb-3">
             <AlertTriangle className="w-8 h-8 animate-pulse text-red-500" />
             <h3 className="text-base font-mono font-bold uppercase tracking-wider">
-              {this.props.fallbackTitle || 'MiseOS Module Crash Recovery'}
+              {this.props.fallbackTitle || 'IncendiumPhi Module Crash Recovery'}
             </h3>
           </div>
           <p className="text-xs text-zinc-300 font-mono mb-4 leading-relaxed">
