@@ -107,6 +107,7 @@ service cloud.firestore {
     match /timers/{id}               { allow read, write: if isAuthenticated(); }
     match /station_presets/{id}     { allow read, write: if isAuthenticated(); }
     match /recipe_categories/{id}   { allow read, write: if isAuthenticated(); }
+    match /recipe_collections/{id}  { allow read, write: if isAuthenticated(); }
     match /event_types/{id}         { allow read, write: if isAuthenticated(); }
     match /clients/{id}             { allow read, write: if isAuthenticated(); }
     match /vendors/{id}              { allow read, write: if isAuthenticated(); }

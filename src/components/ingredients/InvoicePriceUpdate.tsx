@@ -7,6 +7,7 @@ import { toBase, displayUnitsFor, defaultDisplayUnit, smartUnit } from '../../li
 import { yieldReferenceText } from '../../lib/yieldReference';
 import { withRegionContext } from '../../lib/regionContext';
 import { useKitchenSelector } from '../KitchenStateContext';
+import { todayDateKey } from '../../utils';
 import type { Ingredient, IngredientCategory, MeasureType, Allergen, RestaurantProfile } from '../../types';
 import type { UnitSystem, DisplayUnit } from '../../lib/units';
 
@@ -378,7 +379,7 @@ export const InvoicePriceUpdate: React.FC<InvoicePriceUpdateProps> = ({ isOpen, 
     const f = row.addForm;
     setAddingKey(row.key);
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayDateKey();
       const qtyBase = toBase(parseFloat(f.purchaseQtyDisplay) || 0, f.purchaseQtyUnit);
       await addDoc(collection(db, 'ingredients'), {
         name: f.name.trim(),
@@ -424,7 +425,7 @@ export const InvoicePriceUpdate: React.FC<InvoicePriceUpdateProps> = ({ isOpen, 
     if (toApply.length === 0) return;
     setApplying(true);
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayDateKey();
       await Promise.all(toApply.map(r => {
         const cost = parseFloat(r.newPackCostDisplay);
         return updateDoc(doc(db, 'ingredients', r.ingredientId!), {

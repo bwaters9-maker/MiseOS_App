@@ -83,6 +83,29 @@ export interface RecipeCategory {
 }
 
 /**
+ * A seasonal grouping of menu recipes (`recipe_collections` collection),
+ * managed from the Collections sub-tab in RecipesHub. At most one
+ * collection is `active` at a time — activating one deactivates the rest
+ * in a single batch write.
+ *
+ * When a collection is active it defines the menu set: `isRecipeOnMenu`
+ * (costEngine.ts) requires membership in the active collection AND the
+ * recipe's own `onMenu` toggle, so the per-recipe toggle survives as a
+ * one-off off-switch within the season. With no active collection, menu
+ * behavior is exactly the pre-collections `onMenu`-only rule.
+ *
+ * `recipeIds` may reference deleted recipes — stale ids are ignored at
+ * read time, same "survives until re-saved" convention as deleted
+ * categories.
+ */
+export interface RecipeCollection {
+  id: string;
+  name: string;
+  recipeIds: string[];
+  active: boolean;
+}
+
+/**
  * Guest-facing menu print/preview styling choice, selected from the Menu
  * view's Guest Preview toggle. Persisted in the `RestaurantProfile` doc
  * (`menuTemplate`), migrated from an earlier App.tsx + localStorage scheme.

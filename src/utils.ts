@@ -4,6 +4,29 @@
  */
 
 /**
+ * Today's date as YYYY-MM-DD in local time. Never use
+ * `new Date().toISOString().slice(0, 10)` for a "today" date-key comparison
+ * — it's UTC-based and rolls to tomorrow's date hours before local midnight
+ * in any US timezone.
+ */
+export function todayDateKey(): string {
+  return new Date().toLocaleDateString('en-CA');
+}
+
+/**
+ * Formats a 24-hour "HH:MM" time string (the native `<input type="time">`
+ * value shifts/events/milestones are stored as) into 12-hour "H:MM AM/PM"
+ * for display. Storage and sorting stay on the raw 24-hour string — only
+ * the rendered label goes through this.
+ */
+export function formatTime12h(time: string): string {
+  const [h, m] = time.split(':').map(Number);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${hour12}:${m.toString().padStart(2, '0')} ${period}`;
+}
+
+/**
  * Format a duration in milliseconds to HH:MM:SS string.
  * Hides hours if the total duration is less than one hour.
  */

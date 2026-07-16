@@ -4,9 +4,10 @@ import { db } from './firebaseConfig';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { useKitchenSelector } from './components/KitchenStateContext';
 import { useStationPresets } from './hooks/useStationPresets';
+import { todayDateKey, formatTime12h } from './utils';
 import type { Employee, Shift, PrepStation } from './types';
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+const todayStr = todayDateKey;
 
 const formatDate = (dateStr: string) =>
   new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
@@ -216,7 +217,7 @@ const ReassignPanel: React.FC<{
             <div key={sh.id} className="bg-zinc-900/50 border border-zinc-800 rounded-[8px] p-[13px]">
               <div className="flex items-baseline gap-[13px] mb-[8px] text-xs">
                 <span className="font-bold text-zinc-200">{formatDate(sh.date)}</span>
-                <span className="text-zinc-400 tabular-nums">{sh.startTime}–{sh.endTime}</span>
+                <span className="text-zinc-400 tabular-nums">{formatTime12h(sh.startTime)}–{formatTime12h(sh.endTime)}</span>
                 {sh.station && <span className="text-zinc-500">{sh.station}</span>}
                 {sh.note && <span className="text-zinc-500 italic truncate">{sh.note}</span>}
               </div>
@@ -778,7 +779,7 @@ const Staff: React.FC = () => {
                     <div key={sh.id} className="flex items-start justify-between gap-[21px] py-[13px] border-b border-zinc-900 last:border-b-0">
                       <div className="flex flex-wrap items-baseline gap-[13px] min-w-0">
                         <span className="font-bold text-zinc-100 shrink-0">{employee?.name ?? 'Unknown employee'}</span>
-                        <span className="text-zinc-400 tabular-nums text-xs shrink-0">{sh.startTime}–{sh.endTime}</span>
+                        <span className="text-zinc-400 tabular-nums text-xs shrink-0">{formatTime12h(sh.startTime)}–{formatTime12h(sh.endTime)}</span>
                         {sh.station && (
                           <span className={`${BADGE} text-zinc-400 border-zinc-800 bg-zinc-900/30 shrink-0`}>{sh.station}</span>
                         )}

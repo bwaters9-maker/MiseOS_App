@@ -6,13 +6,12 @@ import { useKitchenSelector } from './components/KitchenStateContext';
 import { useStationPresets } from './hooks/useStationPresets';
 import { featureFieldsFromRecipe } from './lib/costEngine';
 import { COURSES, BLANK as BLANK_FEATURE, toDoc as featureToDoc, type FormState as FeatureFormState } from './Features';
+import { todayDateKey, formatTime12h } from './utils';
 import type { Employee, Shift, KitchenEvent, Client, KitchenAlert, Feature, Recipe, Ingredient } from './types';
 
 interface ChefDashboardProps {
   onNavigate?: (view: string) => void;
 }
-
-const todayDateKey = (): string => new Date().toLocaleDateString('en-CA');
 
 export default function ChefDashboard({ onNavigate }: ChefDashboardProps) {
   const staff = (useKitchenSelector((s: any) => s.staff) as Employee[]) ?? [];
@@ -132,7 +131,7 @@ export default function ChefDashboard({ onNavigate }: ChefDashboardProps) {
                     <div className="flex flex-col items-end gap-[2px]">
                       {stationShifts.map(sh => (
                         <span key={sh.id} className="text-xs text-slate text-right">
-                          {staffById.get(sh.staffId)?.name ?? 'Unknown'} · {sh.startTime}–{sh.endTime}
+                          {staffById.get(sh.staffId)?.name ?? 'Unknown'} · {formatTime12h(sh.startTime)}–{formatTime12h(sh.endTime)}
                         </span>
                       ))}
                     </div>
@@ -148,7 +147,7 @@ export default function ChefDashboard({ onNavigate }: ChefDashboardProps) {
                 {unassignedShifts.map(sh => (
                   <div key={sh.id} className="flex items-center justify-between text-xs">
                     <span className="text-navy">{staffById.get(sh.staffId)?.name ?? 'Unknown'}</span>
-                    <span className="text-slate">{sh.startTime}–{sh.endTime}</span>
+                    <span className="text-slate">{formatTime12h(sh.startTime)}–{formatTime12h(sh.endTime)}</span>
                   </div>
                 ))}
               </div>
@@ -168,7 +167,7 @@ export default function ChefDashboard({ onNavigate }: ChefDashboardProps) {
               {todayEvents.map(e => (
                 <div key={e.id} className="flex items-center justify-between gap-[13px] py-[8px]">
                   <div className="flex items-baseline gap-[8px] min-w-0">
-                    {e.time && <span className="text-xs text-slate shrink-0 tabular-nums">{e.time}</span>}
+                    {e.time && <span className="text-xs text-slate shrink-0 tabular-nums">{formatTime12h(e.time)}</span>}
                     <span className="text-xs font-bold text-navy truncate">{e.title}</span>
                   </div>
                   {e.clientId && clientsById.get(e.clientId) && (

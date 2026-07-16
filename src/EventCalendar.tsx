@@ -6,9 +6,10 @@ import { useKitchenSelector } from './components/KitchenStateContext';
 import { useEventTypes } from './hooks/useEventTypes';
 import { useRecipeCategories } from './hooks/useRecipeCategories';
 import { EventDetailView } from './components/events/EventDetailView';
+import { todayDateKey, formatTime12h } from './utils';
 import type { KitchenEvent, Client, Employee, Shift, Recipe, Ingredient, EventChangeLogEntry } from './types';
 
-const getToday = () => new Date().toISOString().slice(0, 10);
+const getToday = todayDateKey;
 
 // Pre-rename docs may still carry the old `covers` field — read it as a
 // fallback for display only; every write from here on uses `attendees`.
@@ -196,7 +197,7 @@ const EventRow: React.FC<{
         {e.eventType && <span className={TYPE_BADGE}>{e.eventType}</span>}
         <span className="font-bold text-zinc-100">{e.title}</span>
         {clientName && <span className="text-zinc-400 text-xs">{clientName}</span>}
-        {e.time && <span className="text-zinc-400 tabular-nums text-xs">{e.time}</span>}
+        {e.time && <span className="text-zinc-400 tabular-nums text-xs">{formatTime12h(e.time)}</span>}
         {attendees != null && (
           <span className="text-zinc-500 text-xs">{attendees}&nbsp;attendees</span>
         )}

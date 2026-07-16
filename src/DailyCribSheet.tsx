@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Printer, Star, Users, CalendarDays, AlertTriangle, ClipboardList } from 'lucide-react';
 import { useKitchenSelector } from './components/KitchenStateContext';
+import { todayDateKey, formatTime12h } from './utils';
 import type { Feature, Employee, Shift, KitchenEvent, KitchenAlert, CribNote } from './types';
 
 const CARD = 'crib-card bg-zinc-950 border border-zinc-800 rounded-[13px] p-[21px]';
@@ -33,7 +34,7 @@ const DailyCribSheet: React.FC = () => {
 
   const [printTime, setPrintTime] = useState('');
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = todayDateKey();
   const tonightFeatures = features.filter(f => {
     if (f.is86d) return false;
     if (f.activeFrom && todayStr < f.activeFrom) return false;
@@ -161,7 +162,7 @@ const DailyCribSheet: React.FC = () => {
                             <span className={`${BADGE} text-zinc-400 border-zinc-800 bg-zinc-900/30 shrink-0`}>{positionLabel}</span>
                           )}
                         </div>
-                        <span className="text-zinc-500 shrink-0 tabular-nums">{sh.startTime}–{sh.endTime}</span>
+                        <span className="text-zinc-500 shrink-0 tabular-nums">{formatTime12h(sh.startTime)}–{formatTime12h(sh.endTime)}</span>
                       </div>
                       {sh.note && (
                         <p className="text-zinc-200 text-xs">{sh.note}</p>
@@ -190,7 +191,7 @@ const DailyCribSheet: React.FC = () => {
                       <div className="flex items-baseline justify-between gap-[13px] w-full">
                         <div className="flex items-baseline gap-[13px] min-w-0">
                           {e.time && (
-                            <span className="text-zinc-400 shrink-0 tabular-nums">{e.time}</span>
+                            <span className="text-zinc-400 shrink-0 tabular-nums">{formatTime12h(e.time)}</span>
                           )}
                           {e.eventType && (
                             <span className={`${BADGE} text-purple-300 border-purple-900 bg-purple-950/30 shrink-0`}>{e.eventType}</span>
@@ -208,7 +209,7 @@ const DailyCribSheet: React.FC = () => {
                         <div className="pl-[13px] border-l border-zinc-800 space-y-[2px] w-full">
                           {sortedMilestones.map((m, i) => (
                             <p key={i} className="text-[10px] text-zinc-500">
-                              <span className="tabular-nums text-zinc-400">{m.time}</span>&nbsp;—&nbsp;{m.label}
+                              <span className="tabular-nums text-zinc-400">{formatTime12h(m.time)}</span>&nbsp;—&nbsp;{m.label}
                             </p>
                           ))}
                         </div>

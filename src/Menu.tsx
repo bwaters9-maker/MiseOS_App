@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { UtensilsCrossed, AlertTriangle, ChevronRight, Eye } from 'lucide-react';
 import { useKitchenSelector } from './components/KitchenStateContext';
 import { useRecipeCategories } from './hooks/useRecipeCategories';
+import { useRecipeCollections } from './hooks/useRecipeCollections';
 import { costPerPortion, fcPercent, fcColor, recipeUsesEstimatedPricing, isRecipeOnMenu } from './lib/costEngine';
 import GuestMenuPreview, { type GuestMenuGroup } from './components/GuestMenuPreview';
 import type { Ingredient, Recipe, MenuTemplate, RestaurantProfile } from './types';
@@ -35,9 +36,13 @@ const Menu: React.FC<MenuProps> = ({ targetFcPercent = 30, onOpenRecipe, menuTem
   const allIngredients = (useKitchenSelector((s: any) => s.ingredients) as Ingredient[]) ?? [];
   const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
   const { categories } = useRecipeCategories();
+  const { activeCollection } = useRecipeCollections();
   const [previewMode, setPreviewMode] = useState(false);
 
-  const menuRecipes = useMemo(() => allRecipes.filter(isRecipeOnMenu), [allRecipes]);
+  const menuRecipes = useMemo(
+    () => allRecipes.filter(r => isRecipeOnMenu(r, activeCollection)),
+    [allRecipes, activeCollection],
+  );
 
   const rows = useMemo<MenuRow[]>(() => menuRecipes.map(recipe => {
     try {
@@ -108,6 +113,11 @@ const Menu: React.FC<MenuProps> = ({ targetFcPercent = 30, onOpenRecipe, menuTem
           <p className="text-xs text-zinc-500 mt-[5px]">
             Read-only operational view — edit recipes in the Recipe Builder.
           </p>
+          {activeCollection && (
+            <p className="text-xs font-bold text-emerald-400 mt-[5px]">
+              Active collection: {activeCollection.name} — menu limited to its recipes
+            </p>
+          )}
         </div>
         <button
           type="button"

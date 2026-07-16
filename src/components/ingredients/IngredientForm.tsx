@@ -3,6 +3,7 @@ import { ChevronDown, AlertTriangle, Sparkles, Loader2 } from 'lucide-react';
 import { computeCostPerBaseUnit } from '../../lib/costEngine';
 import { toBase, fromBase, displayUnitsFor, defaultDisplayUnit, smartUnit, costPerDisplayUnit } from '../../lib/units';
 import { callAi, parseAiJson } from '../../lib/ai';
+import { todayDateKey } from '../../utils';
 import type { Ingredient, IngredientCategory, MeasureType, Allergen, NutritionPer100g, Vendor } from '../../types';
 import type { UnitSystem, DisplayUnit } from '../../lib/units';
 
@@ -142,7 +143,7 @@ export const toDoc = (f: FormState): Omit<Ingredient, 'id'> => {
     ...(Object.keys(nutrition).length > 0 && { nutritionPer100g: nutrition, nutritionSource: f.nutritionSource }),
     ...(f.allergens.length > 0 && { allergens: f.allergens }),
     ...(f.vendorId && { vendorId: f.vendorId }),
-    lastVerified: new Date().toISOString().slice(0, 10),
+    lastVerified: todayDateKey(),
     priceSource: 'manual',
   };
 };
@@ -169,7 +170,7 @@ export const toProposalDoc = (f: FormState, costEdited: boolean): Omit<Ingredien
     ...(Object.keys(nutrition).length > 0 && { nutritionPer100g: nutrition, nutritionSource: 'ai' as const }),
     ...(f.allergens.length > 0 && { allergens: f.allergens }),
     ...(f.vendorId && { vendorId: f.vendorId }),
-    lastVerified: costEdited ? new Date().toISOString().slice(0, 10) : '',
+    lastVerified: costEdited ? todayDateKey() : '',
     priceSource: costEdited ? 'manual' : 'regional-estimate',
   };
 };

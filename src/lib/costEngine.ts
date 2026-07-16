@@ -169,6 +169,18 @@ export const featureFieldsFromRecipe = (
  * menuPrice/guest description and are never shown here. Recipes saved
  * before the `onMenu` field existed default to `true` (their prior,
  * unconditional menu status) rather than silently dropping off the menu.
+ *
+ * When an `activeCollection` is passed (a `RecipeCollection` with
+ * `active: true`, or null when none is active), it defines the menu set:
+ * the recipe must be a member AND pass its own `onMenu` toggle — the
+ * toggle survives as a one-off off-switch within the season. Passing
+ * null/undefined preserves the original `onMenu`-only behavior, so every
+ * existing caller is unchanged.
  */
-export const isRecipeOnMenu = (recipe: Recipe): boolean =>
-  recipe.recipeType === 'menu' && (recipe.onMenu ?? true);
+export const isRecipeOnMenu = (
+  recipe: Recipe,
+  activeCollection?: { recipeIds: string[] } | null,
+): boolean =>
+  recipe.recipeType === 'menu' &&
+  (recipe.onMenu ?? true) &&
+  (!activeCollection || activeCollection.recipeIds.includes(recipe.id));

@@ -4,6 +4,7 @@ import { db } from '../../firebaseConfig';
 import { updateDoc, doc } from 'firebase/firestore';
 import type { KitchenEvent, Client, Employee, Shift, Recipe, Ingredient, RecipeCategory, EventMilestone, TentativeMenuLine, EventChangeLogEntry } from '../../types';
 import { costPerPortion } from '../../lib/costEngine';
+import { todayDateKey, formatTime12h } from '../../utils';
 
 const readAttendees = (e: KitchenEvent): number | undefined =>
   e.attendees ?? (e as unknown as { covers?: number }).covers;
@@ -13,7 +14,7 @@ const formatDate = (dateStr: string) =>
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
   });
 
-const getToday = () => new Date().toISOString().slice(0, 10);
+const getToday = todayDateKey;
 
 const CARD = 'bg-zinc-950 border border-zinc-800 rounded-[13px] p-[21px]';
 const INPUT = 'w-full bg-zinc-900 border border-zinc-700 rounded-[5px] px-[8px] py-[5px] text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-500 placeholder-zinc-600';
@@ -119,7 +120,7 @@ const TimelinePanel: React.FC<{ event: KitchenEvent }> = ({ event }) => {
           return (
             <div key={m.idx} className="flex items-center justify-between gap-[13px] py-[8px] border-b border-zinc-900 last:border-b-0 text-xs">
               <div className="flex items-baseline gap-[13px] min-w-0">
-                <span className="text-purple-300 tabular-nums font-bold shrink-0">{m.time}</span>
+                <span className="text-purple-300 tabular-nums font-bold shrink-0">{formatTime12h(m.time)}</span>
                 <span className="text-zinc-200 truncate">{m.label}</span>
               </div>
               <div className="flex items-center gap-[5px] shrink-0">
@@ -660,7 +661,7 @@ export const EventDetailView: React.FC<{
         </div>
         <div className="flex flex-wrap items-baseline gap-[21px] text-xs text-zinc-400">
           {event.date && <span>{formatDate(event.date)}</span>}
-          {event.time && <span className="tabular-nums">{event.time}</span>}
+          {event.time && <span className="tabular-nums">{formatTime12h(event.time)}</span>}
           {attendees != null && <span>{attendees}&nbsp;attendees</span>}
         </div>
         <div className="flex items-start gap-[8px] mt-[13px] pt-[13px] border-t border-zinc-900 text-zinc-400 text-xs">

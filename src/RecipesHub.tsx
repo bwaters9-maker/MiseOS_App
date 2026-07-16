@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { ChefHat, UtensilsCrossed } from 'lucide-react';
+import { ChefHat, UtensilsCrossed, Layers } from 'lucide-react';
 import Recipes from './Recipes';
 import Menu from './Menu';
+import RecipeCollections from './RecipeCollections';
 import type { UnitSystem } from './lib/units';
 import type { MenuTemplate } from './types';
 
@@ -15,7 +16,7 @@ interface RecipesHubProps {
   onOpenRecipe?: (recipeId: string) => void;
 }
 
-type RecipesSubTab = 'recipes' | 'menu';
+type RecipesSubTab = 'recipes' | 'menu' | 'collections';
 
 const TAB_BTN = 'px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg border transition-colors flex items-center gap-2';
 const tabBtnClass = (active: boolean) =>
@@ -43,6 +44,9 @@ export default function RecipesHub(props: RecipesHubProps) {
           <button onClick={() => setActiveSubTab('menu')} className={tabBtnClass(activeSubTab === 'menu')}>
             <UtensilsCrossed className="w-3.5 h-3.5" /> Menu
           </button>
+          <button onClick={() => setActiveSubTab('collections')} className={tabBtnClass(activeSubTab === 'collections')}>
+            <Layers className="w-3.5 h-3.5" /> Collections
+          </button>
         </div>
       </div>
 
@@ -63,6 +67,7 @@ export default function RecipesHub(props: RecipesHubProps) {
           setMenuTemplate={props.setMenuTemplate}
         />
       )}
+      {activeSubTab === 'collections' && <RecipeCollections />}
     </div>
   );
 }

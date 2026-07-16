@@ -3,6 +3,7 @@ import { Sparkles, RefreshCw, Send, AlertCircle, ExternalLink, Flame, TrendingUp
 import { SOUS_SYSTEM_PROMPT } from './lib/sousPersona';
 import { withRegionContext } from './lib/regionContext';
 import { callAi, parseAiJson } from './lib/ai';
+import { todayDateKey } from './utils';
 import { useKitchenSelector } from './components/KitchenStateContext';
 import { db } from './firebaseConfig';
 import { doc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
@@ -178,8 +179,6 @@ const isStartingWithinWeeks = (item: SeasonalItemForRegion, currentMonth: number
 
 const TREND_HISTORY_CAP = 12;
 const TREND_STALE_MS = 7 * 24 * 60 * 60 * 1000;
-
-const todayDateKey = (): string => new Date().toLocaleDateString('en-CA');
 
 const formatHistoryLabel = (dateKey: string): string => {
   const d = new Date(`${dateKey}T00:00:00`);
