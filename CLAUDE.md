@@ -87,8 +87,6 @@ src/
       EventDetailView.tsx        Event detail: header card (name/type/date/attendees/staff strip) + Timeline, Tentative Menu, Client, Change Log panel grid
 
     dashboard/
-      LineTimerModule.tsx
-      MetricsHUD.tsx
       PrepRegistrationForm.tsx
       TrendSidebar.tsx
 
@@ -221,9 +219,9 @@ MiseOS brand kit v1.0 — Cool tone / Rounded corners / Saffron signal. Tokens d
   other values come from structured selects, ideally user-customizable lists.
 
 **Brand-pass queue** — the brand kit above was only ever applied to the outer app shell (`App.tsx`'s `bg-bg-cool`/`text-navy`, `AppHeader.tsx`). Every content view still runs the older dark zinc/emerald "System Operator Matrix" aesthetic from before the brand kit existed, and gets migrated one view at a time as it comes up for other work (matching the "reskin it in this pass" instruction that shipped Test Kitchen's migration below), not as a dedicated sweep.
-- ~~Test Kitchen — Culinary Trends & Forecasts~~ ✓ (Phase B) — brand kit throughout: `bg-surface` cards, navy/slate text, saffron only as signal (Viral Bridge badge, category tags, seasonal "prime" highlight). The Menu Development Playground sub-tab is intentionally untouched in this pass — it's a separate, already-working feature — so Test Kitchen is currently a brand-kit Trends sub-tab next to a dark-zinc Playground sub-tab, sharing a reskinned outer title bar/sub-tab switcher.
+- ~~Test Kitchen — Culinary Trends & Forecasts~~ ✓ (Phase B) — brand kit throughout: `bg-surface` cards, navy/slate text, saffron only as signal (Viral Bridge badge, category tags, seasonal "prime" highlight). The Menu Development Playground sub-tab is also on brand kit already (confirmed 2026-07-16: zero `zinc`/`slate`/`gray` classes anywhere in `TestKitchenHub.tsx`; the studio-layout redesign in `7d244ff` moved it onto `bg-surface`/`text-navy`/`text-slate`/`border-line` tokens) — this was previously mis-documented here as "dark-zinc" and pending. Note the Playground's Plate Design and Ingredient Palette panels are themed but still explicit placeholders ("...will be embedded here in a later phase") — a functional-completeness gap, not a theming one.
 - ~~Alert History~~ ✓ — rebuilt from placeholder into the real view (live `alerts` from kitchen state, severity + active/resolved filters, resolve/reopen writes) directly on the brand kit: `bg-surface` card, navy/slate text, navy filter pills, saffron as the warning signal, red-400 kept for critical per the kit's unchanged danger color.
-- Pending: Daily Crib Sheet, Features, Staff, Events & Clients, Ingredients (Master Pantry), Vendors, Recipes, Prep Checklist, Kitchen Timers, Settings, Menu, The Menu Development Playground (Test Kitchen's other sub-tab).
+- Pending: Daily Crib Sheet, Features, Staff, Events & Clients, Ingredients (Master Pantry), Vendors, Recipes, Prep Checklist, Kitchen Timers, Settings, Menu.
 
 ## Invoice Price Update (components/ingredients/InvoicePriceUpdate.tsx)
 
@@ -371,7 +369,7 @@ Date-grid math (as opposed to single-date comparisons) also lives in `src/utils.
 Base44-era cruft audit — complete (2026-07-14). Every file below was grep-verified as unreferenced from live code and deleted; `tsc --noEmit` passed clean afterward:
 
 - `src/services/` (entire folder): `apiClient.js`, `apiService.js`, `collectionEngine.js`, stray `apiClient.js# Create the service handler.txt`
-- `src/components/dashboard/`: `MenuCollectionCard.jsx`, `menuService.js`, `recipeService.js`, `seedPantry.js`, `config.js` — the folder now holds only `LineTimerModule.tsx`, `MetricsHUD.tsx`, `PrepRegistrationForm.tsx`
+- `src/components/dashboard/`: `MenuCollectionCard.jsx`, `menuService.js`, `recipeService.js`, `seedPantry.js`, `config.js` — the folder now holds only `PrepRegistrationForm.tsx`. `LineTimerModule.tsx` and `MetricsHUD.tsx` survived that pass but were later found orphaned (grep-verified zero imports anywhere in `src/`) and deleted 2026-07-16.
 - Dead component chain: `src/Dashboard.jsx`, `src/components/KitchenDashboard.jsx` → `src/components/DailyCribSheet.jsx` (old .jsx copy, not the live `src/DailyCribSheet.tsx`) → `src/hooks/usePrepList.js` → `dashboard/config.js`
 - `src/components/BrainDumpModule.jsx` — Base44-era, never wired into the rebuild; deleted with explicit chef sign-off (any future Brain Dump gets rebuilt fresh on the current stack)
 - Root-level orphaned duplicates: `src/AlertDialog.tsx`, `src/AppHeader.tsx`, `src/CribComponents.tsx`, `src/ErrorBoundary.tsx` (App.tsx imports the `src/components/` versions)
