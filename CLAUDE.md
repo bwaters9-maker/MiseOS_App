@@ -56,8 +56,8 @@ src/
   DailyCribSheet.tsx             Crib Sheet view — five sections, print-optimized
   ChefDashboard.tsx              Chef's Dashboard — the app's landing page/command center: today's schedule w/ station coverage, today's events, quick actions, compact alerts indicator. Read-only.
   Features.tsx                   Nightly specials CRUD — 86 toggle syncs to Crib Sheet live
-  Staff.tsx                      Employee directory + shift scheduling — feeds Crib Sheet and Chef's Dashboard (today's shifts only). Shift station select sources from `useStationPresets()` (live, chef-customizable) rather than a hardcoded list — see Chef's Dashboard section.
-  EventCalendar.tsx              Events & Clients — event/client CRUD, grouped by date, upcoming/past split, feeds Crib Sheet; clicking an event opens EventDetailView
+  Staff.tsx                      Employee directory + shift scheduling — feeds Crib Sheet and Chef's Dashboard (today's shifts only). Shift station select sources from `useStationPresets()` (live, chef-customizable) rather than a hardcoded list — see Chef's Dashboard section. Schedule section carries a List/Calendar toggle (`components/staff/ScheduleCalendar.tsx`) merging shifts with Events — see the Staff Schedule Calendar section below.
+  EventCalendar.tsx              Events & Clients — event/client CRUD, grouped by date, upcoming/past split, feeds Crib Sheet; clicking an event opens EventDetailView, which can also be deep-linked into directly via a `selectedEventId` prop (used by the Staff schedule calendar)
   PrepChecklist.tsx              Par-level deficit tracking table
   KitchenTimers.tsx              Multi-station countdown timers (Firestore-backed)
   TestKitchenHub.tsx             Test Kitchen — sub-tabs "Culinary Trends & Forecasts" and "The Menu Development Playground" (calls server-side /api/ai proxy); Playground chat runs on the shared Sous persona (src/lib/sousPersona.ts)
@@ -91,6 +91,9 @@ src/
       MetricsHUD.tsx
       PrepRegistrationForm.tsx
       TrendSidebar.tsx
+
+    staff/
+      ScheduleCalendar.tsx        Week/month schedule calendar — shifts merged with Events, read-only (Staff.tsx's Schedule section, List/Calendar toggle)
 
   hooks/
     useKitchenState.ts           Firestore listeners for all collections
@@ -333,6 +336,19 @@ Build order item 13. A read-only, web-search-grounded advisory modal on the Mast
 - `src/lib/regionContext.ts` exports `buildRegionContext(profile)` (returns a compact `"Restaurant context:\n..."` block, or `''` if the profile has nothing worth surfacing) and `withRegionContext(basePrompt, profile)` (prepends the block, or returns `basePrompt` unchanged when there's no context — so every AI feature works identically with zero profile data).
 - Injected into every `/api/ai` system prompt where it's genuinely relevant: the Sous persona (`TestKitchenHub.tsx` Playground chat), the AI ingredient lookup's price/pack estimate (`AiIngredientLookup.tsx`), the invoice add-unmatched-to-pantry suggestion pass (`InvoicePriceUpdate.tsx`), and both Recipe Builder AI buttons — "Build From Pantry" and "Draft Method" (`Recipes.tsx`). Deliberately **not** injected into `InvoicePriceUpdate.tsx`'s raw invoice line-item extraction prompt — that pass's only job is reading text off a photographed invoice accurately, and region context has no legitimate application there (worse, it risks nudging the model toward region-typical items instead of what's actually printed).
 
+## Staff Schedule Calendar (components/staff/ScheduleCalendar.tsx)
+
+Staff & Scheduling part 2 (Approved Feature Map's "Week/month calendar merged with Events"). Not a new nav tab or sub-tab hub — a List/Calendar toggle on `Staff.tsx`'s existing Schedule section header, same "toggle swaps the view" precedent as `Menu.tsx`'s Guest Preview button, scoped to just that section rather than restructuring the whole page.
+
+- **Read-only derivation, no new collection or writes.** `ScheduleCalendar` takes `shifts`, `staff`, `events`, `clients` (all already-live `useKitchenSelector` reads, the same arrays `ChefDashboard.tsx` uses) and `stationPresets` (`useStationPresets()`) as props, and groups them into per-date maps client-side. `firestore.rules` is unchanged.
+- **Week mode**: 7-column grid, Sunday-start, one column per day showing a per-station coverage strip (covered = employee name(s) + time, uncovered = the same red `Uncovered` badge `ChefDashboard.tsx`'s Today's Schedule already uses), a "No Station" group for shifts with no station assigned, and event chips (time, title, resolved client name via the same `clientsById` pattern as `ChefDashboard.tsx`/`EventCalendar.tsx`).
+- **Month mode**: compact cells — one dot per configured station (teal = covered, red = uncovered) plus an event count badge; leading/trailing days from adjacent months render dimmed but still carry real data. Clicking any cell expands a day-detail panel below the grid showing the same full week-mode breakdown for that day (`DayContent`, shared between week columns and the expanded panel so the two never duplicate the coverage/event logic).
+- **Click-through, no inline edit inside the calendar itself**: clicking a shift chip switches `Staff.tsx` back to List mode and opens that shift in its existing edit form (`startEditShift`) — the calendar never duplicates the shift edit UI. Clicking an event chip deep-links to `EventCalendar.tsx`'s `EventDetailView` via a lifted `selectedEventId`/`setSelectedEventId` pair in `App.tsx` (`onOpenEvent` → `setActiveView('events')`), the same cross-view mechanism `selectedRecipeId` already uses for jumping into the Recipe Builder — `EventCalendar.tsx` syncs `detailEventId` from the incoming prop on mount and clears it on `onBack`, so revisiting Events & Clients later doesn't re-open the same event.
+- **Brand kit**: built brand-kit from the start (`bg-surface`, navy/slate, teal accents, saffron reserved for signal only — not used decoratively here) despite living inside the still-dark-zinc `Staff.tsx` — same accepted mixed state as the Ingredient Advisor modal, pending `Staff.tsx`'s own brand pass.
+- **Hourly rate / pay projections intentionally omitted** from every calendar chip — shift chips show employee name, time, and station only. The Employees directory above already shows `$/hr`, and the still-unbuilt per-employee weekly-hours/overtime-flag feature (Approved Feature Map's remaining STAFF & SCHEDULING item) is the natural place for rate-derived numbers to attach, not this coverage-at-a-glance surface.
+- **Date/time convention followed throughout**: `todayDateKey()` for the today highlight in both modes, `formatTime12h()` for every displayed time; all grid math (week/month start, day addition) uses local-time `Date` construction from `YYYY-MM-DD` + `T00:00:00`, never `toISOString()`.
+- **A real cross-browser `toLocaleDateString` bug surfaced and was fixed here**: calling it with `{ day: 'numeric', year: 'numeric' }` (day+year, no month) rendered a malformed string in testing (`"2026 (day: 18)"` instead of `"18, 2026"`) — the week-range label now always includes the month, sidestepping that options combination entirely.
+
 ## Date/time convention
 
 Every "what day is today" comparison in the app must go through `todayDateKey()` (`src/utils.ts`) — `new Date().toLocaleDateString('en-CA')`, local time, `YYYY-MM-DD`. Never use `new Date().toISOString().slice(0, 10)` for this: it's UTC-based and rolls to tomorrow's date hours before local midnight (for Pacific time, starting mid-afternoon — most of dinner service). `ChefDashboard.tsx` and `TestKitchenHub.tsx` originated this pattern; `DailyCribSheet.tsx`, `Staff.tsx`, `EventCalendar.tsx`, `EventDetailView.tsx`, and the ingredient `lastVerified` stamps (`IngredientForm.tsx`, `InvoicePriceUpdate.tsx`) were audited and migrated to the shared helper, closing the divergence this file used to document between ChefDashboard and Crib Sheet. `toISOString()`/`toLocaleTimeString()` remain fine for full instants (`updatedAt`, `generatedAt`) and pure display formatting where no "is this today" comparison is involved.
@@ -563,7 +579,7 @@ only allowed state.
 1. ~~Remove Handover Log remnants from useKitchenState.ts and types.ts~~ ✓
 2. ~~Daily Crib Sheet (print-optimized)~~ ✓
 3. ~~Features Module~~ ✓
-4. ~~Staff (lightweight)~~ ✓
+4. ~~Staff (lightweight)~~ ✓ — Staff & Scheduling part 2 (week/month calendar merged with Events) added later: `components/staff/ScheduleCalendar.tsx`, see the Staff Schedule Calendar section above. Per-employee projected weekly hours + overtime flag (the Approved Feature Map's remaining STAFF & SCHEDULING item) still pending
 5. ~~Event Calendar~~ ✓ — upgraded to Events & Clients (part 1 of 3: data model + clients ✓; part 2 of 3: event detail view with milestone timeline + tentative menu ✓; part 3 of 3: change log + client event-history view ✓)
 6. ~~Ingredients Master Library~~ ✓
 7. ~~Invoice Price Update (human-confirmed)~~ ✓

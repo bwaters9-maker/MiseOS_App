@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Users, CalendarClock, Plus, Pencil, Trash2, X, Check, DollarSign } from 'lucide-react';
+import { Users, CalendarClock, Plus, Pencil, Trash2, X, Check, DollarSign, List, CalendarRange } from 'lucide-react';
 import { db } from './firebaseConfig';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { useKitchenSelector } from './components/KitchenStateContext';
 import { useStationPresets } from './hooks/useStationPresets';
+import { ScheduleCalendar } from './components/staff/ScheduleCalendar';
 import { todayDateKey, formatTime12h } from './utils';
-import type { Employee, Shift, PrepStation } from './types';
+import type { Employee, Shift, KitchenEvent, Client, PrepStation } from './types';
 
 const todayStr = todayDateKey;
 
@@ -407,11 +408,19 @@ const ShiftForm: React.FC<{
 // MAIN VIEW
 // ===================================================================
 
-const Staff: React.FC = () => {
+interface StaffProps {
+  onOpenEvent?: (eventId: string) => void;
+}
+
+const Staff: React.FC<StaffProps> = ({ onOpenEvent }) => {
   const allStaff = (useKitchenSelector((s: any) => s.staff) as Employee[]) ?? [];
   const allShifts = (useKitchenSelector((s: any) => s.shifts) as Shift[]) ?? [];
+  const allEvents = (useKitchenSelector((s: any) => s.events) as KitchenEvent[]) ?? [];
+  const allClients = (useKitchenSelector((s: any) => s.clients) as Client[]) ?? [];
+  const { presets: stationPresets } = useStationPresets();
   const staffById = new Map(allStaff.map(e => [e.id, e]));
   const today = todayStr();
+  const [scheduleView, setScheduleView] = useState<'list' | 'calendar'>('list');
 
   const sortedStaff = [...allStaff].sort((a, b) => {
     if (a.active !== b.active) return a.active ? -1 : 1;
@@ -538,6 +547,11 @@ const Staff: React.FC = () => {
     setEditShiftForm(shiftToForm(s));
     setDeleteShiftConfirmId(null);
     setShowAddShift(false);
+  };
+
+  const editShiftFromCalendar = (s: Shift) => {
+    setScheduleView('list');
+    startEditShift(s);
   };
 
   const handleDeleteShift = async (id: string) => {
@@ -712,16 +726,36 @@ const Staff: React.FC = () => {
             </h1>
             <p className="text-xs text-zinc-500 mt-[5px]">Upcoming shifts — today's feed the Crib Sheet</p>
           </div>
-          {!showAddShift && (
-            <button
-              onClick={() => { setShowAddShift(true); setAddShiftForm(BLANK_SHIFT()); setEditShiftId(null); }}
-              className={`${BTN_PRIMARY} flex items-center gap-[8px]`}
-              disabled={activeStaff.length === 0}
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Shift
-            </button>
-          )}
+          <div className="flex items-center gap-[13px]">
+            <div className="flex items-center gap-[5px] bg-zinc-900 p-[3px] rounded-[8px] border border-zinc-700">
+              <button
+                onClick={() => setScheduleView('list')}
+                className={`px-[8px] py-[5px] text-[10px] font-bold uppercase tracking-wider rounded-[5px] flex items-center gap-[5px] transition-colors duration-[144ms] ${
+                  scheduleView === 'list' ? 'bg-emerald-900/50 text-emerald-300' : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                <List className="w-3 h-3" /> List
+              </button>
+              <button
+                onClick={() => setScheduleView('calendar')}
+                className={`px-[8px] py-[5px] text-[10px] font-bold uppercase tracking-wider rounded-[5px] flex items-center gap-[5px] transition-colors duration-[144ms] ${
+                  scheduleView === 'calendar' ? 'bg-emerald-900/50 text-emerald-300' : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                <CalendarRange className="w-3 h-3" /> Calendar
+              </button>
+            </div>
+            {!showAddShift && (
+              <button
+                onClick={() => { setShowAddShift(true); setAddShiftForm(BLANK_SHIFT()); setEditShiftId(null); }}
+                className={`${BTN_PRIMARY} flex items-center gap-[8px]`}
+                disabled={activeStaff.length === 0}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add Shift
+              </button>
+            )}
+          </div>
         </div>
 
         {activeStaff.length === 0 && !showAddShift && (
@@ -742,13 +776,25 @@ const Staff: React.FC = () => {
           </div>
         )}
 
-        {shiftsByDate.size === 0 && !showAddShift && (
+        {scheduleView === 'calendar' && (
+          <ScheduleCalendar
+            shifts={allShifts}
+            staff={allStaff}
+            events={allEvents}
+            clients={allClients}
+            stationPresets={stationPresets}
+            onEditShift={editShiftFromCalendar}
+            onOpenEvent={id => onOpenEvent?.(id)}
+          />
+        )}
+
+        {scheduleView === 'list' && shiftsByDate.size === 0 && !showAddShift && (
           <div className="bg-zinc-950 border border-zinc-800 rounded-[13px] p-[34px] text-center">
             <p className="text-xs text-zinc-500 italic">No upcoming shifts scheduled.</p>
           </div>
         )}
 
-        {shiftsByDate.size > 0 && (
+        {scheduleView === 'list' && shiftsByDate.size > 0 && (
           <div className="space-y-[21px]">
             {Array.from(shiftsByDate.entries()).map(([dateKey, group]) => (
               <div key={dateKey} className="bg-zinc-950 border border-zinc-800 rounded-[13px] p-[21px]">

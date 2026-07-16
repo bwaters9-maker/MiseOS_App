@@ -86,6 +86,7 @@ const AppShell: React.FC = () => {
     () => (localStorage.getItem('miseos_unit_system') as UnitSystem | null) ?? 'imperial'
   );
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
   // targetFcPercent and menuTemplate now live on the restaurant profile doc
   // (migrated from App.tsx state + localStorage) — read fallback to the old
@@ -101,6 +102,11 @@ const AppShell: React.FC = () => {
   const openRecipeInBuilder = (recipeId: string) => {
     setSelectedRecipeId(recipeId);
     setActiveView('recipes');
+  };
+
+  const openEventDetail = (eventId: string) => {
+    setSelectedEventId(eventId);
+    setActiveView('events');
   };
 
   const setUnitSystem = (u: UnitSystem) => {
@@ -163,6 +169,9 @@ const AppShell: React.FC = () => {
               selectedRecipeId={selectedRecipeId}
               setSelectedRecipeId={setSelectedRecipeId}
               onOpenRecipe={openRecipeInBuilder}
+              selectedEventId={selectedEventId}
+              setSelectedEventId={setSelectedEventId}
+              onOpenEvent={openEventDetail}
               onNavigate={setActiveView}
             />
           </Suspense>

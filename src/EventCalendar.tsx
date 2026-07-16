@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CalendarDays, Contact, Plus, Pencil, Trash2, X, Check, ChevronDown, Flag } from 'lucide-react';
 import { db } from './firebaseConfig';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
@@ -464,7 +464,12 @@ const ClientCard: React.FC<{
 // MAIN VIEW
 // ===================================================================
 
-const EventCalendar: React.FC = () => {
+interface EventCalendarProps {
+  selectedEventId?: string | null;
+  setSelectedEventId?: (id: string | null) => void;
+}
+
+const EventCalendar: React.FC<EventCalendarProps> = ({ selectedEventId, setSelectedEventId }) => {
   const allEvents = (useKitchenSelector((s: any) => s.events) as KitchenEvent[]) ?? [];
   const allClients = (useKitchenSelector((s: any) => s.clients) as Client[]) ?? [];
   const allStaff = (useKitchenSelector((s: any) => s.staff) as Employee[]) ?? [];
@@ -478,6 +483,13 @@ const EventCalendar: React.FC = () => {
   const today = getToday();
 
   const [detailEventId, setDetailEventId] = useState<string | null>(null);
+
+  // Deep-link from another view (e.g. the Staff schedule calendar) — jumping
+  // here with a target event id opens its detail view directly, same pattern
+  // as RecipesHub syncing selectedRecipeId to the Recipe Builder sub-tab.
+  useEffect(() => {
+    if (selectedEventId) setDetailEventId(selectedEventId);
+  }, [selectedEventId]);
 
   const upcoming = [...allEvents]
     .filter(e => !e.date || e.date >= today)
@@ -619,7 +631,7 @@ const EventCalendar: React.FC = () => {
         recipes={allRecipes}
         ingredients={allIngredients}
         recipeCategories={recipeCategories}
-        onBack={() => setDetailEventId(null)}
+        onBack={() => { setDetailEventId(null); setSelectedEventId?.(null); }}
         onNavigateToEvent={setDetailEventId}
       />
     );
