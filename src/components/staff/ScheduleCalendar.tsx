@@ -182,6 +182,66 @@ const MonthCell: React.FC<{
 };
 
 // ===================================================================
+// WEEKLY HOURS — per-employee sum of shift durations across the visible
+// week, with a flat 40-hr overtime flag. Every saved shift is guaranteed
+// same-day with endTime > startTime (isShiftValid, Staff.tsx), so there
+// is no overnight/wraparound case to handle here.
+// ===================================================================
+
+const OVERTIME_THRESHOLD_HOURS = 40;
+
+const shiftHours = (shift: Shift) => {
+  const [startH, startM] = shift.startTime.split(':').map(Number);
+  const [endH, endM] = shift.endTime.split(':').map(Number);
+  return (endH * 60 + endM - (startH * 60 + startM)) / 60;
+};
+
+const WeeklyHoursStrip: React.FC<{
+  weekShifts: Shift[];
+  staffById: Map<string, Employee>;
+}> = ({ weekShifts, staffById }) => {
+  const hoursByStaffId = new Map<string, number>();
+  for (const sh of weekShifts) {
+    hoursByStaffId.set(sh.staffId, (hoursByStaffId.get(sh.staffId) ?? 0) + shiftHours(sh));
+  }
+
+  const rows = Array.from(hoursByStaffId.entries())
+    .map(([staffId, hours]) => ({ staffId, hours, employee: staffById.get(staffId) }))
+    .sort((a, b) => (a.employee?.name ?? 'Unknown').localeCompare(b.employee?.name ?? 'Unknown'));
+
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="pt-[13px] border-t border-line">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[8px]">Weekly Hours</p>
+      <div className="flex flex-wrap gap-[8px]">
+        {rows.map(({ staffId, hours, employee }) => {
+          const isOvertime = hours >= OVERTIME_THRESHOLD_HOURS;
+          return (
+            <div
+              key={staffId}
+              className={`flex items-center gap-[8px] px-[13px] py-[8px] rounded-card border ${
+                isOvertime ? 'border-red-400 bg-red-400/10' : 'border-line bg-bg-cool'
+              }`}
+            >
+              <span className="text-xs font-bold text-navy">
+                {employee?.name ?? 'Unknown'}{employee && !employee.active ? ' (inactive)' : ''}
+              </span>
+              <span className="text-xs text-slate tabular-nums">{hours.toFixed(1)} hrs</span>
+              {isOvertime && (
+                <span className="px-[8px] py-[3px] rounded-[5px] text-[10px] font-bold uppercase tracking-wider bg-red-400 text-white">
+                  Overtime
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ===================================================================
 // MAIN COMPONENT
 // ===================================================================
 
@@ -233,6 +293,7 @@ export const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
 
   const weekStart = startOfWeek(anchorDate);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const weekShifts = weekDays.flatMap(dateKey => shiftsByDate.get(dateKey) ?? []);
 
   const monthStart = startOfMonth(anchorDate);
   const gridStart = startOfWeek(monthStart);
@@ -286,31 +347,34 @@ export const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
       </div>
 
       {mode === 'week' && (
-        <div className="grid grid-cols-1 md:grid-cols-7 gap-[8px]">
-          {weekDays.map(dateKey => {
-            const isToday = dateKey === today;
-            return (
-              <div
-                key={dateKey}
-                className={`rounded-[8px] border p-[8px] ${isToday ? 'border-teal bg-teal/5' : 'border-line'}`}
-              >
-                <p className={`text-[10px] font-bold uppercase tracking-wider mb-[5px] ${isToday ? 'text-teal' : 'text-slate'}`}>
-                  {dayLabel(dateKey)} {dayNumber(dateKey)}{isToday ? ' · Today' : ''}
-                </p>
-                <DayContent
-                  dateKey={dateKey}
-                  dayShifts={shiftsByDate.get(dateKey) ?? []}
-                  dayEvents={eventsByDate.get(dateKey) ?? []}
-                  stationPresets={stationPresets}
-                  staffById={staffById}
-                  clientsById={clientsById}
-                  onEditShift={onEditShift}
-                  onOpenEvent={onOpenEvent}
-                />
-              </div>
-            );
-          })}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-7 gap-[8px]">
+            {weekDays.map(dateKey => {
+              const isToday = dateKey === today;
+              return (
+                <div
+                  key={dateKey}
+                  className={`rounded-[8px] border p-[8px] ${isToday ? 'border-teal bg-teal/5' : 'border-line'}`}
+                >
+                  <p className={`text-[10px] font-bold uppercase tracking-wider mb-[5px] ${isToday ? 'text-teal' : 'text-slate'}`}>
+                    {dayLabel(dateKey)} {dayNumber(dateKey)}{isToday ? ' · Today' : ''}
+                  </p>
+                  <DayContent
+                    dateKey={dateKey}
+                    dayShifts={shiftsByDate.get(dateKey) ?? []}
+                    dayEvents={eventsByDate.get(dateKey) ?? []}
+                    stationPresets={stationPresets}
+                    staffById={staffById}
+                    clientsById={clientsById}
+                    onEditShift={onEditShift}
+                    onOpenEvent={onOpenEvent}
+                  />
+                </div>
+              );
+            })}
+          </div>
+          <WeeklyHoursStrip weekShifts={weekShifts} staffById={staffById} />
+        </>
       )}
 
       {mode === 'month' && (
