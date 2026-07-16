@@ -1,31 +1,18 @@
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, CalendarDays, X } from 'lucide-react';
-import { todayDateKey, formatTime12h } from '../../utils';
+import { todayDateKey, formatTime12h, parseDateKey, toDateKey, addDays, startOfWeek } from '../../utils';
 import type { Employee, Shift, KitchenEvent, Client, PrepStation } from '../../types';
 
 // ===================================================================
-// DATE GRID MATH — Sunday-start weeks, local-time throughout (never
-// toISOString for date-key math, per the app's date/time convention).
+// MONTH GRID MATH — the week-boundary primitives (parseDateKey,
+// toDateKey, addDays, startOfWeek) live in utils.ts so the weekly-hours
+// summary below shares one definition instead of a second copy; these
+// two are month-mode-only and have no other consumer yet.
 // ===================================================================
-
-const parseDateKey = (key: string) => new Date(key + 'T00:00:00');
-const toDateKey = (d: Date) => d.toLocaleDateString('en-CA');
-
-const addDays = (key: string, n: number) => {
-  const d = parseDateKey(key);
-  d.setDate(d.getDate() + n);
-  return toDateKey(d);
-};
 
 const addMonths = (key: string, n: number) => {
   const d = parseDateKey(key);
   d.setMonth(d.getMonth() + n);
-  return toDateKey(d);
-};
-
-const startOfWeek = (key: string) => {
-  const d = parseDateKey(key);
-  d.setDate(d.getDate() - d.getDay());
   return toDateKey(d);
 };
 

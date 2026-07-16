@@ -27,6 +27,39 @@ export function formatTime12h(time: string): string {
 }
 
 /**
+ * Parses a YYYY-MM-DD date key into a local-time Date at midnight — the
+ * date-grid counterpart to todayDateKey(), never toISOString-based.
+ */
+export function parseDateKey(key: string): Date {
+  return new Date(key + 'T00:00:00');
+}
+
+/**
+ * Formats a Date back into a YYYY-MM-DD local-time date key.
+ */
+export function toDateKey(d: Date): string {
+  return d.toLocaleDateString('en-CA');
+}
+
+/**
+ * Adds (or subtracts, for negative n) whole days to a date key.
+ */
+export function addDays(key: string, n: number): string {
+  const d = parseDateKey(key);
+  d.setDate(d.getDate() + n);
+  return toDateKey(d);
+}
+
+/**
+ * Returns the Sunday-start date key of the week containing the given date.
+ */
+export function startOfWeek(key: string): string {
+  const d = parseDateKey(key);
+  d.setDate(d.getDate() - d.getDay());
+  return toDateKey(d);
+}
+
+/**
  * Format a duration in milliseconds to HH:MM:SS string.
  * Hides hours if the total duration is less than one hour.
  */
