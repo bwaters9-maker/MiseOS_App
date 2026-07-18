@@ -197,6 +197,10 @@ export const PlateComponentShape: React.FC<{ type: PlateComponentType; technique
       const Render = technique.Render;
       return (
         <g transform={`scale(${SAUCE_TECHNIQUE_SCALE}) translate(-500,-500)`}>
+          {/* Several techniques (e.g. Crosshatch Mesh) are mostly open space
+              between thin strokes — without this, clicking the gaps between
+              lines would miss the shape entirely and never select/drag it. */}
+          <rect x={0} y={0} width={1000} height={1000} fill="transparent" />
           <Render color={fill} />
         </g>
       );
