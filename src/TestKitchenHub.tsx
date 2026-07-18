@@ -337,7 +337,7 @@ export default function TestKitchenHub() {
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [trendsLoading, setTrendsLoading] = useState(false);
   const [trendsError, setTrendsError] = useState<string | null>(null);
@@ -356,10 +356,8 @@ export default function TestKitchenHub() {
   );
 
   useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }
-  }, [messages]);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [messages, isGenerating]);
 
   const handleNewSession = () => {
     setMessages([]);
@@ -476,8 +474,8 @@ export default function TestKitchenHub() {
   const regularCards = displayedReport?.cards.filter(c => !c.isViralBridge) ?? [];
 
   return (
-    <div className="max-w-[1597px] mx-auto px-[21px] py-[34px] font-body">
-      <div className="border-b border-line pb-[21px] flex flex-col sm:flex-row justify-between items-start sm:items-end gap-[21px]">
+    <div className={`max-w-[1597px] mx-auto px-[21px] py-[34px] font-body ${activeSubTab === 'optimizer' ? 'h-full flex flex-col min-h-0' : ''}`}>
+      <div className="border-b border-line pb-[21px] flex flex-col sm:flex-row justify-between items-start sm:items-end gap-[21px] shrink-0">
         <div>
           <h1 className="text-xl font-display font-bold tracking-tight text-navy">Test Kitchen</h1>
           <p className="text-xs text-slate mt-[5px]">Develop new dishes with real-time AI assistance</p>
@@ -791,70 +789,71 @@ export default function TestKitchenHub() {
       )}
 
       {activeSubTab === 'optimizer' && (
-        <div className="space-y-6 mt-6">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-            {/* LEFT COLUMN, FULL HEIGHT: existing chat — relocated, logic untouched */}
-            <div className="lg:col-span-1 lg:self-stretch flex flex-col gap-4">
-              <div className="bg-surface border border-line rounded-card p-5 flex-1 min-h-[350px] flex flex-col justify-between">
-                <div className="flex justify-between items-center border-b border-line pb-3">
+        <div className="flex-1 min-h-0 mt-[21px]">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-[21px] h-full min-h-0">
+            {/* LEFT COLUMN, FULL HEIGHT: chat — message list scrolls internally, input pinned at bottom */}
+            <div className="lg:col-span-1 h-full min-h-0 flex flex-col gap-[13px]">
+              <div className="bg-surface border border-line rounded-card p-[21px] flex-1 min-h-0 flex flex-col">
+                <div className="flex justify-between items-center border-b border-line pb-[13px] shrink-0">
                   {/* "Chef Matthew" is a placeholder persona name pending a future onboarding customization setting */}
                   <div className="text-xs font-bold uppercase tracking-widest text-navy">Chef Matthew — Sous Chef</div>
-                  <button onClick={handleNewSession} className="text-[10px] font-bold uppercase text-slate hover:text-navy flex items-center gap-1">
+                  <button onClick={handleNewSession} className="text-[10px] font-bold uppercase text-slate hover:text-navy flex items-center gap-[3px]">
                     <RefreshCw className="w-3 h-3" /> New Session
                   </button>
                 </div>
-                <div ref={chatContainerRef} className="flex-1 p-4 my-4 overflow-y-auto h-96">
+                <div className="flex-1 min-h-0 overflow-y-auto p-[13px] my-[13px]">
                   {messages.length === 0 && !isGenerating ? (
                     <div className="flex items-center justify-center h-full text-center">
                       <p className="text-xs text-slate max-w-md leading-relaxed">Brainstorm and develop brand-new dishes from scratch. Get AI guidance on trending ingredients, flavor pairings, and precise menu costing adjustments.</p>
                     </div>
                   ) : (
-                    <div className="space-y-6">
+                    <div className="space-y-[21px]">
                       {messages.map((msg, index) => (
-                        <div key={index} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div key={index} className={`flex gap-[13px] ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                           {msg.role === 'model' && <div className="w-6 h-6 rounded-full bg-teal/15 flex items-center justify-center text-teal shrink-0"><Sparkles className="w-3.5 h-3.5" /></div>}
-                          <div className={`max-w-xl p-3 rounded-card text-navy ${msg.role === 'user' ? 'bg-bg-cool' : 'bg-surface border border-line'}`}>
+                          <div className={`max-w-xl p-[13px] rounded-card text-navy ${msg.role === 'user' ? 'bg-bg-cool' : 'bg-surface border border-line'}`}>
                             <MarkdownContent content={msg.content} />
                           </div>
                         </div>
                       ))}
                       {isGenerating && (
-                        <div className="flex gap-3 justify-start">
+                        <div className="flex gap-[13px] justify-start">
                           <div className="w-6 h-6 rounded-full bg-teal/15 flex items-center justify-center text-teal shrink-0"><Sparkles className="w-3.5 h-3.5" /></div>
-                          <div className="p-3"><span className="animate-pulse text-slate">...</span></div>
+                          <div className="p-[13px]"><span className="animate-pulse text-slate">...</span></div>
                         </div>
                       )}
+                      <div ref={messagesEndRef} />
                     </div>
                   )}
                 </div>
-                <form onSubmit={handleSubmit} className="pt-3">
+                <form onSubmit={handleSubmit} className="pt-[13px] shrink-0">
                   <div className="relative">
-                    <input type="text" value={userInput} onChange={(e) => setUserInput(e.target.value)} placeholder="Describe a dish concept you want to develop..." className="w-full bg-bg-cool border border-line p-3.5 pr-12 rounded-card text-xs focus:outline-none focus:border-teal text-navy placeholder:text-slate/60 font-body disabled:opacity-50" disabled={isGenerating} />
+                    <input type="text" value={userInput} onChange={(e) => setUserInput(e.target.value)} placeholder="Describe a dish concept you want to develop..." className="w-full bg-bg-cool border border-line p-[13px] pr-12 rounded-card text-xs focus:outline-none focus:border-teal text-navy placeholder:text-slate/60 font-body disabled:opacity-50" disabled={isGenerating} />
                     <button type="submit" disabled={isGenerating} className="absolute right-3 top-3 text-slate hover:text-teal transition-colors disabled:opacity-50"><Send className="w-4 h-4" /></button>
                   </div>
                 </form>
               </div>
               {sessionError && (
-                <div className="bg-surface border border-red-400 rounded-card p-3 flex justify-between items-center">
-                  <div className="flex items-center gap-2.5 text-red-400 text-xs font-bold"><AlertCircle className="w-4 h-4 shrink-0" /><span>{sessionError}</span></div>
-                  <button onClick={() => setSessionError(null)} className="text-[9px] uppercase font-bold text-slate hover:text-navy px-2 py-1 rounded border border-line">Clear Status</button>
+                <div className="bg-surface border border-red-400 rounded-card p-[13px] flex justify-between items-center shrink-0">
+                  <div className="flex items-center gap-[8px] text-red-400 text-xs font-bold"><AlertCircle className="w-4 h-4 shrink-0" /><span>{sessionError}</span></div>
+                  <button onClick={() => setSessionError(null)} className="text-[9px] uppercase font-bold text-slate hover:text-navy px-[8px] py-[3px] rounded border border-line">Clear Status</button>
                 </div>
               )}
             </div>
 
             {/* CENTER: Plate Design — largest zone, contains Ingredient Palette sub-section */}
-            <div className="lg:col-span-2">
-              <div className="bg-surface border border-line rounded-card p-5 min-h-[610px] flex flex-col">
-                <div className="border-b border-line pb-3 mb-4">
+            <div className="lg:col-span-2 h-full min-h-0">
+              <div className="bg-surface border border-line rounded-card p-[21px] h-full min-h-0 flex flex-col">
+                <div className="border-b border-line pb-[13px] mb-[13px] shrink-0">
                   <p className="text-[10px] text-slate uppercase tracking-wider">Working Dish</p>
                   <h2 className="text-lg font-display font-bold text-navy">Untitled Dish</h2>
                 </div>
-                <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="md:col-span-3">
+                <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-4 gap-[13px]">
+                  <div className="md:col-span-3 min-h-0 overflow-y-auto">
                     <PlateDesigner />
                   </div>
-                  <div className="md:col-span-1 bg-bg-cool border border-line rounded-card p-4">
-                    <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate mb-2">Ingredient Palette</h3>
+                  <div className="md:col-span-1 min-h-0 overflow-y-auto bg-bg-cool border border-line rounded-card p-[13px]">
+                    <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[8px]">Ingredient Palette</h3>
                     <p className="text-xs text-slate leading-relaxed italic">Placeholder — a searchable ingredient palette will live here in a later phase.</p>
                   </div>
                 </div>
@@ -862,23 +861,23 @@ export default function TestKitchenHub() {
             </div>
 
             {/* RIGHT: Trends (top) + Recipe Build (below) */}
-            <div className="lg:col-span-1 space-y-6">
-              <div className="bg-surface border border-line rounded-card p-5">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-navy border-b border-line pb-2 mb-3">Trends for This Dish</h3>
+            <div className="lg:col-span-1 h-full min-h-0 overflow-y-auto space-y-[21px]">
+              <div className="bg-surface border border-line rounded-card p-[21px]">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-navy border-b border-line pb-[8px] mb-[13px]">Trends for This Dish</h3>
                 <p className="text-xs text-slate leading-relaxed">Placeholder — dish-specific trend signals will surface here in a later phase.</p>
               </div>
-              <div className="bg-surface border border-line rounded-card p-5 space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-navy border-b border-line pb-2">Recipe Build</h3>
+              <div className="bg-surface border border-line rounded-card p-[21px] space-y-[13px]">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-navy border-b border-line pb-[8px]">Recipe Build</h3>
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-1">Yield</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[3px]">Yield</p>
                   <p className="text-xs text-slate italic">Not yet specified.</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-1">Ingredients</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[3px]">Ingredients</p>
                   <p className="text-xs text-slate italic">No ingredients added yet.</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-1">Method</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[3px]">Method</p>
                   <p className="text-xs text-slate italic">No method steps yet.</p>
                 </div>
               </div>

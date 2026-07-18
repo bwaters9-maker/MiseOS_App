@@ -174,9 +174,9 @@ const AppShell: React.FC = () => {
   }, [theme]);
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-bg-cool text-navy antialiased font-body">
+    <div className="h-screen w-full overflow-x-hidden bg-bg-cool text-navy antialiased font-body flex flex-col">
       <AppHeader activeView={activeView} onNavigate={setActiveView} />
-      <main className="py-6">
+      <main className="flex-1 min-h-0 overflow-y-auto py-6">
         <ErrorBoundary>
           <Suspense fallback={<div className="p-12 text-center text-sm text-slate">Loading...</div>}>
             <ActiveViewRenderer

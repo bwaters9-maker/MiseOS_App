@@ -111,6 +111,15 @@
     background: transparent !important;
   }
 
+  /* main is the app's scroll container (viewport-height + overflow-y-auto,
+     for Test Kitchen's fixed-height Playground layout) — printing must see
+     the full natural-flow document, not just whatever's scrolled into view. */
+  main {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
   /* Force background color clearance & pitch-black text for paper legibility */
   div,
   section,
