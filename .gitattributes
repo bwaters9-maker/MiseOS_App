@@ -1,0 +1,19 @@
+# Normalize line endings for all text files to LF in the repository,
+# regardless of each contributor's local core.autocrlf setting. Stops the
+# tree-wide CRLF/LF churn that otherwise shows every file as modified.
+* text=auto eol=lf
+
+# Windows-specific scripts should keep CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets — never touch line endings.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
