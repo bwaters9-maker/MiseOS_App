@@ -15,7 +15,6 @@ service cloud.firestore {
     //
     // Collection: prepItems      — see src/types.ts PrepItem
     // Collection: recipes        — see src/types.ts Recipe / RecipeLine
-    // Collection: items86        — see src/types.ts Item86
     // Collection: features       — see src/types.ts Feature
     // Collection: staff          — see src/types.ts Employee
     // Collection: shifts         — see src/types.ts Shift
@@ -97,7 +96,6 @@ service cloud.firestore {
 
     match /prepItems/{id}          { allow read, write: if isAuthenticated(); }
     match /recipes/{id}            { allow read, write: if isAuthenticated(); }
-    match /items86/{id}            { allow read, write: if isAuthenticated(); }
     match /features/{id}           { allow read, write: if isAuthenticated(); }
     match /staff/{id}               { allow read, write: if isAuthenticated(); }
     match /shifts/{id}              { allow read, write: if isAuthenticated(); }

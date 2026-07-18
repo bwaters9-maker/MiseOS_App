@@ -149,24 +149,9 @@ export interface RestaurantProfile {
   menuTemplate?: MenuTemplate;
 }
 
-/**
- * Represents an 86'd (out-of-stock) item.
- */
-export interface Item86 {
-  id: string;
-  name: string;
-  status: 'out' | 'limited';
-  station?: PrepStation | 'All';
-  substitute?: string;
-  blockedAt: string;
-  timestamp: string;
-}
-
 export type PrepStation = 'Sauté' | 'Grill' | 'Garde Manger' | 'Pastry';
 
 export type ProductionRun = PrepItem;
-
-export type Item86Entry = Item86;
 
 /**
  * A single editorial trend card shown in Test Kitchen's Culinary Trends &

@@ -140,7 +140,6 @@ The Recipe Builder sub-tab also carries a "View Menu" button (`onViewMenu` prop)
 |---|---|
 | `prepItems` | `useKitchenState`, `PrepChecklist` |
 | `recipes` | `useKitchenState`, `Recipes.tsx` |
-| `items86` | `useKitchenState` |
 | `features` | `useKitchenState`, `Features`, `DailyCribSheet` |
 | `staff` | `useKitchenState`, `Staff.tsx` — employee directory (repurposed from daily roster) |
 | `shifts` | `useKitchenState`, `Staff.tsx`, `DailyCribSheet`, `ChefDashboard` — planned shifts, joined to `staff` for display |
@@ -167,7 +166,6 @@ The Recipe Builder sub-tab also carries a "View Menu" button (`onViewMenu` prop)
 | `PrepItem` / `ProductionRun` | Prep checklist task |
 | `Recipe` | id, name, recipeType ('sub' \| 'menu'), course, categoryId?, batchYield { qty, measureType }, portions, lines: RecipeLine[], methodSteps, menuPrice?, menuDescription?, updatedAt |
 | `RecipeLine` | A recipe component: `{ type: 'ingredient' \| 'recipe', refId, qty, entryUnit?, note? }`. `qty` is always canonical base units. `entryUnit: 'each'` marks a line the chef entered by piece on a spec'd weight ingredient (qty stores pieces × pieceWeightG; spec'd ingredients default to 'each' when added and offer it in the unit select). Only `recipeType: 'sub'` recipes may be referenced as a line — menu recipes never nest |
-| `Item86` / `Item86Entry` | 86'd item |
 | `PrepStation` | `'Sauté' \| 'Grill' \| 'Garde Manger' \| 'Pastry'` |
 | `Feature` | Nightly special (course, name, description, price, cost, activeFrom, activeTo, is86d, recipeId?) — `recipeId` is provenance only; name/description/price/cost are a one-time snapshot copied from the recipe at creation, never re-synced |
 | `Employee` | Directory entry: id, name, positions: string[], hourlyRate?, active |
@@ -199,7 +197,7 @@ The Recipe Builder sub-tab also carries a "View Menu" button (`onViewMenu` prop)
 | `PricePoint` | `'$' \| '$$' \| '$$$' \| '$$$$'` — `RestaurantProfile.pricePoint` |
 | `RestaurantProfile` | Singleton doc at `restaurant_profile/main`: name?, chefName?, brandColor?, cuisineStyle?, pricePoint?, city?, state?, regionalNotes?, targetFcPercent?, menuTemplate? — every field optional, edited from Settings' Restaurant Profile section. `regionalNotes` is free text by design (chef commentary on local ingredients/traditions); `state` is a plain string (USPS code) rather than a union, UI-constrained to a fixed select. `targetFcPercent`/`menuTemplate` were migrated here from App.tsx state + localStorage — see the Restaurant Profile section below |
 
-Note: `useKitchenState.ts` also defines `PrepItem` and `Item86` locally (pre-existing duplication). `Recipe` was de-duplicated — `useKitchenState.ts` now imports the canonical type from `src/types.ts` directly. New types belong in `src/types.ts` only.
+Note: `useKitchenState.ts` also defines `PrepItem` locally (pre-existing duplication). `Recipe` was de-duplicated — `useKitchenState.ts` now imports the canonical type from `src/types.ts` directly. New types belong in `src/types.ts` only.
 
 ## Design system
 
@@ -426,7 +424,7 @@ path in BrainDumpModule.jsx."
 ### Approved Feature Map
 
 DAILY OPERATIONS
-- Dashboard / Crib Sheet (86'd items, features tonight, events snapshot — print-optimized)
+- Dashboard / Crib Sheet (features tonight, events snapshot — print-optimized)
 - Kitchen Timers (multi-station)
 - Alert History
 
@@ -571,6 +569,7 @@ AI LAYER
 - Market Volatility Tracking
 - Training Dashboard
 - Hostess Chat
+- 86'd Items (standalone `items86` collection — separate from `Feature.is86d`, which is live and unrelated)
 
 ### Master Pantry Mandate
 No live data feeds. No automatic mutation. No vendor-system

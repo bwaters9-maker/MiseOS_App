@@ -17,18 +17,9 @@ export interface PrepItem {
   recipe_id: string;
 }
 
-export interface Item86 {
-  id: string;
-  name: string;
-  status: 'out' | 'limited';
-  substitute?: string;
-  timestamp: string;
-}
-
 export const useKitchenState = () => {
   const [prepItems, setPrepItems] = useState<PrepItem[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [items86, setItems86] = useState<Item86[]>([]);
   const [features, setFeatures] = useState<Feature[]>([]);
   const [staff, setStaff] = useState<Employee[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
@@ -64,17 +55,6 @@ export const useKitchenState = () => {
       (snapshot: QuerySnapshot<DocumentData>) => {
         const items = snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as Recipe));
         setRecipes(items);
-      },
-      (error: FirestoreError) => {
-        setError(error);
-      }
-    );
-
-    const unsub86 = onSnapshot(
-      collection(db, 'items86'),
-      (snapshot: QuerySnapshot<DocumentData>) => {
-        const items = snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as Item86));
-        setItems86(items);
       },
       (error: FirestoreError) => {
         setError(error);
@@ -180,7 +160,6 @@ export const useKitchenState = () => {
     return () => {
       unsubPrep();
       unsubRecipes();
-      unsub86();
       unsubFeatures();
       unsubStaff();
       unsubShifts();
@@ -195,5 +174,5 @@ export const useKitchenState = () => {
     };
   }, []);
 
-  return { prepItems, setPrepItems, recipes, setRecipes, items86, features, staff, shifts, events, clients, alerts, cribNotes, ingredients, vendors, restaurantProfile, restaurantProfileLoaded, trendReport, trendReportLoaded, loading, error };
+  return { prepItems, setPrepItems, recipes, setRecipes, features, staff, shifts, events, clients, alerts, cribNotes, ingredients, vendors, restaurantProfile, restaurantProfileLoaded, trendReport, trendReportLoaded, loading, error };
 };
