@@ -106,6 +106,39 @@ export interface RecipeCollection {
 }
 
 /**
+ * Test Kitchen Phase D — Plate Designer. A standalone visual layout tool,
+ * not linked to Recipe / RecipeLine — no cost or nutrition implications.
+ */
+export type PlateShape = 'round-rimmed' | 'coupe' | 'bowl' | 'wide-rim-bowl' | 'rectangle' | 'square' | 'offset';
+
+export type PlateComponentType = 'protein' | 'starch' | 'vegetable' | 'sauceSmear' | 'sauceDots' | 'garnish';
+
+/**
+ * One placed item on the plate. `x`/`y`/`scale`/`rotation` are all in the
+ * canvas's own 0-400 SVG viewBox coordinate space, not screen pixels.
+ */
+export interface PlateComponent {
+  id: string;
+  type: PlateComponentType;
+  x: number;
+  y: number;
+  scale: number;
+  rotation: number;
+  /** Stacking order — higher renders on top. Mutated by bring-forward/send-backward. */
+  z: number;
+}
+
+export interface PlateDesign {
+  id: string;
+  /** Dish name — free text, same allowed exception as other name fields. */
+  name: string;
+  plateShape: PlateShape;
+  components: PlateComponent[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
  * Guest-facing menu print/preview styling choice, selected from the Menu
  * view's Guest Preview toggle. Persisted in the `RestaurantProfile` doc
  * (`menuTemplate`), migrated from an earlier App.tsx + localStorage scheme.
