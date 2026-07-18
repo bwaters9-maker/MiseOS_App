@@ -1,4 +1,5 @@
 import React from 'react';
+import { findSauceTechnique } from './sauceTechniques';
 import type { PlateShape, PlateComponentType } from '../../types';
 
 /**
@@ -97,7 +98,18 @@ export const PLATE_COMPONENT_TYPES: { value: PlateComponentType; label: string }
   { value: 'sauceSmear', label: 'Sauce Smear' },
   { value: 'sauceDots', label: 'Sauce Dots' },
   { value: 'garnish', label: 'Garnish' },
+  { value: 'sauceTechnique', label: 'Sauce' },
 ];
+
+/**
+ * Palette-eligible non-sauce types. Sauce placement goes through the
+ * technique picker (SAUCE_TECHNIQUES in sauceTechniques.tsx) instead of a
+ * flat palette chip — 'sauceSmear'/'sauceDots' stay out of the palette
+ * entirely (v1.0 shapes, load-only) and 'sauceTechnique' has its own UI.
+ */
+export const PALETTE_COMPONENT_TYPES = PLATE_COMPONENT_TYPES.filter(
+  t => t.value !== 'sauceSmear' && t.value !== 'sauceDots' && t.value !== 'sauceTechnique'
+);
 
 /**
  * Local content palette for color-coding component types on the canvas —
@@ -113,12 +125,19 @@ export const PLATE_COMPONENT_COLORS: Record<PlateComponentType, string> = {
   sauceSmear: '#7A4A63',
   sauceDots: '#5B7A93',
   garnish: '#3F6B4A',
+  sauceTechnique: '#7A4A63',
 };
+
+/** Sauce technique blueprints are authored in 1000x1000 space; this scales
+ * them down to the same footprint the other components use on the 400-unit
+ * canvas. Picker thumbnails render the raw 1000x1000 geometry directly
+ * instead (viewBox="0 0 1000 1000"), so this only applies at placement time. */
+export const SAUCE_TECHNIQUE_SCALE = 0.16;
 
 const EDGE_STROKE = 'rgba(0,0,0,0.18)';
 
 /** Renders one component shape centered at local (0,0) — wrap in a <g transform>. */
-export const PlateComponentShape: React.FC<{ type: PlateComponentType }> = ({ type }) => {
+export const PlateComponentShape: React.FC<{ type: PlateComponentType; techniqueId?: string }> = ({ type, techniqueId }) => {
   const fill = PLATE_COMPONENT_COLORS[type];
   switch (type) {
     case 'protein':
@@ -172,5 +191,15 @@ export const PlateComponentShape: React.FC<{ type: PlateComponentType }> = ({ ty
           <path d="M 0,4 C -6,-10 -4,-26 0,-34 C 4,-26 6,-10 0,4 Z" />
         </g>
       );
+    case 'sauceTechnique': {
+      const technique = findSauceTechnique(techniqueId);
+      if (!technique) return null;
+      const Render = technique.Render;
+      return (
+        <g transform={`scale(${SAUCE_TECHNIQUE_SCALE}) translate(-500,-500)`}>
+          <Render color={fill} />
+        </g>
+      );
+    }
   }
 };
