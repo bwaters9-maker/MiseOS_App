@@ -9,6 +9,8 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import http from 'http';
+import { initializeApp } from 'firebase-admin/app';
+import { handleAiProxyRequest } from './functions/src/aiProxyHandler.ts';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -17,55 +19,23 @@ app.use(express.json({ limit: '20mb' }));
 
 const PORT = 3001;
 
-const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
+// Enough for verifyIdToken() (JWT signature check against Google's
+// public keys) — does not need full service-account credentials, so
+// local dev needs no service account key just to enforce the same
+// auth check the deployed Cloud Function enforces.
+const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
+if (!projectId) {
+  console.error('FATAL: FIREBASE_PROJECT_ID or VITE_FIREBASE_PROJECT_ID must be set.');
+  process.exit(1);
+}
+initializeApp({ projectId });
 
 app.post('/api/ai', async (req, res) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    res.status(500).json({ error: { message: 'ANTHROPIC_API_KEY is not configured on the server.' } });
-    return;
-  }
-
-  const { system, messages, max_tokens, tools } = req.body ?? {};
-  if (!Array.isArray(messages)) {
-    res.status(400).json({ error: { message: 'Request body must include a "messages" array.' } });
-    return;
-  }
-
-  let allowedTools;
-  if (tools !== undefined) {
-    if (!Array.isArray(tools) || !tools.every((t) => t && t.type === 'web_search_20250305' && t.name === 'web_search')) {
-      res.status(400).json({ error: { message: 'Only the web_search tool may be requested through this proxy.' } });
-      return;
-    }
-    allowedTools = tools;
-  }
-
-  try {
-    const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: ANTHROPIC_MODEL,
-        max_tokens: max_tokens ?? 1024,
-        ...(system ? { system } : {}),
-        ...(allowedTools ? { tools: allowedTools } : {}),
-        messages,
-      }),
-    });
-
-    const data = await anthropicResponse.json();
-
-    // Anthropic's own error body is already { error: { message } } — forward it as-is.
-    res.status(anthropicResponse.status).json(data);
-  } catch (err) {
-    console.error('Anthropic proxy request failed:', err);
-    res.status(502).json({ error: { message: 'Failed to reach Anthropic API.' } });
-  }
+  const result = await handleAiProxyRequest(
+    { authHeader: req.headers.authorization, body: req.body ?? {} },
+    process.env.ANTHROPIC_API_KEY
+  );
+  res.status(result.status).json(result.body);
 });
 
 async function startServer() {
