@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Sparkles, RefreshCw, Send, AlertCircle, ExternalLink, Flame, TrendingUp, TrendingDown, ChevronDown, CalendarDays, Printer } from 'lucide-react';
+import PlateDesigner from './components/testKitchen/PlateDesigner';
 import { SOUS_SYSTEM_PROMPT } from './lib/sousPersona';
 import { withRegionContext } from './lib/regionContext';
 import { callAi, parseAiJson, getAiAuthHeader } from './lib/ai';
@@ -843,14 +844,14 @@ export default function TestKitchenHub() {
 
             {/* CENTER: Plate Design — largest zone, contains Ingredient Palette sub-section */}
             <div className="lg:col-span-2">
-              <div className="bg-surface border border-line rounded-card p-5 min-h-[350px] flex flex-col">
+              <div className="bg-surface border border-line rounded-card p-5 min-h-[610px] flex flex-col">
                 <div className="border-b border-line pb-3 mb-4">
                   <p className="text-[10px] text-slate uppercase tracking-wider">Working Dish</p>
                   <h2 className="text-lg font-display font-bold text-navy">Untitled Dish</h2>
                 </div>
                 <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="md:col-span-3 bg-bg-cool border border-line rounded-card flex items-center justify-center">
-                    <p className="text-xs text-slate italic">Plate Design — the plate builder will be embedded here in a later phase.</p>
+                  <div className="md:col-span-3">
+                    <PlateDesigner />
                   </div>
                   <div className="md:col-span-1 bg-bg-cool border border-line rounded-card p-4">
                     <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate mb-2">Ingredient Palette</h3>
