@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Settings as SettingsIcon, Sun, Moon, Trash2, PlusCircle, AlertTriangle, Pencil, Check, X, Scale, LogOut, User, ChefHat, Image } from 'lucide-react';
 import type { UnitSystem } from './lib/units';
-import { db } from './firebaseConfig';
-import { collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy, updateDoc, setDoc, deleteField } from 'firebase/firestore';
+import { onSnapshot, addDoc, deleteDoc, query, orderBy, updateDoc, setDoc, deleteField } from 'firebase/firestore';
+import { rCollection, rDoc } from './lib/firestorePaths';
 import { AlertDialog } from './components/AlertDialog';
-import { useAuth } from './components/AuthContext';
+import { useAuth, useRestaurantId } from './components/AuthContext';
 import { useKitchenSelector } from './components/KitchenStateContext';
 import Ingredients from './IngredientsTable';
 import Vendors from './Vendors';
@@ -109,6 +109,7 @@ const profileToDoc = (f: ProfileFormState) => ({
 
 export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem = 'imperial', setUnitSystem, targetFcPercent = 30, setTargetFcPercent }) => {
   const { user, signOut } = useAuth();
+  const restaurantId = useRestaurantId();
   const [signingOut, setSigningOut] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'general' | 'ingredients' | 'vendors'>('general');
 
@@ -128,7 +129,7 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
     if (savingProfile) return;
     setSavingProfile(true);
     try {
-      await setDoc(doc(db, 'restaurant_profile', 'main'), profileToDoc(profileForm), { merge: true });
+      await setDoc(rDoc(restaurantId, 'restaurant_profile', 'main'), profileToDoc(profileForm), { merge: true });
     } finally {
       setSavingProfile(false);
     }
@@ -154,7 +155,7 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
   const eventTypeSeeding = useRef(false);
 
   useEffect(() => {
-    const q = query(collection(db, 'station_presets'), orderBy('name'));
+    const q = query(rCollection(restaurantId, 'station_presets'), orderBy('name'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const stationData = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -164,14 +165,14 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [restaurantId]);
 
   useEffect(() => {
-    const q = query(collection(db, 'recipe_categories'), orderBy('name'));
+    const q = query(rCollection(restaurantId, 'recipe_categories'), orderBy('name'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       if (snapshot.empty && !categorySeeding.current) {
         categorySeeding.current = true;
-        Promise.all(DEFAULT_RECIPE_CATEGORIES.map(name => addDoc(collection(db, 'recipe_categories'), { name })));
+        Promise.all(DEFAULT_RECIPE_CATEGORIES.map(name => addDoc(rCollection(restaurantId, 'recipe_categories'), { name })));
       }
       const categoryData = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -181,14 +182,14 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [restaurantId]);
 
   useEffect(() => {
-    const q = query(collection(db, 'event_types'), orderBy('name'));
+    const q = query(rCollection(restaurantId, 'event_types'), orderBy('name'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       if (snapshot.empty && !eventTypeSeeding.current) {
         eventTypeSeeding.current = true;
-        Promise.all(DEFAULT_EVENT_TYPES.map(name => addDoc(collection(db, 'event_types'), { name })));
+        Promise.all(DEFAULT_EVENT_TYPES.map(name => addDoc(rCollection(restaurantId, 'event_types'), { name })));
       }
       const eventTypeData = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -198,17 +199,17 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [restaurantId]);
 
   const handleAddStation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newStationName.trim() === '') return;
-    await addDoc(collection(db, 'station_presets'), { name: newStationName.trim() });
+    await addDoc(rCollection(restaurantId, 'station_presets'), { name: newStationName.trim() });
     setNewStationName('');
   };
 
   const handleDeleteStation = async (id: string) => {
-    await deleteDoc(doc(db, 'station_presets', id));
+    await deleteDoc(rDoc(restaurantId, 'station_presets', id));
     setStationToDelete(null);
   };
 
@@ -225,19 +226,19 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
   const handleUpdateStation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!stationToEdit || editingStationName.trim() === '') return;
-    await updateDoc(doc(db, 'station_presets', stationToEdit.id), { name: editingStationName.trim() });
+    await updateDoc(rDoc(restaurantId, 'station_presets', stationToEdit.id), { name: editingStationName.trim() });
     handleCancelEdit();
   };
 
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newCategoryName.trim() === '') return;
-    await addDoc(collection(db, 'recipe_categories'), { name: newCategoryName.trim() });
+    await addDoc(rCollection(restaurantId, 'recipe_categories'), { name: newCategoryName.trim() });
     setNewCategoryName('');
   };
 
   const handleDeleteCategory = async (id: string) => {
-    await deleteDoc(doc(db, 'recipe_categories', id));
+    await deleteDoc(rDoc(restaurantId, 'recipe_categories', id));
     setCategoryToDelete(null);
   };
 
@@ -254,19 +255,19 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
   const handleUpdateCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!categoryToEdit || editingCategoryName.trim() === '') return;
-    await updateDoc(doc(db, 'recipe_categories', categoryToEdit.id), { name: editingCategoryName.trim() });
+    await updateDoc(rDoc(restaurantId, 'recipe_categories', categoryToEdit.id), { name: editingCategoryName.trim() });
     handleCancelEditCategory();
   };
 
   const handleAddEventType = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newEventTypeName.trim() === '') return;
-    await addDoc(collection(db, 'event_types'), { name: newEventTypeName.trim() });
+    await addDoc(rCollection(restaurantId, 'event_types'), { name: newEventTypeName.trim() });
     setNewEventTypeName('');
   };
 
   const handleDeleteEventType = async (id: string) => {
-    await deleteDoc(doc(db, 'event_types', id));
+    await deleteDoc(rDoc(restaurantId, 'event_types', id));
     setEventTypeToDelete(null);
   };
 
@@ -283,7 +284,7 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
   const handleUpdateEventType = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!eventTypeToEdit || editingEventTypeName.trim() === '') return;
-    await updateDoc(doc(db, 'event_types', eventTypeToEdit.id), { name: editingEventTypeName.trim() });
+    await updateDoc(rDoc(restaurantId, 'event_types', eventTypeToEdit.id), { name: editingEventTypeName.trim() });
     handleCancelEditEventType();
   };
 

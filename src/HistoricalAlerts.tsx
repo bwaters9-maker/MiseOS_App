@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { History, CheckCircle2, RotateCcw } from 'lucide-react';
 import { useKitchenSelector } from './components/KitchenStateContext';
-import { db } from './firebaseConfig';
-import { doc, updateDoc } from 'firebase/firestore';
+import { useRestaurantId } from './components/AuthContext';
+import { updateDoc } from 'firebase/firestore';
+import { rDoc } from './lib/firestorePaths';
 import type { KitchenAlert } from './types';
 
 const BADGE = 'px-[8px] py-[3px] rounded-[5px] text-[10px] font-bold uppercase tracking-wider border';
@@ -36,12 +37,13 @@ const filterBtnClass = (active: boolean) =>
     : 'bg-transparent text-slate border-line hover:text-navy'}`;
 
 export const HistoricalAlerts: React.FC = () => {
+  const restaurantId = useRestaurantId();
   const alerts = (useKitchenSelector((s: any) => s.alerts) as KitchenAlert[]) ?? [];
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
   const setResolved = (id: string, resolved: boolean) => {
-    updateDoc(doc(db, 'alerts', id), { resolved });
+    updateDoc(rDoc(restaurantId, 'alerts', id), { resolved });
   };
 
   const filtered = [...alerts]

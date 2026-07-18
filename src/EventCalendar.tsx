@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { CalendarDays, Contact, Plus, Pencil, Trash2, X, Check, ChevronDown, Flag } from 'lucide-react';
-import { db } from './firebaseConfig';
-import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { rCollection, rDoc } from './lib/firestorePaths';
 import { useKitchenSelector } from './components/KitchenStateContext';
+import { useRestaurantId } from './components/AuthContext';
 import { useEventTypes } from './hooks/useEventTypes';
 import { useRecipeCategories } from './hooks/useRecipeCategories';
 import { EventDetailView } from './components/events/EventDetailView';
@@ -470,6 +471,7 @@ interface EventCalendarProps {
 }
 
 const EventCalendar: React.FC<EventCalendarProps> = ({ selectedEventId, setSelectedEventId }) => {
+  const restaurantId = useRestaurantId();
   const allEvents = (useKitchenSelector((s: any) => s.events) as KitchenEvent[]) ?? [];
   const allClients = (useKitchenSelector((s: any) => s.clients) as Client[]) ?? [];
   const allStaff = (useKitchenSelector((s: any) => s.staff) as Employee[]) ?? [];
@@ -533,7 +535,7 @@ const EventCalendar: React.FC<EventCalendarProps> = ({ selectedEventId, setSelec
     if (!addEventForm.title.trim() || !addEventForm.date || savingEvent) return;
     setSavingEvent(true);
     try {
-      await addDoc(collection(db, 'events'), eventToDoc(addEventForm));
+      await addDoc(rCollection(restaurantId, 'events'), eventToDoc(addEventForm));
       setAddEventForm(BLANK_EVENT());
       setShowAddEvent(false);
     } finally {
@@ -560,7 +562,7 @@ const EventCalendar: React.FC<EventCalendarProps> = ({ selectedEventId, setSelec
         const nextLog: EventChangeLogEntry[] = [...(before?.changeLog ?? []), { date: today, text: logText }];
         patch.changeLog = nextLog;
       }
-      await updateDoc(doc(db, 'events', editEventId), patch);
+      await updateDoc(rDoc(restaurantId, 'events', editEventId), patch);
       setEditEventId(null);
     } finally {
       setSavingEvent(false);
@@ -568,7 +570,7 @@ const EventCalendar: React.FC<EventCalendarProps> = ({ selectedEventId, setSelec
   };
 
   const handleDeleteEvent = async (id: string) => {
-    await deleteDoc(doc(db, 'events', id));
+    await deleteDoc(rDoc(restaurantId, 'events', id));
     setDeleteEventConfirmId(null);
     if (editEventId === id) setEditEventId(null);
   };
@@ -586,7 +588,7 @@ const EventCalendar: React.FC<EventCalendarProps> = ({ selectedEventId, setSelec
     if (!addClientForm.name.trim() || savingClient) return;
     setSavingClient(true);
     try {
-      await addDoc(collection(db, 'clients'), clientToDoc(addClientForm));
+      await addDoc(rCollection(restaurantId, 'clients'), clientToDoc(addClientForm));
       setAddClientForm(BLANK_CLIENT());
       setShowAddClient(false);
     } finally {
@@ -598,7 +600,7 @@ const EventCalendar: React.FC<EventCalendarProps> = ({ selectedEventId, setSelec
     if (!editClientForm.name.trim() || savingClient || !editClientId) return;
     setSavingClient(true);
     try {
-      await updateDoc(doc(db, 'clients', editClientId), clientToDoc(editClientForm));
+      await updateDoc(rDoc(restaurantId, 'clients', editClientId), clientToDoc(editClientForm));
       setEditClientId(null);
     } finally {
       setSavingClient(false);
@@ -606,7 +608,7 @@ const EventCalendar: React.FC<EventCalendarProps> = ({ selectedEventId, setSelec
   };
 
   const handleDeleteClient = async (id: string) => {
-    await deleteDoc(doc(db, 'clients', id));
+    await deleteDoc(rDoc(restaurantId, 'clients', id));
     setDeleteClientConfirmId(null);
   };
 

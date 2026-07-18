@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Package, Plus, Pencil, Trash2, X, Check, ChevronDown, ChevronUp, Search, ChevronsUpDown, AlertTriangle, Receipt, Compass } from 'lucide-react';
-import { db } from './firebaseConfig';
-import { updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { updateDoc, deleteDoc } from 'firebase/firestore';
+import { rDoc } from './lib/firestorePaths';
 import { useKitchenSelector } from './components/KitchenStateContext';
+import { useRestaurantId } from './components/AuthContext';
 import { computeCostPerBaseUnit } from './lib/costEngine';
 import { costPerDisplayUnit } from './lib/units';
 import { InvoicePriceUpdate } from './components/ingredients/InvoicePriceUpdate';
@@ -39,6 +40,7 @@ interface IngredientsProps {
 }
 
 const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) => {
+  const restaurantId = useRestaurantId();
   const allIngredients = (useKitchenSelector((s: any) => s.ingredients) as Ingredient[]) ?? [];
   const allVendors = (useKitchenSelector((s: any) => s.vendors) as Vendor[]) ?? [];
   const sortedVendors = [...allVendors].sort((a, b) => a.name.localeCompare(b.name));
@@ -91,7 +93,7 @@ const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) =>
     if (saving || !editId) return;
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'ingredients', editId), toDoc(editForm));
+      await updateDoc(rDoc(restaurantId, 'ingredients', editId), toDoc(editForm));
       setEditId(null);
     } finally {
       setSaving(false);
@@ -99,7 +101,7 @@ const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) =>
   };
 
   const handleDelete = async (id: string) => {
-    await deleteDoc(doc(db, 'ingredients', id));
+    await deleteDoc(rDoc(restaurantId, 'ingredients', id));
     setDeleteConfirmId(null);
     if (editId === id) setEditId(null);
   };

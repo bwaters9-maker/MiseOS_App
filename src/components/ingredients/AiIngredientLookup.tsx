@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Sparkles, Loader2, AlertTriangle, PenLine } from 'lucide-react';
-import { db } from '../../firebaseConfig';
-import { collection, addDoc } from 'firebase/firestore';
+import { addDoc } from 'firebase/firestore';
+import { rCollection } from '../../lib/firestorePaths';
 import { callAi, parseAiJson } from '../../lib/ai';
 import { smartUnit, defaultDisplayUnit } from '../../lib/units';
 import { yieldReferenceText } from '../../lib/yieldReference';
 import { withRegionContext } from '../../lib/regionContext';
 import { useKitchenSelector } from '../KitchenStateContext';
+import { useRestaurantId } from '../AuthContext';
 import {
   IngredientForm, BLANK, toDoc, toProposalDoc, CATEGORIES,
   INPUT, FIELD_LABEL, BTN_PRIMARY, BTN_GHOST,
@@ -91,6 +92,7 @@ interface AiIngredientLookupProps {
 }
 
 export const AiIngredientLookup: React.FC<AiIngredientLookupProps> = ({ unitSystem, vendors, onCancel, onSaved }) => {
+  const restaurantId = useRestaurantId();
   const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
   const [stage, setStage] = useState<Stage>('name');
   const [name, setName] = useState('');
@@ -134,7 +136,7 @@ export const AiIngredientLookup: React.FC<AiIngredientLookupProps> = ({ unitSyst
     if (!reviewForm || saving) return;
     setSaving(true);
     try {
-      await addDoc(collection(db, 'ingredients'), toProposalDoc(reviewForm, costEdited));
+      await addDoc(rCollection(restaurantId, 'ingredients'), toProposalDoc(reviewForm, costEdited));
       onSaved();
     } finally {
       setSaving(false);
@@ -145,7 +147,7 @@ export const AiIngredientLookup: React.FC<AiIngredientLookupProps> = ({ unitSyst
     if (saving) return;
     setSaving(true);
     try {
-      await addDoc(collection(db, 'ingredients'), toDoc(manualForm));
+      await addDoc(rCollection(restaurantId, 'ingredients'), toDoc(manualForm));
       onSaved();
     } finally {
       setSaving(false);

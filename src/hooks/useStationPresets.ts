@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react';
-import { db } from '../firebaseConfig';
-import { collection, query, orderBy, onSnapshot, QuerySnapshot, QueryDocumentSnapshot } from 'firebase/firestore';
+import { query, orderBy, onSnapshot, QuerySnapshot, QueryDocumentSnapshot } from 'firebase/firestore';
+import { rCollection } from '../lib/firestorePaths';
+import { useAuth } from '../components/AuthContext';
 import { PrepStation } from '../types';
 
 const DEFAULT_STATIONS: PrepStation[] = ['Sauté', 'Grill', 'Garde Manger', 'Pastry'];
 
 export function useStationPresets() {
+  const { restaurantId } = useAuth();
   const [presets, setPresets] = useState<PrepStation[]>(DEFAULT_STATIONS);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const q = query(collection(db, 'station_presets'), orderBy('name'));
+    if (!restaurantId) return;
+    const q = query(rCollection(restaurantId, 'station_presets'), orderBy('name'));
 
     const unsubscribe = onSnapshot(q,
       (snapshot: QuerySnapshot) => {
@@ -29,7 +32,7 @@ export function useStationPresets() {
     );
 
     return () => unsubscribe();
-  }, []);
+  }, [restaurantId]);
 
   return { presets, error };
 }

@@ -1,15 +1,18 @@
 import { useState, useEffect, useMemo } from 'react';
-import { db } from '../firebaseConfig';
-import { collection, query, orderBy, onSnapshot, QuerySnapshot, QueryDocumentSnapshot } from 'firebase/firestore';
+import { query, orderBy, onSnapshot, QuerySnapshot, QueryDocumentSnapshot } from 'firebase/firestore';
+import { rCollection } from '../lib/firestorePaths';
+import { useAuth } from '../components/AuthContext';
 import type { RecipeCollection } from '../types';
 
 export function useRecipeCollections() {
+  const { restaurantId } = useAuth();
   const [collections, setCollections] = useState<RecipeCollection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const q = query(collection(db, 'recipe_collections'), orderBy('name'));
+    if (!restaurantId) return;
+    const q = query(rCollection(restaurantId, 'recipe_collections'), orderBy('name'));
 
     const unsubscribe = onSnapshot(q,
       (snapshot: QuerySnapshot) => {
@@ -32,7 +35,7 @@ export function useRecipeCollections() {
     );
 
     return () => unsubscribe();
-  }, []);
+  }, [restaurantId]);
 
   const activeCollection = useMemo(
     () => collections.find(c => c.active) ?? null,

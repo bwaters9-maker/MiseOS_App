@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Truck, Plus, Pencil, Trash2, X, Check, ChevronDown, Phone, Mail, Hash, Clock, Package } from 'lucide-react';
-import { db } from './firebaseConfig';
-import { collection, addDoc, updateDoc, deleteDoc, doc, deleteField } from 'firebase/firestore';
+import { addDoc, updateDoc, deleteDoc, deleteField } from 'firebase/firestore';
+import { rCollection, rDoc } from './lib/firestorePaths';
 import { useKitchenSelector } from './components/KitchenStateContext';
+import { useRestaurantId } from './components/AuthContext';
 import type { Vendor, Weekday, Ingredient, IngredientCategory } from './types';
 
 const WEEKDAYS: Weekday[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -326,6 +327,7 @@ const VendorCard: React.FC<{
 };
 
 const Vendors: React.FC = () => {
+  const restaurantId = useRestaurantId();
   const allVendors = (useKitchenSelector((s: any) => s.vendors) as Vendor[]) ?? [];
   const allIngredients = (useKitchenSelector((s: any) => s.ingredients) as Ingredient[]) ?? [];
   const sortedVendors = [...allVendors].sort((a, b) => a.name.localeCompare(b.name));
@@ -342,7 +344,7 @@ const Vendors: React.FC = () => {
     if (!addForm.name.trim() || saving) return;
     setSaving(true);
     try {
-      await addDoc(collection(db, 'vendors'), vendorToDoc(addForm));
+      await addDoc(rCollection(restaurantId, 'vendors'), vendorToDoc(addForm));
       setAddForm(BLANK_VENDOR());
       setShowAdd(false);
     } finally {
@@ -354,7 +356,7 @@ const Vendors: React.FC = () => {
     if (!editForm.name.trim() || saving || !editId) return;
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'vendors', editId), vendorToDoc(editForm));
+      await updateDoc(rDoc(restaurantId, 'vendors', editId), vendorToDoc(editForm));
       setEditId(null);
     } finally {
       setSaving(false);
@@ -373,8 +375,8 @@ const Vendors: React.FC = () => {
     setDeleting(true);
     try {
       const linked = allIngredients.filter(ing => ing.vendorId === v.id);
-      await Promise.all(linked.map(ing => updateDoc(doc(db, 'ingredients', ing.id), { vendorId: deleteField() })));
-      await deleteDoc(doc(db, 'vendors', v.id));
+      await Promise.all(linked.map(ing => updateDoc(rDoc(restaurantId, 'ingredients', ing.id), { vendorId: deleteField() })));
+      await deleteDoc(rDoc(restaurantId, 'vendors', v.id));
       setDeleteConfirmId(null);
       if (editId === v.id) setEditId(null);
     } finally {

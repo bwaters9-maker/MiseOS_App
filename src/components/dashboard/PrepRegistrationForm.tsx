@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { db } from '../../firebaseConfig';
-import { collection, addDoc } from 'firebase/firestore';
+import { addDoc } from 'firebase/firestore';
+import { rCollection } from '../../lib/firestorePaths';
+import { useRestaurantId } from '../AuthContext';
 import { PrepStation } from '../../types';
 import { PlusCircle, Clipboard } from 'lucide-react';
 
@@ -10,6 +11,7 @@ interface PrepRegistrationFormProps {
 }
 
 export const PrepRegistrationForm: React.FC<PrepRegistrationFormProps> = ({ onSuccess, onCancel }) => {
+  const restaurantId = useRestaurantId();
   // Form states
   const [description, setDescription] = useState('');
   const [quantity, setQuantity] = useState(1);
@@ -26,7 +28,7 @@ export const PrepRegistrationForm: React.FC<PrepRegistrationFormProps> = ({ onSu
 
     setSaving(true);
     try {
-      await addDoc(collection(db, 'prepItems'), {
+      await addDoc(rCollection(restaurantId, 'prepItems'), {
         name: description.trim(),
         quantity: quantity,
         par: par,

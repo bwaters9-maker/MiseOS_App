@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Users, CalendarClock, Plus, Pencil, Trash2, X, Check, DollarSign, List, CalendarRange } from 'lucide-react';
-import { db } from './firebaseConfig';
-import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { rCollection, rDoc } from './lib/firestorePaths';
 import { useKitchenSelector } from './components/KitchenStateContext';
+import { useRestaurantId } from './components/AuthContext';
 import { useStationPresets } from './hooks/useStationPresets';
 import { ScheduleCalendar } from './components/staff/ScheduleCalendar';
 import { todayDateKey, formatTime12h } from './utils';
@@ -413,6 +414,7 @@ interface StaffProps {
 }
 
 const Staff: React.FC<StaffProps> = ({ onOpenEvent }) => {
+  const restaurantId = useRestaurantId();
   const allStaff = (useKitchenSelector((s: any) => s.staff) as Employee[]) ?? [];
   const allShifts = (useKitchenSelector((s: any) => s.shifts) as Shift[]) ?? [];
   const allEvents = (useKitchenSelector((s: any) => s.events) as KitchenEvent[]) ?? [];
@@ -459,7 +461,7 @@ const Staff: React.FC<StaffProps> = ({ onOpenEvent }) => {
     if (!addEmployeeForm.name.trim() || savingEmployee) return;
     setSavingEmployee(true);
     try {
-      await addDoc(collection(db, 'staff'), employeeToDoc(addEmployeeForm));
+      await addDoc(rCollection(restaurantId, 'staff'), employeeToDoc(addEmployeeForm));
       setAddEmployeeForm(BLANK_EMPLOYEE());
       setShowAddEmployee(false);
     } finally {
@@ -471,7 +473,7 @@ const Staff: React.FC<StaffProps> = ({ onOpenEvent }) => {
     if (!editEmployeeForm.name.trim() || savingEmployee || !editEmployeeId) return;
     setSavingEmployee(true);
     try {
-      await updateDoc(doc(db, 'staff', editEmployeeId), employeeToDoc(editEmployeeForm));
+      await updateDoc(rDoc(restaurantId, 'staff', editEmployeeId), employeeToDoc(editEmployeeForm));
       setEditEmployeeId(null);
     } finally {
       setSavingEmployee(false);
@@ -499,7 +501,7 @@ const Staff: React.FC<StaffProps> = ({ onOpenEvent }) => {
   };
 
   const handleDeleteEmployee = async (id: string) => {
-    await deleteDoc(doc(db, 'staff', id));
+    await deleteDoc(rDoc(restaurantId, 'staff', id));
     setDeleteEmployeeConfirmId(null);
   };
 
@@ -509,10 +511,10 @@ const Staff: React.FC<StaffProps> = ({ onOpenEvent }) => {
       await Promise.all(affected.map(sh => {
         const r = resolutions[sh.id];
         return r.mode === 'delete'
-          ? deleteDoc(doc(db, 'shifts', sh.id))
-          : updateDoc(doc(db, 'shifts', sh.id), { staffId: r.staffId });
+          ? deleteDoc(rDoc(restaurantId, 'shifts', sh.id))
+          : updateDoc(rDoc(restaurantId, 'shifts', sh.id), { staffId: r.staffId });
       }));
-      await deleteDoc(doc(db, 'staff', employeeId));
+      await deleteDoc(rDoc(restaurantId, 'staff', employeeId));
       setReassignEmployeeId(null);
     } finally {
       setSavingEmployee(false);
@@ -523,7 +525,7 @@ const Staff: React.FC<StaffProps> = ({ onOpenEvent }) => {
     if (!isShiftValid(addShiftForm) || savingShift) return;
     setSavingShift(true);
     try {
-      await addDoc(collection(db, 'shifts'), shiftToDoc(addShiftForm));
+      await addDoc(rCollection(restaurantId, 'shifts'), shiftToDoc(addShiftForm));
       setAddShiftForm(BLANK_SHIFT());
       setShowAddShift(false);
     } finally {
@@ -535,7 +537,7 @@ const Staff: React.FC<StaffProps> = ({ onOpenEvent }) => {
     if (!isShiftValid(editShiftForm) || savingShift || !editShiftId) return;
     setSavingShift(true);
     try {
-      await updateDoc(doc(db, 'shifts', editShiftId), shiftToDoc(editShiftForm));
+      await updateDoc(rDoc(restaurantId, 'shifts', editShiftId), shiftToDoc(editShiftForm));
       setEditShiftId(null);
     } finally {
       setSavingShift(false);
@@ -555,7 +557,7 @@ const Staff: React.FC<StaffProps> = ({ onOpenEvent }) => {
   };
 
   const handleDeleteShift = async (id: string) => {
-    await deleteDoc(doc(db, 'shifts', id));
+    await deleteDoc(rDoc(restaurantId, 'shifts', id));
     setDeleteShiftConfirmId(null);
   };
 
@@ -651,7 +653,7 @@ const Staff: React.FC<StaffProps> = ({ onOpenEvent }) => {
                     <div className="flex flex-wrap items-baseline gap-[13px] min-w-0">
                       <span className="font-bold text-zinc-100 shrink-0">{e.name}</span>
                       <button
-                        onClick={() => updateDoc(doc(db, 'staff', e.id), { active: !e.active })}
+                        onClick={() => updateDoc(rDoc(restaurantId, 'staff', e.id), { active: !e.active })}
                         className={`${BADGE} shrink-0 transition-colors duration-[144ms] ${
                           e.active
                             ? 'text-emerald-300 border-emerald-800 bg-emerald-950/40 hover:bg-emerald-900/40'

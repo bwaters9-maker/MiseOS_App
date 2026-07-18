@@ -2,10 +2,10 @@ import React, { Suspense, useState, useEffect, useRef } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AppHeader } from './components/AppHeader';
 import { KitchenStateProvider, useKitchenSelector } from './components/KitchenStateContext';
-import { AuthProvider, useAuth } from './components/AuthContext';
+import { AuthProvider, useAuth, useRestaurantId } from './components/AuthContext';
 import { SignIn } from './components/SignIn';
-import { db } from './firebaseConfig';
-import { doc, setDoc } from 'firebase/firestore';
+import { setDoc } from 'firebase/firestore';
+import { rDoc } from './lib/firestorePaths';
 import type { UnitSystem } from './lib/units';
 import type { MenuTemplate, RestaurantProfile } from './types';
 
@@ -88,15 +88,16 @@ const AuthGate: React.FC = () => {
   }
 
   return (
-    <KitchenStateProvider>
+    <KitchenStateProvider restaurantId={restaurantId}>
       <AppShell />
     </KitchenStateProvider>
   );
 };
 
-const profileDocRef = () => doc(db, 'restaurant_profile', 'main');
+const profileDocRef = (restaurantId: string) => rDoc(restaurantId, 'restaurant_profile', 'main');
 
 const AppShell: React.FC = () => {
+  const restaurantId = useRestaurantId();
   const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
   const restaurantProfileLoaded = useKitchenSelector((s: any) => s.restaurantProfileLoaded) as boolean;
 
@@ -139,11 +140,11 @@ const AppShell: React.FC = () => {
   };
 
   const setTargetFcPercent = (v: number) => {
-    setDoc(profileDocRef(), { targetFcPercent: v }, { merge: true });
+    setDoc(profileDocRef(restaurantId), { targetFcPercent: v }, { merge: true });
   };
 
   const setMenuTemplate = (t: MenuTemplate) => {
-    setDoc(profileDocRef(), { menuTemplate: t }, { merge: true });
+    setDoc(profileDocRef(restaurantId), { menuTemplate: t }, { merge: true });
   };
 
   // One-time migration: once the profile doc has loaded (whether or not it
@@ -164,7 +165,7 @@ const AppShell: React.FC = () => {
       if (legacy === 'classic' || legacy === 'clean') patch.menuTemplate = legacy;
     }
     if (Object.keys(patch).length > 0) {
-      setDoc(profileDocRef(), patch, { merge: true });
+      setDoc(profileDocRef(restaurantId), patch, { merge: true });
     }
   }, [restaurantProfileLoaded, restaurantProfile]);
 

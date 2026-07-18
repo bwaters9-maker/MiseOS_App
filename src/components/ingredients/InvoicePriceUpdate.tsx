@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Receipt, Upload, Loader2, AlertTriangle, X, Check, FileWarning, Plus } from 'lucide-react';
-import { db } from '../../firebaseConfig';
-import { addDoc, collection, updateDoc, doc } from 'firebase/firestore';
+import { addDoc, updateDoc } from 'firebase/firestore';
+import { rCollection, rDoc } from '../../lib/firestorePaths';
 import { callAi, parseAiJson } from '../../lib/ai';
 import { toBase, displayUnitsFor, defaultDisplayUnit, smartUnit } from '../../lib/units';
 import { yieldReferenceText } from '../../lib/yieldReference';
 import { withRegionContext } from '../../lib/regionContext';
 import { useKitchenSelector } from '../KitchenStateContext';
+import { useRestaurantId } from '../AuthContext';
 import { todayDateKey } from '../../utils';
 import type { Ingredient, IngredientCategory, MeasureType, Allergen, RestaurantProfile } from '../../types';
 import type { UnitSystem, DisplayUnit } from '../../lib/units';
@@ -206,6 +207,7 @@ interface InvoicePriceUpdateProps {
 }
 
 export const InvoicePriceUpdate: React.FC<InvoicePriceUpdateProps> = ({ isOpen, onClose, ingredients, unitSystem = 'imperial' }) => {
+  const restaurantId = useRestaurantId();
   const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
   const [stage, setStage] = useState<Stage>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -381,7 +383,7 @@ export const InvoicePriceUpdate: React.FC<InvoicePriceUpdateProps> = ({ isOpen, 
     try {
       const today = todayDateKey();
       const qtyBase = toBase(parseFloat(f.purchaseQtyDisplay) || 0, f.purchaseQtyUnit);
-      await addDoc(collection(db, 'ingredients'), {
+      await addDoc(rCollection(restaurantId, 'ingredients'), {
         name: f.name.trim(),
         category: f.category as IngredientCategory,
         measureType: f.measureType,
@@ -428,7 +430,7 @@ export const InvoicePriceUpdate: React.FC<InvoicePriceUpdateProps> = ({ isOpen, 
       const today = todayDateKey();
       await Promise.all(toApply.map(r => {
         const cost = parseFloat(r.newPackCostDisplay);
-        return updateDoc(doc(db, 'ingredients', r.ingredientId!), {
+        return updateDoc(rDoc(restaurantId, 'ingredients', r.ingredientId!), {
           purchaseCost: cost,
           priceSource: 'invoice',
           lastVerified: today,

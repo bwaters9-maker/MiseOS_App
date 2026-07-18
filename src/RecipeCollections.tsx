@@ -1,14 +1,17 @@
 import React, { useMemo, useState } from 'react';
 import { Layers, Plus, Trash2, CheckCircle2, Circle, ChevronDown, ChevronRight } from 'lucide-react';
 import { db } from './firebaseConfig';
-import { collection, addDoc, deleteDoc, doc, updateDoc, writeBatch } from 'firebase/firestore';
+import { addDoc, deleteDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import { rCollection, rDoc } from './lib/firestorePaths';
 import { useKitchenSelector } from './components/KitchenStateContext';
+import { useRestaurantId } from './components/AuthContext';
 import { useRecipeCollections } from './hooks/useRecipeCollections';
 import type { Recipe, RecipeCollection } from './types';
 
 const CARD = 'bg-surface border border-line rounded-card p-[21px]';
 
 const RecipeCollections: React.FC = () => {
+  const restaurantId = useRestaurantId();
   const allRecipes = (useKitchenSelector((s: any) => s.recipes) as Recipe[]) ?? [];
   const { collections, activeCollection, loading } = useRecipeCollections();
 
@@ -29,7 +32,7 @@ const RecipeCollections: React.FC = () => {
     if (!name || saving) return;
     setSaving(true);
     try {
-      await addDoc(collection(db, 'recipe_collections'), { name, recipeIds: [], active: false });
+      await addDoc(rCollection(restaurantId, 'recipe_collections'), { name, recipeIds: [], active: false });
       setNewName('');
     } finally {
       setSaving(false);
@@ -42,7 +45,7 @@ const RecipeCollections: React.FC = () => {
     try {
       const batch = writeBatch(db);
       collections.forEach(c => {
-        batch.update(doc(db, 'recipe_collections', c.id), { active: c.id === target.id });
+        batch.update(rDoc(restaurantId, 'recipe_collections', c.id), { active: c.id === target.id });
       });
       await batch.commit();
     } finally {
@@ -54,7 +57,7 @@ const RecipeCollections: React.FC = () => {
     if (saving) return;
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'recipe_collections', target.id), { active: false });
+      await updateDoc(rDoc(restaurantId, 'recipe_collections', target.id), { active: false });
     } finally {
       setSaving(false);
     }
@@ -64,7 +67,7 @@ const RecipeCollections: React.FC = () => {
     if (saving) return;
     setSaving(true);
     try {
-      await deleteDoc(doc(db, 'recipe_collections', target.id));
+      await deleteDoc(rDoc(restaurantId, 'recipe_collections', target.id));
       setConfirmDeleteId(null);
       if (expandedId === target.id) setExpandedId(null);
     } finally {
@@ -76,7 +79,7 @@ const RecipeCollections: React.FC = () => {
     const next = c.recipeIds.includes(recipeId)
       ? c.recipeIds.filter(id => id !== recipeId)
       : [...c.recipeIds, recipeId];
-    await updateDoc(doc(db, 'recipe_collections', c.id), { recipeIds: next });
+    await updateDoc(rDoc(restaurantId, 'recipe_collections', c.id), { recipeIds: next });
   };
 
   const memberCount = (c: RecipeCollection) =>

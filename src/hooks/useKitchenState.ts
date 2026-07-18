@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { db } from '../firebaseConfig';
-import { collection, doc, onSnapshot, DocumentData, DocumentSnapshot, QuerySnapshot, QueryDocumentSnapshot, FirestoreError } from 'firebase/firestore';
+import { onSnapshot, DocumentData, DocumentSnapshot, QuerySnapshot, QueryDocumentSnapshot, FirestoreError } from 'firebase/firestore';
+import { rCollection, rDoc } from '../lib/firestorePaths';
 import type { Feature, Employee, Shift, KitchenEvent, KitchenAlert, CribNote, Ingredient, Recipe, Client, Vendor, RestaurantProfile, TrendReport } from '../types';
 
 // Based on firebase-blueprint.json
@@ -17,7 +17,7 @@ export interface PrepItem {
   recipe_id: string;
 }
 
-export const useKitchenState = () => {
+export const useKitchenState = (restaurantId: string) => {
   const [prepItems, setPrepItems] = useState<PrepItem[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [features, setFeatures] = useState<Feature[]>([]);
@@ -38,7 +38,7 @@ export const useKitchenState = () => {
 
   useEffect(() => {
     const unsubPrep = onSnapshot(
-      collection(db, 'prepItems'),
+      rCollection(restaurantId, 'prepItems'),
       (snapshot: QuerySnapshot<DocumentData>) => {
         const items = snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as PrepItem));
         setPrepItems(items);
@@ -51,7 +51,7 @@ export const useKitchenState = () => {
     );
 
     const unsubRecipes = onSnapshot(
-      collection(db, 'recipes'),
+      rCollection(restaurantId, 'recipes'),
       (snapshot: QuerySnapshot<DocumentData>) => {
         const items = snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as Recipe));
         setRecipes(items);
@@ -62,7 +62,7 @@ export const useKitchenState = () => {
     );
 
     const unsubFeatures = onSnapshot(
-      collection(db, 'features'),
+      rCollection(restaurantId, 'features'),
       (snapshot: QuerySnapshot<DocumentData>) => {
         setFeatures(snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as Feature)));
       },
@@ -70,7 +70,7 @@ export const useKitchenState = () => {
     );
 
     const unsubStaff = onSnapshot(
-      collection(db, 'staff'),
+      rCollection(restaurantId, 'staff'),
       (snapshot: QuerySnapshot<DocumentData>) => {
         setStaff(snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as Employee)));
       },
@@ -78,7 +78,7 @@ export const useKitchenState = () => {
     );
 
     const unsubShifts = onSnapshot(
-      collection(db, 'shifts'),
+      rCollection(restaurantId, 'shifts'),
       (snapshot: QuerySnapshot<DocumentData>) => {
         setShifts(snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as Shift)));
       },
@@ -86,7 +86,7 @@ export const useKitchenState = () => {
     );
 
     const unsubEvents = onSnapshot(
-      collection(db, 'events'),
+      rCollection(restaurantId, 'events'),
       (snapshot: QuerySnapshot<DocumentData>) => {
         setEvents(snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as KitchenEvent)));
       },
@@ -94,7 +94,7 @@ export const useKitchenState = () => {
     );
 
     const unsubClients = onSnapshot(
-      collection(db, 'clients'),
+      rCollection(restaurantId, 'clients'),
       (snapshot: QuerySnapshot<DocumentData>) => {
         setClients(snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as Client)));
       },
@@ -102,7 +102,7 @@ export const useKitchenState = () => {
     );
 
     const unsubAlerts = onSnapshot(
-      collection(db, 'alerts'),
+      rCollection(restaurantId, 'alerts'),
       (snapshot: QuerySnapshot<DocumentData>) => {
         setAlerts(snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as KitchenAlert)));
       },
@@ -110,7 +110,7 @@ export const useKitchenState = () => {
     );
 
     const unsubCribNotes = onSnapshot(
-      collection(db, 'crib_notes'),
+      rCollection(restaurantId, 'crib_notes'),
       (snapshot: QuerySnapshot<DocumentData>) => {
         setCribNotes(snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as CribNote)));
       },
@@ -118,7 +118,7 @@ export const useKitchenState = () => {
     );
 
     const unsubIngredients = onSnapshot(
-      collection(db, 'ingredients'),
+      rCollection(restaurantId, 'ingredients'),
       (snapshot: QuerySnapshot<DocumentData>) => {
         setIngredients(snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as Ingredient)));
       },
@@ -126,7 +126,7 @@ export const useKitchenState = () => {
     );
 
     const unsubVendors = onSnapshot(
-      collection(db, 'vendors'),
+      rCollection(restaurantId, 'vendors'),
       (snapshot: QuerySnapshot<DocumentData>) => {
         setVendors(snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as Vendor)));
       },
@@ -134,7 +134,7 @@ export const useKitchenState = () => {
     );
 
     const unsubProfile = onSnapshot(
-      doc(db, 'restaurant_profile', 'main'),
+      rDoc(restaurantId, 'restaurant_profile', 'main'),
       (snap: DocumentSnapshot<DocumentData>) => {
         setRestaurantProfile(snap.exists() ? (snap.data() as RestaurantProfile) : null);
         setRestaurantProfileLoaded(true);
@@ -146,7 +146,7 @@ export const useKitchenState = () => {
     );
 
     const unsubTrendReport = onSnapshot(
-      doc(db, 'trend_reports', 'latest'),
+      rDoc(restaurantId, 'trend_reports', 'latest'),
       (snap: DocumentSnapshot<DocumentData>) => {
         setTrendReport(snap.exists() ? (snap.data() as TrendReport) : null);
         setTrendReportLoaded(true);
@@ -172,7 +172,7 @@ export const useKitchenState = () => {
       unsubProfile();
       unsubTrendReport();
     };
-  }, []);
+  }, [restaurantId]);
 
   return { prepItems, setPrepItems, recipes, setRecipes, features, staff, shifts, events, clients, alerts, cribNotes, ingredients, vendors, restaurantProfile, restaurantProfileLoaded, trendReport, trendReportLoaded, loading, error };
 };

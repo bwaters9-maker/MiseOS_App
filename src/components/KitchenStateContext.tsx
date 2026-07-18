@@ -5,8 +5,8 @@ import { useKitchenState } from '../hooks/useKitchenState'; // Assuming original
 // to prevent re-renders, but for this concept, standard context works.
 const KitchenStateContext = createContext<any | null>(null);
 
-export const KitchenStateProvider = ({ children }: { children: React.ReactNode }) => {
-  const kitchenState = useKitchenState();
+export const KitchenStateProvider = ({ restaurantId, children }: { restaurantId: string; children: React.ReactNode }) => {
+  const kitchenState = useKitchenState(restaurantId);
   return (
     <KitchenStateContext.Provider value={kitchenState}>
       {children}

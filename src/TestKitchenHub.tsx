@@ -5,8 +5,9 @@ import { withRegionContext } from './lib/regionContext';
 import { callAi, parseAiJson } from './lib/ai';
 import { todayDateKey } from './utils';
 import { useKitchenSelector } from './components/KitchenStateContext';
-import { db } from './firebaseConfig';
-import { doc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
+import { useRestaurantId } from './components/AuthContext';
+import { setDoc, getDocs, deleteDoc } from 'firebase/firestore';
+import { rCollection, rDoc } from './lib/firestorePaths';
 import { regionForState, itemsForRegion, type SeasonalItemForRegion } from './lib/seasonalData';
 import { APP_NAME, APP_TAGLINE, APP_SHORT_DESC } from './lib/appParams';
 import type { RestaurantProfile, TrendReport, TrendCard, PricingTrendItem } from './types';
@@ -314,8 +315,8 @@ const formatHistoryLabel = (dateKey: string): string => {
 
 /** Keeps only the 12 most recent dated reports — runs after every
  * successful refresh so history never grows unbounded. */
-const pruneTrendHistory = async () => {
-  const snap = await getDocs(collection(db, 'trend_reports'));
+const pruneTrendHistory = async (restaurantId: string) => {
+  const snap = await getDocs(rCollection(restaurantId, 'trend_reports'));
   const dated = snap.docs.filter(d => d.id !== 'latest').sort((a, b) => b.id.localeCompare(a.id));
   const stale = dated.slice(TREND_HISTORY_CAP);
   await Promise.all(stale.map(d => deleteDoc(d.ref)));
@@ -326,6 +327,7 @@ const pruneTrendHistory = async () => {
 // ===================================================================
 
 export default function TestKitchenHub() {
+  const restaurantId = useRestaurantId();
   const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
   const trendReport = useKitchenSelector((s: any) => s.trendReport) as TrendReport | null;
   const trendReportLoaded = useKitchenSelector((s: any) => s.trendReportLoaded) as boolean;
@@ -423,9 +425,9 @@ export default function TestKitchenHub() {
 
       const report: TrendReport = { generatedAt: new Date().toISOString(), cards: verified, pricingTrends };
       // Dated doc preserves history; 'latest' keeps existing readers working.
-      await setDoc(doc(db, 'trend_reports', todayDateKey()), report);
-      await setDoc(doc(db, 'trend_reports', 'latest'), report);
-      await pruneTrendHistory();
+      await setDoc(rDoc(restaurantId, 'trend_reports', todayDateKey()), report);
+      await setDoc(rDoc(restaurantId, 'trend_reports', 'latest'), report);
+      await pruneTrendHistory(restaurantId);
     } catch (e: any) {
       setTrendsError(e?.message || 'Could not refresh trends. Try again.');
     } finally {
@@ -451,7 +453,7 @@ export default function TestKitchenHub() {
     let cancelled = false;
     (async () => {
       try {
-        const snap = await getDocs(collection(db, 'trend_reports'));
+        const snap = await getDocs(rCollection(restaurantId, 'trend_reports'));
         const dated = snap.docs
           .filter(d => d.id !== 'latest')
           .map(d => ({ id: d.id, report: d.data() as TrendReport }))
@@ -462,7 +464,7 @@ export default function TestKitchenHub() {
       }
     })();
     return () => { cancelled = true; };
-  }, [trendReport]);
+  }, [trendReport, restaurantId]);
 
   const displayedReport = viewingHistoryId
     ? historyReports.find(h => h.id === viewingHistoryId)?.report ?? null

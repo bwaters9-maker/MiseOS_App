@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { db } from './firebaseConfig';
-import { collection, onSnapshot, addDoc, deleteDoc, updateDoc, doc, getDocs } from 'firebase/firestore';
+import { onSnapshot, addDoc, deleteDoc, updateDoc, getDocs } from 'firebase/firestore';
+import { rCollection, rDoc } from './lib/firestorePaths';
+import { useRestaurantId } from './components/AuthContext';
 import { KitchenTimer, PrepStation } from './types';
 import { formatDuration } from './utils';
 import { Play, Pause, RotateCcw, Plus, Trash2, Clock, Bell } from 'lucide-react';
 
 export const KitchenTimers: React.FC = () => {
+  const restaurantId = useRestaurantId();
   const [timers, setTimers] = useState<KitchenTimer[]>([]);
   const [stations, setStations] = useState<PrepStation[]>([]);
   const [tick, setTick] = useState(0);
@@ -18,7 +20,7 @@ export const KitchenTimers: React.FC = () => {
   // Fetch station presets from Firestore on mount
   useEffect(() => {
     const fetchStations = async () => {
-      const stationSnap = await getDocs(collection(db, "station_presets"));
+      const stationSnap = await getDocs(rCollection(restaurantId, "station_presets"));
       const stationData = stationSnap.docs.map(d => d.data().name as PrepStation);
       setStations(stationData.length > 0 ? stationData : ['Sauté', 'Grill', 'Garde Manger', 'Pastry']);
       if (stationData.length > 0) {
@@ -26,16 +28,16 @@ export const KitchenTimers: React.FC = () => {
       }
     };
     fetchStations();
-  }, []);
+  }, [restaurantId]);
 
   // Set up the live listener for the timers collection
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'timers'), (snapshot) => {
+    const unsubscribe = onSnapshot(rCollection(restaurantId, 'timers'), (snapshot) => {
       const fetchedTimers = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as KitchenTimer));
       setTimers(fetchedTimers);
     });
     return () => unsubscribe();
-  }, []);
+  }, [restaurantId]);
 
   // Trigger a re-render every second to update running timers
   useEffect(() => {
@@ -47,7 +49,7 @@ export const KitchenTimers: React.FC = () => {
     e.preventDefault();
     if (!newLabel.trim()) return;
 
-    await addDoc(collection(db, 'timers'), {
+    await addDoc(rCollection(restaurantId, 'timers'), {
       label: newLabel.trim(),
       durationMs: newMinutes * 60 * 1000,
       elapsedMs: 0,
@@ -58,7 +60,7 @@ export const KitchenTimers: React.FC = () => {
   };
 
   const deleteTimer = async (id: string) => {
-    await deleteDoc(doc(db, 'timers', id));
+    await deleteDoc(rDoc(restaurantId, 'timers', id));
   };
 
   const toggleTimer = async (id: string) => {
@@ -81,11 +83,11 @@ export const KitchenTimers: React.FC = () => {
         startTime: now,
       };
     }
-    await updateDoc(doc(db, 'timers', id), updateData);
+    await updateDoc(rDoc(restaurantId, 'timers', id), updateData);
   };
-  
+
   const resetTimer = async (id: string) => {
-    await updateDoc(doc(db, 'timers', id), {
+    await updateDoc(rDoc(restaurantId, 'timers', id), {
       status: 'idle',
       elapsedMs: 0,
       startTime: undefined,
@@ -98,7 +100,7 @@ export const KitchenTimers: React.FC = () => {
     
     const msAdjustment = minutes * 60 * 1000;
     const newDuration = Math.max(0, timer.durationMs + msAdjustment);
-    await updateDoc(doc(db, 'timers', id), { durationMs: newDuration });
+    await updateDoc(rDoc(restaurantId, 'timers', id), { durationMs: newDuration });
   };
 
   return (

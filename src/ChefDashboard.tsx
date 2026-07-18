@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { LayoutDashboard, Users, CalendarDays, AlertTriangle, Clock, Printer, Star, Plus, X } from 'lucide-react';
-import { db } from './firebaseConfig';
-import { addDoc, collection } from 'firebase/firestore';
+import { addDoc } from 'firebase/firestore';
+import { rCollection } from './lib/firestorePaths';
 import { useKitchenSelector } from './components/KitchenStateContext';
+import { useRestaurantId } from './components/AuthContext';
 import { useStationPresets } from './hooks/useStationPresets';
 import { featureFieldsFromRecipe } from './lib/costEngine';
 import { COURSES, BLANK as BLANK_FEATURE, toDoc as featureToDoc, type FormState as FeatureFormState } from './Features';
@@ -14,6 +15,7 @@ interface ChefDashboardProps {
 }
 
 export default function ChefDashboard({ onNavigate }: ChefDashboardProps) {
+  const restaurantId = useRestaurantId();
   const staff = (useKitchenSelector((s: any) => s.staff) as Employee[]) ?? [];
   const shifts = (useKitchenSelector((s: any) => s.shifts) as Shift[]) ?? [];
   const events = (useKitchenSelector((s: any) => s.events) as KitchenEvent[]) ?? [];
@@ -75,7 +77,7 @@ export default function ChefDashboard({ onNavigate }: ChefDashboardProps) {
     if (!featureForm.name.trim() || savingFeature) return;
     setSavingFeature(true);
     try {
-      await addDoc(collection(db, 'features'), featureToDoc(featureForm));
+      await addDoc(rCollection(restaurantId, 'features'), featureToDoc(featureForm));
       setFeatureForm({ ...BLANK_FEATURE, activeFrom: todayStr, activeTo: todayStr });
       setAddKind('manual');
       setShowAddFeature(false);

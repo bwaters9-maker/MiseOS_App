@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Star, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
-import { db } from './firebaseConfig';
-import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { rCollection, rDoc } from './lib/firestorePaths';
 import { useKitchenSelector } from './components/KitchenStateContext';
+import { useRestaurantId } from './components/AuthContext';
 import { featureFieldsFromRecipe } from './lib/costEngine';
 import type { Feature, Recipe, Ingredient } from './types';
 
@@ -169,6 +170,7 @@ const FeatureForm: React.FC<{
 };
 
 const Features: React.FC = () => {
+  const restaurantId = useRestaurantId();
   const allFeatures = (useKitchenSelector((s: any) => s.features) as Feature[]) ?? [];
   const allRecipes = (useKitchenSelector((s: any) => s.recipes) as Recipe[]) ?? [];
   const allIngredients = (useKitchenSelector((s: any) => s.ingredients) as Ingredient[]) ?? [];
@@ -203,7 +205,7 @@ const Features: React.FC = () => {
     if (!addForm.name.trim() || saving) return;
     setSaving(true);
     try {
-      await addDoc(collection(db, 'features'), toDoc(addForm));
+      await addDoc(rCollection(restaurantId, 'features'), toDoc(addForm));
       setAddForm({ ...BLANK });
       setAddKind('manual');
       setShowAdd(false);
@@ -216,7 +218,7 @@ const Features: React.FC = () => {
     if (!editForm.name.trim() || saving || !editId) return;
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'features', editId), toDoc(editForm));
+      await updateDoc(rDoc(restaurantId, 'features', editId), toDoc(editForm));
       setEditId(null);
     } finally {
       setSaving(false);
@@ -224,12 +226,12 @@ const Features: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    await deleteDoc(doc(db, 'features', id));
+    await deleteDoc(rDoc(restaurantId, 'features', id));
     setDeleteConfirmId(null);
   };
 
   const toggle86 = async (f: Feature) => {
-    await updateDoc(doc(db, 'features', f.id), { is86d: !f.is86d });
+    await updateDoc(rDoc(restaurantId, 'features', f.id), { is86d: !f.is86d });
   };
 
   const startEdit = (f: Feature) => {

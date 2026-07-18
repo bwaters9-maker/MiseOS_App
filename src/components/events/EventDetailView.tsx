@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Clock, Plus, Pencil, Trash2, Check, X, Search, ChefHat, Contact, History, Flag, Users, Link2, Unlink, ChevronDown, ScrollText } from 'lucide-react';
-import { db } from '../../firebaseConfig';
-import { updateDoc, doc } from 'firebase/firestore';
+import { updateDoc } from 'firebase/firestore';
+import { rDoc } from '../../lib/firestorePaths';
+import { useRestaurantId } from '../AuthContext';
 import type { KitchenEvent, Client, Employee, Shift, Recipe, Ingredient, RecipeCategory, EventMilestone, TentativeMenuLine, EventChangeLogEntry } from '../../types';
 import { costPerPortion } from '../../lib/costEngine';
 import { todayDateKey, formatTime12h } from '../../utils';
@@ -36,6 +37,7 @@ interface MilestoneFormState {
 const BLANK_MILESTONE = (): MilestoneFormState => ({ time: '', label: '' });
 
 const TimelinePanel: React.FC<{ event: KitchenEvent }> = ({ event }) => {
+  const restaurantId = useRestaurantId();
   const milestones = event.milestones ?? [];
   const sorted = milestones
     .map((m, idx) => ({ ...m, idx }))
@@ -51,7 +53,7 @@ const TimelinePanel: React.FC<{ event: KitchenEvent }> = ({ event }) => {
   const writeMilestones = async (next: EventMilestone[]) => {
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'events', event.id), { milestones: next });
+      await updateDoc(rDoc(restaurantId, 'events', event.id), { milestones: next });
     } finally {
       setSaving(false);
     }
@@ -296,6 +298,7 @@ const MenuPanel: React.FC<{
   ingredients: Ingredient[];
   categories: RecipeCategory[];
 }> = ({ event, recipes, ingredients, categories }) => {
+  const restaurantId = useRestaurantId();
   const lines = event.tentativeMenu ?? [];
   const recipesById = new Map(recipes.map(r => [r.id, r]));
   const attendees = readAttendees(event);
@@ -312,7 +315,7 @@ const MenuPanel: React.FC<{
     try {
       const patch: Partial<KitchenEvent> = { tentativeMenu: next };
       if (logText) patch.changeLog = [...(event.changeLog ?? []), { date: getToday(), text: logText }];
-      await updateDoc(doc(db, 'events', event.id), patch);
+      await updateDoc(rDoc(restaurantId, 'events', event.id), patch);
     } finally {
       setSaving(false);
     }
@@ -557,6 +560,7 @@ const ClientPanel: React.FC<{
 // ===================================================================
 
 const ChangeLogPanel: React.FC<{ event: KitchenEvent }> = ({ event }) => {
+  const restaurantId = useRestaurantId();
   const entries = event.changeLog ?? [];
   const reversed = [...entries].reverse();
 
@@ -569,7 +573,7 @@ const ChangeLogPanel: React.FC<{ event: KitchenEvent }> = ({ event }) => {
     setSaving(true);
     try {
       const next: EventChangeLogEntry[] = [...entries, { date: getToday(), text: text.trim() }];
-      await updateDoc(doc(db, 'events', event.id), { changeLog: next });
+      await updateDoc(rDoc(restaurantId, 'events', event.id), { changeLog: next });
       setText('');
       setShowAdd(false);
     } finally {

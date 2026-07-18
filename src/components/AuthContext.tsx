@@ -68,3 +68,17 @@ export const useAuth = (): AuthContextValue => {
   }
   return ctx;
 };
+
+/**
+ * Non-null restaurantId for components that only ever render below
+ * AuthGate's blocked-state check (i.e. everything inside AppShell).
+ * Throws if that invariant is ever violated instead of silently
+ * querying restaurants/null/... .
+ */
+export const useRestaurantId = (): string => {
+  const { restaurantId } = useAuth();
+  if (!restaurantId) {
+    throw new Error('useRestaurantId called without a resolved restaurantId — this component must render below AuthGate\'s claim check.');
+  }
+  return restaurantId;
+};

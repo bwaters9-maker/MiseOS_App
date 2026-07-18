@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { ChefHat, Plus, Trash2, X, Check, Search, Layers, UtensilsCrossed, AlertTriangle, Sparkles, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
-import { db } from './firebaseConfig';
-import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { rCollection, rDoc } from './lib/firestorePaths';
 import { useKitchenSelector } from './components/KitchenStateContext';
+import { useRestaurantId } from './components/AuthContext';
 import { useRecipeCategories } from './hooks/useRecipeCategories';
 import { AlertDialog } from './components/AlertDialog';
 import NutritionLabel from './components/recipes/NutritionLabel';
@@ -1070,6 +1071,7 @@ interface RecipesProps {
 }
 
 const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPercent = 30, selectedRecipeId, setSelectedRecipeId, onViewMenu }) => {
+  const restaurantId = useRestaurantId();
   const allRecipes = (useKitchenSelector((s: any) => s.recipes) as Recipe[]) ?? [];
   const allIngredients = (useKitchenSelector((s: any) => s.ingredients) as Ingredient[]) ?? [];
   const { categories } = useRecipeCategories();
@@ -1138,9 +1140,9 @@ const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPerc
     try {
       const docData = toDoc(form, allIngredients);
       if (selectedId) {
-        await updateDoc(doc(db, 'recipes', selectedId), docData);
+        await updateDoc(rDoc(restaurantId, 'recipes', selectedId), docData);
       } else {
-        const ref = await addDoc(collection(db, 'recipes'), docData);
+        const ref = await addDoc(rCollection(restaurantId, 'recipes'), docData);
         setSelectedId(ref.id);
         setIsCreating(false);
       }
@@ -1150,13 +1152,13 @@ const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPerc
   };
 
   const handleDelete = async (id: string) => {
-    await deleteDoc(doc(db, 'recipes', id));
+    await deleteDoc(rDoc(restaurantId, 'recipes', id));
     setDeleteConfirmId(null);
     if (selectedId === id) closeEditor();
   };
 
   const handleToggleOnMenu = async (r: Recipe) => {
-    await updateDoc(doc(db, 'recipes', r.id), { onMenu: !isRecipeOnMenu(r) });
+    await updateDoc(rDoc(restaurantId, 'recipes', r.id), { onMenu: !isRecipeOnMenu(r) });
   };
 
   return (
