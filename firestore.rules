@@ -4,22 +4,13 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ===============================================================
-    // TRANSITIONAL — multi-tenant migration in progress
+    // Multi-tenant data model
     // ===============================================================
     //
-    // This ruleset allows BOTH the old flat top-level collections
-    // (pre-migration shape) AND the new restaurants/{restaurantId}/...
-    // subcollections (post-migration shape) simultaneously, so the
-    // currently-deployed app (still reading/writing flat paths) keeps
-    // working unaffected while scripts/migrateToRestaurantSubcollections.ts
-    // copies data into the new shape and the app code is rewired to
-    // read/write it. The "TRANSITIONAL ONLY" section below is temporary
-    // and gets deleted once that cutover is verified — see CLAUDE.md's
-    // multi-tenant migration notes for status.
-    //
-    // Tenant isolation (new shape only): every authenticated user's ID
-    // token carries a restaurantId custom claim, set only via the Admin
-    // SDK (scripts/manageChefAccount.ts) — never client-settable. A user
+    // Every collection lives under restaurants/{restaurantId}/... .
+    // Tenant isolation: every authenticated user's ID token carries a
+    // restaurantId custom claim, set only via the Admin SDK
+    // (scripts/manageChefAccount.ts) — never client-settable. A user
     // may read/write only restaurants/{their own restaurantId}/... .
     //
     // Collection: prepItems      — see src/types.ts PrepItem
@@ -97,12 +88,8 @@ service cloud.firestore {
     }
 
     // ===============================================================
-    // New: restaurant-scoped subcollections
+    // Restaurant-scoped subcollections
     // ===============================================================
-    //
-    // Every collection lives once here, once in the TRANSITIONAL ONLY
-    // section below. When the transitional section is deleted after
-    // cutover, this becomes the entire ruleset (plus /users/{uid}).
 
     match /restaurants/{restaurantId} {
       match /prepItems/{id}          { allow read, write: if isOwner(restaurantId); }
@@ -143,38 +130,9 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // ===============================================================
-    // TRANSITIONAL ONLY — old flat top-level paths, pre-migration
-    // shape. DELETE this entire section once the cutover to
-    // restaurants/{restaurantId}/... is deployed and verified.
-    // ===============================================================
-
-    match /prepItems/{id}          { allow read, write: if isAuthenticated(); }
-    match /recipes/{id}            { allow read, write: if isAuthenticated(); }
-    match /features/{id}           { allow read, write: if isAuthenticated(); }
-    match /staff/{id}               { allow read, write: if isAuthenticated(); }
-    match /shifts/{id}              { allow read, write: if isAuthenticated(); }
-    match /events/{id}              { allow read, write: if isAuthenticated(); }
-    match /alerts/{id}              { allow read, write: if isAuthenticated(); }
-    match /crib_notes/{id}          { allow read, write: if isAuthenticated(); }
-    match /timers/{id}               { allow read, write: if isAuthenticated(); }
-    match /station_presets/{id}     { allow read, write: if isAuthenticated(); }
-    match /recipe_categories/{id}   { allow read, write: if isAuthenticated(); }
-    match /recipe_collections/{id}  { allow read, write: if isAuthenticated(); }
-    match /event_types/{id}         { allow read, write: if isAuthenticated(); }
-    match /clients/{id}             { allow read, write: if isAuthenticated(); }
-    match /vendors/{id}              { allow read, write: if isAuthenticated(); }
-    match /restaurant_profile/{id}   { allow read, write: if isAuthenticated(); }
-    match /trend_reports/{id}        { allow read, write: if isAuthenticated(); }
-
-    match /ingredients/{id} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidIngredient(request.resource.data);
-      allow update: if isAuthenticated() && isValidIngredient(request.resource.data);
-      allow delete: if isAuthenticated();
-    }
-
-    // Default deny for anything not explicitly matched above.
+    // Default deny for anything not explicitly matched above — this
+    // now also covers the old flat top-level collection paths, which
+    // no longer exist (migrated and deleted 2026-07-18).
     match /{document=**} {
       allow read, write: if false;
     }

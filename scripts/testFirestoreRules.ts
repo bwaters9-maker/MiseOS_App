@@ -75,11 +75,11 @@ async function main() {
     await assertFails(getDoc(doc(noClaim.firestore(), 'restaurants/restaurant-a/recipes/r1')));
   });
 
-  await check('transitional: old flat path still reachable by any authenticated user', async () => {
-    await assertSucceeds(getDoc(doc(chefB.firestore(), 'recipes/legacy1')));
+  await check('post-cutover: old flat path denied even to an authenticated user', async () => {
+    await assertFails(getDoc(doc(chefB.firestore(), 'recipes/legacy1')));
   });
 
-  await check('transitional: old flat path unreachable by unauthenticated user', async () => {
+  await check('post-cutover: old flat path denied to an unauthenticated user', async () => {
     await assertFails(getDoc(doc(anon.firestore(), 'recipes/legacy1')));
   });
 
