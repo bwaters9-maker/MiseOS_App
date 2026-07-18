@@ -7,13 +7,15 @@
  * verification, uid logging, and the Anthropic forward, not two copies
  * that can drift apart.
  *
- * Assumes firebase-admin's default app is already initialized by the
- * caller (initializeApp({ projectId }) is enough — verifyIdToken()
- * checks the JWT signature against Google's public keys and does not
- * itself require full service-account credentials).
+ * Does NOT import firebase-admin itself: server.ts (root node_modules)
+ * and this file when bundled with the Cloud Function (functions/
+ * node_modules) resolve `firebase-admin` to two separate installed
+ * copies with independent internal app registries — initializeApp()
+ * on one is invisible to getAuth() on the other, which surfaced as a
+ * live "The default Firebase app does not exist" failure. Each caller
+ * instead passes its own already-correctly-initialized verifyIdToken
+ * function.
  */
-import { getAuth } from 'firebase-admin/auth';
-
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 
 export interface AiProxyRequest {
@@ -31,7 +33,11 @@ export interface AiProxyResult {
   body: unknown;
 }
 
-export async function handleAiProxyRequest(req: AiProxyRequest, apiKey: string | undefined): Promise<AiProxyResult> {
+export async function handleAiProxyRequest(
+  req: AiProxyRequest,
+  apiKey: string | undefined,
+  verifyIdToken: (idToken: string) => Promise<{ uid: string }>
+): Promise<AiProxyResult> {
   const { authHeader, body } = req;
 
   const idToken = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : undefined;
@@ -41,9 +47,11 @@ export async function handleAiProxyRequest(req: AiProxyRequest, apiKey: string |
 
   let uid: string;
   try {
-    const decoded = await getAuth().verifyIdToken(idToken);
+    const decoded = await verifyIdToken(idToken);
     uid = decoded.uid;
-  } catch {
+  } catch (err) {
+    // Server-side only — never leak verification internals to the client.
+    console.error('verifyIdToken failed:', err instanceof Error ? err.message : err);
     return { status: 401, body: { error: { message: 'Invalid or expired ID token.' } } };
   }
 

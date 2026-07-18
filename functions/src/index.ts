@@ -5,6 +5,7 @@
 import { onRequest } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import { handleAiProxyRequest } from './aiProxyHandler.js';
 
 initializeApp();
@@ -24,7 +25,8 @@ export const ai = onRequest({ secrets: [anthropicApiKey] }, async (req, res) => 
 
   const result = await handleAiProxyRequest(
     { authHeader: req.headers.authorization, body: req.body ?? {} },
-    anthropicApiKey.value()
+    anthropicApiKey.value(),
+    (idToken) => getAuth().verifyIdToken(idToken)
   );
   res.status(result.status).json(result.body);
 });

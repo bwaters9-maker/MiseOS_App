@@ -10,6 +10,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import http from 'http';
 import { initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import { handleAiProxyRequest } from './functions/src/aiProxyHandler.ts';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,7 +34,8 @@ initializeApp({ projectId });
 app.post('/api/ai', async (req, res) => {
   const result = await handleAiProxyRequest(
     { authHeader: req.headers.authorization, body: req.body ?? {} },
-    process.env.ANTHROPIC_API_KEY
+    process.env.ANTHROPIC_API_KEY,
+    (idToken) => getAuth().verifyIdToken(idToken)
   );
   res.status(result.status).json(result.body);
 });
