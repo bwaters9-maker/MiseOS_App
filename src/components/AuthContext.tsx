@@ -34,7 +34,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setRestaurantIdLoaded(false);
       try {
-        const tokenResult = await u.getIdTokenResult();
+        // Force-refresh: a cached ID token (e.g. from a session persisted
+        // before a claim was set or changed) would otherwise report stale
+        // claims instead of the account's current restaurantId.
+        const tokenResult = await u.getIdTokenResult(true);
         const claim = tokenResult.claims.restaurantId;
         setRestaurantId(typeof claim === 'string' && claim.length > 0 ? claim : null);
       } catch {
