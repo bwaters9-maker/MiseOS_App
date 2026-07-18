@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Plus, Save, Trash2, Copy, Minus, RotateCcw, RotateCw } from 'lucide-react';
+import { Plus, Save, Trash2, Copy, Minus, RotateCcw, RotateCw, Droplet, ChevronDown } from 'lucide-react';
 import { addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { rCollection, rDoc } from '../../lib/firestorePaths';
 import { useRestaurantId } from '../AuthContext';
@@ -7,11 +7,18 @@ import { usePlateDesigns } from '../../hooks/usePlateDesigns';
 import {
   PLATE_SHAPES,
   PLATE_COMPONENT_TYPES,
+  PALETTE_COMPONENT_TYPES,
   PLATE_COMPONENT_COLORS,
   PlateShapeBackground,
   PlateComponentShape,
 } from './plateShapes';
+import { SAUCE_TECHNIQUES, findSauceTechnique } from './sauceTechniques';
 import type { PlateDesign, PlateComponent, PlateShape, PlateComponentType } from '../../types';
+
+interface ArmedPlacement {
+  type: PlateComponentType;
+  techniqueId?: string;
+}
 
 const VIEWBOX = 400;
 const SCALE_MIN = 0.5;
@@ -40,6 +47,22 @@ const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(mi
 const shapeLabel = (shape: PlateShape) => PLATE_SHAPES.find(s => s.value === shape)?.label ?? shape;
 const typeLabel = (type: PlateComponentType) => PLATE_COMPONENT_TYPES.find(t => t.value === type)?.label ?? type;
 
+/** 'sauceTechnique' components show the specific technique name, not just "Sauce". */
+const componentLabel = (c: PlateComponent): string => {
+  if (c.type === 'sauceTechnique') {
+    const technique = findSauceTechnique(c.techniqueId);
+    return technique ? `Sauce — ${technique.name}` : 'Sauce (unknown technique)';
+  }
+  return typeLabel(c.type);
+};
+
+const armedLabel = (armed: ArmedPlacement): string => {
+  if (armed.type === 'sauceTechnique') {
+    return findSauceTechnique(armed.techniqueId)?.name ?? 'Sauce';
+  }
+  return typeLabel(armed.type);
+};
+
 const PlateDesigner: React.FC = () => {
   const restaurantId = useRestaurantId();
   const { designs, loading } = usePlateDesigns();
@@ -51,7 +74,8 @@ const PlateDesigner: React.FC = () => {
   const [baseline, setBaseline] = useState(snapshotKey(BLANK_STATE));
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [armedType, setArmedType] = useState<PlateComponentType | null>(null);
+  const [armed, setArmed] = useState<ArmedPlacement | null>(null);
+  const [sauceExpanded, setSauceExpanded] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -76,7 +100,7 @@ const PlateDesigner: React.FC = () => {
     setComponents(BLANK_STATE.components);
     setBaseline(snapshotKey(BLANK_STATE));
     setSelectedId(null);
-    setArmedType(null);
+    setArmed(null);
     setSaveError(null);
   };
 
@@ -87,7 +111,7 @@ const PlateDesigner: React.FC = () => {
     setComponents(d.components);
     setBaseline(snapshotKey({ name: d.name, plateShape: d.plateShape, components: d.components }));
     setSelectedId(null);
-    setArmedType(null);
+    setArmed(null);
     setSaveError(null);
   };
 
@@ -102,26 +126,35 @@ const PlateDesigner: React.FC = () => {
     return { x, y };
   };
 
-  const addComponentAt = (type: PlateComponentType, x: number, y: number) => {
+  const addComponentAt = (type: PlateComponentType, x: number, y: number, techniqueId?: string) => {
     const nextZ = components.length === 0 ? 1 : Math.max(...components.map(c => c.z)) + 1;
-    const newComp: PlateComponent = { id: crypto.randomUUID(), type, x, y, scale: 1, rotation: 0, z: nextZ };
+    const newComp: PlateComponent = {
+      id: crypto.randomUUID(), type, x, y, scale: 1, rotation: 0, z: nextZ,
+      ...(techniqueId ? { techniqueId } : {}),
+    };
     setComponents(prev => [...prev, newComp]);
     setSelectedId(newComp.id);
   };
 
   const handleCanvasDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    const type = e.dataTransfer.getData('text/plain');
-    if (!PLATE_COMPONENT_TYPES.some(t => t.value === type)) return;
+    let parsed: ArmedPlacement | null = null;
+    try {
+      parsed = JSON.parse(e.dataTransfer.getData('text/plain'));
+    } catch {
+      return;
+    }
+    if (!parsed || !PLATE_COMPONENT_TYPES.some(t => t.value === parsed!.type)) return;
+    if (parsed.type === 'sauceTechnique' && !findSauceTechnique(parsed.techniqueId)) return;
     const { x, y } = toViewBoxPoint(e.clientX, e.clientY);
-    addComponentAt(type as PlateComponentType, x, y);
+    addComponentAt(parsed.type, x, y, parsed.techniqueId);
   };
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (armedType) {
+    if (armed) {
       const { x, y } = toViewBoxPoint(e.clientX, e.clientY);
-      addComponentAt(armedType, x, y);
-      setArmedType(null);
+      addComponentAt(armed.type, x, y, armed.techniqueId);
+      setArmed(null);
     } else {
       setSelectedId(null);
     }
@@ -131,7 +164,7 @@ const PlateDesigner: React.FC = () => {
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
     setSelectedId(id);
-    setArmedType(null);
+    setArmed(null);
     setDraggingId(id);
   };
 
@@ -323,16 +356,16 @@ const PlateDesigner: React.FC = () => {
       <div>
         <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[5px]">Component Palette</p>
         <div className="flex flex-wrap gap-[8px]">
-          {PLATE_COMPONENT_TYPES.map(t => (
+          {PALETTE_COMPONENT_TYPES.map(t => (
             <button
               key={t.value}
               type="button"
               draggable
-              onDragStart={e => { setArmedType(null); e.dataTransfer.setData('text/plain', t.value); e.dataTransfer.effectAllowed = 'copy'; }}
-              onClick={() => setArmedType(cur => (cur === t.value ? null : t.value))}
-              aria-pressed={armedType === t.value}
+              onDragStart={e => { setArmed(null); e.dataTransfer.setData('text/plain', JSON.stringify({ type: t.value })); e.dataTransfer.effectAllowed = 'copy'; }}
+              onClick={() => setArmed(cur => (cur && cur.type === t.value ? null : { type: t.value }))}
+              aria-pressed={armed?.type === t.value}
               className={`flex items-center gap-[5px] px-[8px] py-[5px] rounded-[8px] border-2 text-[10px] font-bold text-navy transition-colors duration-[144ms] cursor-grab active:cursor-grabbing ${
-                armedType === t.value ? 'border-teal bg-accent-wash' : 'border-line hover:border-slate/50'
+                armed?.type === t.value ? 'border-teal bg-accent-wash' : 'border-line hover:border-slate/50'
               }`}
             >
               <svg viewBox="-30 -30 60 60" className="w-[18px] h-[18px] shrink-0">
@@ -341,10 +374,48 @@ const PlateDesigner: React.FC = () => {
               {t.label}
             </button>
           ))}
+
+          <button
+            type="button"
+            onClick={() => setSauceExpanded(x => !x)}
+            aria-expanded={sauceExpanded}
+            className={`flex items-center gap-[5px] px-[8px] py-[5px] rounded-[8px] border-2 text-[10px] font-bold text-navy transition-colors duration-[144ms] ${
+              sauceExpanded || armed?.type === 'sauceTechnique' ? 'border-teal bg-accent-wash' : 'border-line hover:border-slate/50'
+            }`}
+          >
+            <Droplet className="w-[18px] h-[18px] shrink-0" style={{ color: PLATE_COMPONENT_COLORS.sauceTechnique }} />
+            Sauce
+            <ChevronDown className={`w-3 h-3 transition-transform duration-[144ms] ${sauceExpanded ? 'rotate-180' : ''}`} />
+          </button>
         </div>
+
+        {sauceExpanded && (
+          <div className="mt-[8px] grid grid-cols-2 sm:grid-cols-4 gap-[8px] bg-bg-cool border border-line rounded-card p-[8px]">
+            {SAUCE_TECHNIQUES.map(tech => (
+              <button
+                key={tech.id}
+                type="button"
+                draggable
+                onDragStart={e => { setArmed(null); e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'sauceTechnique', techniqueId: tech.id })); e.dataTransfer.effectAllowed = 'copy'; }}
+                onClick={() => setArmed(cur => (cur?.techniqueId === tech.id ? null : { type: 'sauceTechnique', techniqueId: tech.id }))}
+                aria-pressed={armed?.techniqueId === tech.id}
+                title={tech.description}
+                className={`flex flex-col items-center gap-[3px] p-[5px] rounded-[8px] border-2 text-center transition-colors duration-[144ms] cursor-grab active:cursor-grabbing ${
+                  armed?.techniqueId === tech.id ? 'border-teal bg-accent-wash' : 'border-line bg-surface hover:border-slate/50'
+                }`}
+              >
+                <svg viewBox="0 0 1000 1000" className="w-[36px] h-[36px] rounded-[5px] bg-bg-cool shrink-0">
+                  <tech.Render color={PLATE_COMPONENT_COLORS.sauceTechnique} />
+                </svg>
+                <span className="text-[9px] font-bold text-navy leading-tight">{tech.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         <p className="text-[10px] text-slate mt-[5px]">
-          {armedType
-            ? `Tap the plate to place a ${typeLabel(armedType)}.`
+          {armed
+            ? `Tap the plate to place ${armedLabel(armed)}.`
             : 'Drag onto the plate, or tap a component then tap the plate to place it.'}
         </p>
       </div>
@@ -370,7 +441,7 @@ const PlateDesigner: React.FC = () => {
               onClick={e => e.stopPropagation()}
               style={{ cursor: 'grab', touchAction: 'none' }}
             >
-              <PlateComponentShape type={c.type} />
+              <PlateComponentShape type={c.type} techniqueId={c.techniqueId} />
               {selectedId === c.id && (
                 <circle r={46} fill="none" stroke="var(--color-teal)" strokeWidth={2} strokeDasharray="5 4" />
               )}
@@ -391,7 +462,7 @@ const PlateDesigner: React.FC = () => {
                   className="w-[13px] h-[13px] rounded-full shrink-0"
                   style={{ backgroundColor: PLATE_COMPONENT_COLORS[selected.type] }}
                 />
-                {typeLabel(selected.type)}
+                {componentLabel(selected)}
               </span>
               <button
                 type="button"
