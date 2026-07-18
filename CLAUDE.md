@@ -563,14 +563,26 @@ AI LAYER
   Trends & Forecasts (Phase B ✓) is editorial and read-only by hard
   boundary — see the Test Kitchen section above; it never touches
   the pantry, costing, or any other domain data.
-- Sous (BOH culinary advisor — direct, practical, no mascot) —
-  the persona itself shipped early, inside the Test Kitchen
-  Playground chat (`src/lib/sousPersona.ts`, item 15's regional
-  context now injected into it too). A standalone "Chef Chat"
-  surface separate from the Playground is intentionally not built
-  — it would duplicate the same persona behind a second UI with no
-  clear new capability. Build it only if a real gap shows up that
-  the Playground can't cover.
+- Sous ("Chef Matthew" — direct, practical, no mascot) — the
+  persona shipped early, inside the Test Kitchen Playground chat
+  (`src/lib/sousPersona.ts`, item 15's regional context injected
+  into it). Expanded 2026-07-18 from a single culinary advisor into
+  five domains — culinary, restaurant business, front of house, the
+  app itself, and this restaurant's brand — plus a fixed persona
+  canon (backstory, self-awareness, humor calibration) injected
+  verbatim so answers stay consistent under testing; see PROMPTS.md
+  for the decision. App facts come only from the maintained
+  `src/lib/sousAppKnowledge.ts` (update it whenever a module ships,
+  a nav tab renames, or a feature moves — Sous is never allowed to
+  freehand what the app does); restaurant facts come only from the
+  Restaurant Profile via `withRegionContext`. Hard rule: Sous never
+  invents a fact about the restaurant or the app — anything outside
+  those two injected sources gets an honest "I don't have that on
+  file," never a plausible-sounding guess. A standalone "Chef Chat"
+  surface separate from the Playground is still intentionally not
+  built — it would duplicate the same persona behind a second UI
+  with no clear new capability. Build it only if a real gap shows
+  up that the Playground can't cover.
 - Ingredient Advisor (web-search enabled, region-aware)
 
 ### Permanently Purged — Never Rebuild

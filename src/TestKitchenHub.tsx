@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Sparkles, RefreshCw, Send, AlertCircle, ExternalLink, Flame, TrendingUp, TrendingDown, ChevronDown, CalendarDays, Printer } from 'lucide-react';
 import PlateDesigner from './components/testKitchen/PlateDesigner';
 import { SOUS_SYSTEM_PROMPT } from './lib/sousPersona';
+import { APP_KNOWLEDGE_CONTEXT } from './lib/sousAppKnowledge';
 import { withRegionContext } from './lib/regionContext';
 import { callAi, parseAiJson, getAiAuthHeader } from './lib/ai';
 import { todayDateKey } from './utils';
@@ -383,7 +384,7 @@ export default function TestKitchenHub() {
         },
         body: JSON.stringify({
           max_tokens: 2048,
-          system: withRegionContext(SOUS_SYSTEM_PROMPT, restaurantProfile),
+          system: withRegionContext(`${SOUS_SYSTEM_PROMPT}\n\n${APP_KNOWLEDGE_CONTEXT}`, restaurantProfile),
           messages: updatedMessages.map(msg => ({
             role: msg.role === 'model' ? 'assistant' : 'user',
             content: msg.content,
