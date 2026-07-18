@@ -111,7 +111,13 @@ export interface RecipeCollection {
  */
 export type PlateShape = 'round-rimmed' | 'coupe' | 'bowl' | 'wide-rim-bowl' | 'rectangle' | 'square' | 'offset';
 
-export type PlateComponentType = 'protein' | 'starch' | 'vegetable' | 'sauceSmear' | 'sauceDots' | 'garnish';
+/**
+ * 'sauceSmear' / 'sauceDots' are v1.0 sauce shapes — kept only so designs
+ * saved before v1.1's technique registry (see sauceTechniques.tsx) keep
+ * loading and rendering unchanged. Not offered in the palette anymore;
+ * new sauce placements are always 'sauceTechnique'.
+ */
+export type PlateComponentType = 'protein' | 'starch' | 'vegetable' | 'sauceSmear' | 'sauceDots' | 'garnish' | 'sauceTechnique';
 
 /**
  * One placed item on the plate. `x`/`y`/`scale`/`rotation` are all in the
@@ -126,6 +132,8 @@ export interface PlateComponent {
   rotation: number;
   /** Stacking order — higher renders on top. Mutated by bring-forward/send-backward. */
   z: number;
+  /** Required when type is 'sauceTechnique' — id into the SAUCE_TECHNIQUES registry. */
+  techniqueId?: string;
 }
 
 export interface PlateDesign {
