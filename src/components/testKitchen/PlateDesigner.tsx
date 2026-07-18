@@ -13,12 +13,53 @@ import {
   PlateComponentShape,
 } from './plateShapes';
 import { SAUCE_TECHNIQUES, findSauceTechnique } from './sauceTechniques';
+import { structuresFor, findStructure } from './plateStructures';
 import type { PlateDesign, PlateComponent, PlateShape, PlateComponentType } from '../../types';
 
 interface ArmedPlacement {
   type: PlateComponentType;
   techniqueId?: string;
+  structureId?: string;
 }
+
+interface PaletteGroupConfig {
+  type: PlateComponentType;
+  label: string;
+  icon: React.ReactNode;
+  items: { id: string; name: string; description: string; Render: React.FC<{ color: string }> }[];
+  /** Whether this group offers a plain "Default" entry ahead of its named
+   * variants. Sauce has no bare/default state — every placement is a
+   * specific technique — so it's the only group with this false. */
+  includeDefault: boolean;
+  getPlacement: (itemId?: string) => ArmedPlacement;
+}
+
+/** One entry per palette group — 4 solid types (each gets its structure
+ * registry + a synthetic Default option) plus Sauce (its own technique
+ * registry, no default). Built once at module scope since none of it
+ * depends on component state. */
+const PALETTE_GROUP_CONFIGS: PaletteGroupConfig[] = [
+  ...PALETTE_COMPONENT_TYPES.map((t): PaletteGroupConfig => ({
+    type: t.value,
+    label: t.label,
+    icon: (
+      <svg viewBox="-30 -30 60 60" className="w-[18px] h-[18px] shrink-0">
+        <PlateComponentShape type={t.value} />
+      </svg>
+    ),
+    items: structuresFor(t.value),
+    includeDefault: true,
+    getPlacement: (itemId?: string) => ({ type: t.value, structureId: itemId }),
+  })),
+  {
+    type: 'sauceTechnique',
+    label: 'Sauce',
+    icon: <Droplet className="w-[18px] h-[18px] shrink-0" style={{ color: PLATE_COMPONENT_COLORS.sauceTechnique }} />,
+    items: SAUCE_TECHNIQUES,
+    includeDefault: false,
+    getPlacement: (itemId?: string) => ({ type: 'sauceTechnique', techniqueId: itemId }),
+  },
+];
 
 const VIEWBOX = 400;
 const SCALE_MIN = 0.5;
@@ -47,11 +88,17 @@ const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(mi
 const shapeLabel = (shape: PlateShape) => PLATE_SHAPES.find(s => s.value === shape)?.label ?? shape;
 const typeLabel = (type: PlateComponentType) => PLATE_COMPONENT_TYPES.find(t => t.value === type)?.label ?? type;
 
-/** 'sauceTechnique' components show the specific technique name, not just "Sauce". */
+/** 'sauceTechnique' components show the specific technique name, and a
+ * structured protein/starch/vegetable/garnish shows its variant name —
+ * "Protein" alone only for the plain default shape. */
 const componentLabel = (c: PlateComponent): string => {
   if (c.type === 'sauceTechnique') {
     const technique = findSauceTechnique(c.techniqueId);
     return technique ? `Sauce — ${technique.name}` : 'Sauce (unknown technique)';
+  }
+  if (c.structureId) {
+    const structure = findStructure(c.type, c.structureId);
+    return structure ? `${typeLabel(c.type)} — ${structure.name}` : `${typeLabel(c.type)} (unknown variant)`;
   }
   return typeLabel(c.type);
 };
@@ -59,6 +106,9 @@ const componentLabel = (c: PlateComponent): string => {
 const armedLabel = (armed: ArmedPlacement): string => {
   if (armed.type === 'sauceTechnique') {
     return findSauceTechnique(armed.techniqueId)?.name ?? 'Sauce';
+  }
+  if (armed.structureId) {
+    return findStructure(armed.type, armed.structureId)?.name ?? typeLabel(armed.type);
   }
   return typeLabel(armed.type);
 };
@@ -75,7 +125,7 @@ const PlateDesigner: React.FC = () => {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [armed, setArmed] = useState<ArmedPlacement | null>(null);
-  const [sauceExpanded, setSauceExpanded] = useState(false);
+  const [expandedGroup, setExpandedGroup] = useState<PlateComponentType | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -87,6 +137,13 @@ const PlateDesigner: React.FC = () => {
   const isDirty = snapshotKey({ name, plateShape, components }) !== baseline;
   const selected = components.find(c => c.id === selectedId) ?? null;
   const orderedComponents = useMemo(() => [...components].sort((a, b) => a.z - b.z), [components]);
+  const expandedGroupConfig = PALETTE_GROUP_CONFIGS.find(g => g.type === expandedGroup) ?? null;
+
+  /** itemId undefined checks against the group's plain Default option. */
+  const isItemArmed = (group: PaletteGroupConfig, itemId?: string): boolean => {
+    if (armed?.type !== group.type) return false;
+    return (armed.structureId ?? armed.techniqueId) === itemId;
+  };
 
   const runOrConfirmDiscard = (action: () => void) => {
     if (isDirty) setPendingDiscardAction(() => action);
@@ -126,11 +183,12 @@ const PlateDesigner: React.FC = () => {
     return { x, y };
   };
 
-  const addComponentAt = (type: PlateComponentType, x: number, y: number, techniqueId?: string) => {
+  const addComponentAt = (type: PlateComponentType, x: number, y: number, techniqueId?: string, structureId?: string) => {
     const nextZ = components.length === 0 ? 1 : Math.max(...components.map(c => c.z)) + 1;
     const newComp: PlateComponent = {
       id: crypto.randomUUID(), type, x, y, scale: 1, rotation: 0, z: nextZ,
       ...(techniqueId ? { techniqueId } : {}),
+      ...(structureId ? { structureId } : {}),
     };
     setComponents(prev => [...prev, newComp]);
     setSelectedId(newComp.id);
@@ -146,14 +204,15 @@ const PlateDesigner: React.FC = () => {
     }
     if (!parsed || !PLATE_COMPONENT_TYPES.some(t => t.value === parsed!.type)) return;
     if (parsed.type === 'sauceTechnique' && !findSauceTechnique(parsed.techniqueId)) return;
+    if (parsed.structureId && !findStructure(parsed.type, parsed.structureId)) return;
     const { x, y } = toViewBoxPoint(e.clientX, e.clientY);
-    addComponentAt(parsed.type, x, y, parsed.techniqueId);
+    addComponentAt(parsed.type, x, y, parsed.techniqueId, parsed.structureId);
   };
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (armed) {
       const { x, y } = toViewBoxPoint(e.clientX, e.clientY);
-      addComponentAt(armed.type, x, y, armed.techniqueId);
+      addComponentAt(armed.type, x, y, armed.techniqueId, armed.structureId);
       setArmed(null);
     } else {
       setSelectedId(null);
@@ -368,58 +427,63 @@ const PlateDesigner: React.FC = () => {
       <div>
         <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[5px]">Component Palette</p>
         <div className="flex flex-wrap gap-[8px]">
-          {PALETTE_COMPONENT_TYPES.map(t => (
-            <button
-              key={t.value}
-              type="button"
-              draggable
-              onDragStart={e => { setArmed(null); e.dataTransfer.setData('text/plain', JSON.stringify({ type: t.value })); e.dataTransfer.effectAllowed = 'copy'; }}
-              onClick={() => setArmed(cur => (cur && cur.type === t.value ? null : { type: t.value }))}
-              aria-pressed={armed?.type === t.value}
-              className={`flex items-center gap-[5px] px-[8px] py-[5px] rounded-[8px] border-2 text-[10px] font-bold text-navy transition-colors duration-[144ms] cursor-grab active:cursor-grabbing ${
-                armed?.type === t.value ? 'border-teal bg-accent-wash' : 'border-line hover:border-slate/50'
-              }`}
-            >
-              <svg viewBox="-30 -30 60 60" className="w-[18px] h-[18px] shrink-0">
-                <PlateComponentShape type={t.value} />
-              </svg>
-              {t.label}
-            </button>
-          ))}
-
-          <button
-            type="button"
-            onClick={() => setSauceExpanded(x => !x)}
-            aria-expanded={sauceExpanded}
-            className={`flex items-center gap-[5px] px-[8px] py-[5px] rounded-[8px] border-2 text-[10px] font-bold text-navy transition-colors duration-[144ms] ${
-              sauceExpanded || armed?.type === 'sauceTechnique' ? 'border-teal bg-accent-wash' : 'border-line hover:border-slate/50'
-            }`}
-          >
-            <Droplet className="w-[18px] h-[18px] shrink-0" style={{ color: PLATE_COMPONENT_COLORS.sauceTechnique }} />
-            Sauce
-            <ChevronDown className={`w-3 h-3 transition-transform duration-[144ms] ${sauceExpanded ? 'rotate-180' : ''}`} />
-          </button>
+          {PALETTE_GROUP_CONFIGS.map(group => {
+            const isExpanded = expandedGroup === group.type;
+            return (
+              <button
+                key={group.type}
+                type="button"
+                onClick={() => setExpandedGroup(g => (g === group.type ? null : group.type))}
+                aria-expanded={isExpanded}
+                className={`flex items-center gap-[5px] px-[8px] py-[5px] rounded-[8px] border-2 text-[10px] font-bold text-navy transition-colors duration-[144ms] ${
+                  isExpanded || armed?.type === group.type ? 'border-teal bg-accent-wash' : 'border-line hover:border-slate/50'
+                }`}
+              >
+                {group.icon}
+                {group.label}
+                <ChevronDown className={`w-3 h-3 transition-transform duration-[144ms] ${isExpanded ? 'rotate-180' : ''}`} />
+              </button>
+            );
+          })}
         </div>
 
-        {sauceExpanded && (
+        {expandedGroupConfig && (
           <div className="mt-[8px] grid grid-cols-2 sm:grid-cols-4 gap-[8px] bg-bg-cool border border-line rounded-card p-[8px]">
-            {SAUCE_TECHNIQUES.map(tech => (
+            {expandedGroupConfig.includeDefault && (
               <button
-                key={tech.id}
                 type="button"
                 draggable
-                onDragStart={e => { setArmed(null); e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'sauceTechnique', techniqueId: tech.id })); e.dataTransfer.effectAllowed = 'copy'; }}
-                onClick={() => setArmed(cur => (cur?.techniqueId === tech.id ? null : { type: 'sauceTechnique', techniqueId: tech.id }))}
-                aria-pressed={armed?.techniqueId === tech.id}
-                title={tech.description}
+                onDragStart={e => { setArmed(null); e.dataTransfer.setData('text/plain', JSON.stringify(expandedGroupConfig.getPlacement(undefined))); e.dataTransfer.effectAllowed = 'copy'; }}
+                onClick={() => setArmed(isItemArmed(expandedGroupConfig, undefined) ? null : expandedGroupConfig.getPlacement(undefined))}
+                aria-pressed={isItemArmed(expandedGroupConfig, undefined)}
+                title="Plain default shape"
                 className={`flex flex-col items-center gap-[3px] p-[5px] rounded-[8px] border-2 text-center transition-colors duration-[144ms] cursor-grab active:cursor-grabbing ${
-                  armed?.techniqueId === tech.id ? 'border-teal bg-accent-wash' : 'border-line bg-surface hover:border-slate/50'
+                  isItemArmed(expandedGroupConfig, undefined) ? 'border-teal bg-accent-wash' : 'border-line bg-surface hover:border-slate/50'
+                }`}
+              >
+                <svg viewBox="-30 -30 60 60" className="w-[36px] h-[36px] rounded-[5px] bg-bg-cool shrink-0">
+                  <PlateComponentShape type={expandedGroupConfig.type} />
+                </svg>
+                <span className="text-[9px] font-bold text-navy leading-tight">Default</span>
+              </button>
+            )}
+            {expandedGroupConfig.items.map(item => (
+              <button
+                key={item.id}
+                type="button"
+                draggable
+                onDragStart={e => { setArmed(null); e.dataTransfer.setData('text/plain', JSON.stringify(expandedGroupConfig.getPlacement(item.id))); e.dataTransfer.effectAllowed = 'copy'; }}
+                onClick={() => setArmed(isItemArmed(expandedGroupConfig, item.id) ? null : expandedGroupConfig.getPlacement(item.id))}
+                aria-pressed={isItemArmed(expandedGroupConfig, item.id)}
+                title={item.description}
+                className={`flex flex-col items-center gap-[3px] p-[5px] rounded-[8px] border-2 text-center transition-colors duration-[144ms] cursor-grab active:cursor-grabbing ${
+                  isItemArmed(expandedGroupConfig, item.id) ? 'border-teal bg-accent-wash' : 'border-line bg-surface hover:border-slate/50'
                 }`}
               >
                 <svg viewBox="0 0 1000 1000" className="w-[36px] h-[36px] rounded-[5px] bg-bg-cool shrink-0">
-                  <tech.Render color={PLATE_COMPONENT_COLORS.sauceTechnique} />
+                  <item.Render color={PLATE_COMPONENT_COLORS[expandedGroupConfig.type]} />
                 </svg>
-                <span className="text-[9px] font-bold text-navy leading-tight">{tech.name}</span>
+                <span className="text-[9px] font-bold text-navy leading-tight">{item.name}</span>
               </button>
             ))}
           </div>
@@ -453,7 +517,7 @@ const PlateDesigner: React.FC = () => {
               onClick={e => e.stopPropagation()}
               style={{ cursor: 'grab', touchAction: 'none' }}
             >
-              <PlateComponentShape type={c.type} techniqueId={c.techniqueId} color={c.color} />
+              <PlateComponentShape type={c.type} techniqueId={c.techniqueId} structureId={c.structureId} color={c.color} />
               {selectedId === c.id && (
                 <circle r={46} fill="none" stroke="var(--color-teal)" strokeWidth={2} strokeDasharray="5 4" />
               )}
