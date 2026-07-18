@@ -1,15 +1,28 @@
 /**
  * src/lib/ai.ts
  * Thin client for the server-side /api/ai proxy. No React, no Anthropic key —
- * the key stays server-side in server.ts.
+ * the key stays server-side (server.ts locally, a Cloud Function secret in
+ * prod). The proxy requires a Firebase ID token; getAiAuthHeader() is the
+ * single place every /api/ai caller (callAi() below, plus the few raw-fetch
+ * callers that need `tools` or multi-turn `messages`) sources it from, so
+ * there's one implementation, not several copies that can drift.
  */
+import { auth } from '../firebaseConfig';
 
 export type AiContent = string | Array<Record<string, any>>;
+
+/** Empty object if signed out — the server's 401 handles that case; every
+ * caller of this is already gated behind AuthGate, so it's always present
+ * in practice. */
+export const getAiAuthHeader = async (): Promise<Record<string, string>> => {
+  const token = await auth.currentUser?.getIdToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 export const callAi = async (system: string, content: AiContent, maxTokens: number): Promise<string> => {
   const response = await fetch('/api/ai', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await getAiAuthHeader()) },
     body: JSON.stringify({
       max_tokens: maxTokens,
       system,

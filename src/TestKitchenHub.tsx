@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Sparkles, RefreshCw, Send, AlertCircle, ExternalLink, Flame, TrendingUp, TrendingDown, ChevronDown, CalendarDays, Printer } from 'lucide-react';
 import { SOUS_SYSTEM_PROMPT } from './lib/sousPersona';
 import { withRegionContext } from './lib/regionContext';
-import { callAi, parseAiJson } from './lib/ai';
+import { callAi, parseAiJson, getAiAuthHeader } from './lib/ai';
 import { todayDateKey } from './utils';
 import { useKitchenSelector } from './components/KitchenStateContext';
 import { useRestaurantId } from './components/AuthContext';
@@ -113,7 +113,7 @@ const verifyTrendCard = async (card: TrendCard): Promise<TrendCard | null> => {
   try {
     const response = await fetch('/api/ai', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await getAiAuthHeader()) },
       body: JSON.stringify({
         max_tokens: 1024,
         system: TREND_VERIFY_SYSTEM_PROMPT,
@@ -380,6 +380,7 @@ export default function TestKitchenHub() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(await getAiAuthHeader()),
         },
         body: JSON.stringify({
           max_tokens: 2048,

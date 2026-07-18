@@ -3,6 +3,7 @@ import { Compass, X, Search, ExternalLink, AlertTriangle } from 'lucide-react';
 import { useKitchenSelector } from '../KitchenStateContext';
 import { withRegionContext } from '../../lib/regionContext';
 import { ADVISOR_SYSTEM_PROMPT } from '../../lib/advisorPersona';
+import { getAiAuthHeader } from '../../lib/ai';
 import type { RestaurantProfile } from '../../types';
 
 interface SourceLink {
@@ -67,7 +68,7 @@ export const IngredientAdvisor: React.FC<IngredientAdvisorProps> = ({ isOpen, on
     try {
       const response = await fetch('/api/ai', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await getAiAuthHeader()) },
         body: JSON.stringify({
           max_tokens: 3000,
           system: withRegionContext(ADVISOR_SYSTEM_PROMPT, restaurantProfile),
