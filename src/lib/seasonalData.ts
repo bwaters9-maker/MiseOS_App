@@ -5,6 +5,10 @@
  * a planning aid, not a precise agricultural record. Same no-runtime-calls
  * pattern as yieldReference.ts: versioned static data, no live feeds.
  *
+ * Northeast windows chef-verified 2026-07-17 (Brian Waters) against the
+ * printed Seasonal Sourcing Calendar; other regions remain general
+ * chef-knowledge pending their own verification pass.
+ *
  * Each item's window is per-region since the same crop peaks at different
  * times across the country. Months are 1-12. rampUp/prime/tailOff can wrap
  * the year boundary (e.g. citrus prime [12, 1, 2]) — consumers should test
@@ -69,7 +73,7 @@ export const SEASONAL_DATA: SeasonalItem[] = [
   {
     name: 'Strawberries', type: 'produce',
     regions: {
-      Northeast: { rampUp: [5], prime: [6], tailOff: [7] },
+      Northeast: { rampUp: [], prime: [6], tailOff: [7] },
       Southeast: { rampUp: [3], prime: [4], tailOff: [5] },
       Midwest: { rampUp: [5], prime: [6], tailOff: [7] },
       Southwest: { rampUp: [3], prime: [4], tailOff: [5] },
@@ -99,7 +103,7 @@ export const SEASONAL_DATA: SeasonalItem[] = [
   {
     name: 'Zucchini & Summer Squash', type: 'produce',
     regions: {
-      Northeast: { rampUp: [6], prime: [7], tailOff: [8] },
+      Northeast: { rampUp: [6], prime: [7, 8], tailOff: [9] },
       Southeast: { rampUp: [5], prime: [6], tailOff: [7] },
       Midwest: { rampUp: [6], prime: [7], tailOff: [8] },
       Southwest: { rampUp: [5], prime: [6], tailOff: [7] },
@@ -109,7 +113,7 @@ export const SEASONAL_DATA: SeasonalItem[] = [
   {
     name: 'Green Beans', type: 'produce',
     regions: {
-      Northeast: { rampUp: [6], prime: [7], tailOff: [8] },
+      Northeast: { rampUp: [6], prime: [7, 8], tailOff: [9] },
       Southeast: { rampUp: [5], prime: [6], tailOff: [7] },
       Midwest: { rampUp: [6], prime: [7], tailOff: [8] },
     },
@@ -143,7 +147,7 @@ export const SEASONAL_DATA: SeasonalItem[] = [
   {
     name: 'Sweet Peppers', type: 'produce',
     regions: {
-      Northeast: { rampUp: [7], prime: [8], tailOff: [9] },
+      Northeast: { rampUp: [7], prime: [8, 9], tailOff: [10] },
       Southeast: { rampUp: [6], prime: [7], tailOff: [8] },
       Midwest: { rampUp: [7], prime: [8], tailOff: [9] },
       Southwest: { rampUp: [6], prime: [7], tailOff: [8] },
@@ -161,7 +165,7 @@ export const SEASONAL_DATA: SeasonalItem[] = [
   {
     name: 'Winter Squash — Butternut, Acorn, Kabocha', type: 'produce',
     regions: {
-      Northeast: { rampUp: [9], prime: [10], tailOff: [11] },
+      Northeast: { rampUp: [9], prime: [10, 11], tailOff: [12] },
       Southeast: { rampUp: [9], prime: [10], tailOff: [11] },
       Midwest: { rampUp: [9], prime: [10], tailOff: [11] },
       West: { rampUp: [9], prime: [10], tailOff: [11] },
@@ -170,7 +174,7 @@ export const SEASONAL_DATA: SeasonalItem[] = [
   {
     name: 'Apples', type: 'produce',
     regions: {
-      Northeast: { rampUp: [9], prime: [10], tailOff: [11] },
+      Northeast: { rampUp: [8], prime: [9, 10], tailOff: [11] },
       Midwest: { rampUp: [9], prime: [10], tailOff: [11] },
       West: { rampUp: [8], prime: [9], tailOff: [10] },
     },
@@ -178,7 +182,7 @@ export const SEASONAL_DATA: SeasonalItem[] = [
   {
     name: 'Brussels Sprouts', type: 'produce',
     regions: {
-      Northeast: { rampUp: [10], prime: [11], tailOff: [12] },
+      Northeast: { rampUp: [9], prime: [10, 11], tailOff: [12] },
       Midwest: { rampUp: [10], prime: [11], tailOff: [12] },
       West: { rampUp: [10], prime: [11], tailOff: [12] },
     },
@@ -186,7 +190,7 @@ export const SEASONAL_DATA: SeasonalItem[] = [
   {
     name: 'Root Vegetables — Beets, Carrots, Turnips', type: 'produce',
     regions: {
-      Northeast: { rampUp: [9], prime: [10], tailOff: [11] },
+      Northeast: { rampUp: [7, 8], prime: [9, 10], tailOff: [11] },
       Southeast: { rampUp: [10], prime: [11], tailOff: [12] },
       Midwest: { rampUp: [9], prime: [10], tailOff: [11] },
       Southwest: { rampUp: [10], prime: [11], tailOff: [12] },
@@ -204,7 +208,7 @@ export const SEASONAL_DATA: SeasonalItem[] = [
   {
     name: 'Soft-Shell Crab', type: 'protein',
     regions: {
-      Northeast: { rampUp: [5], prime: [6], tailOff: [7] },
+      Northeast: { rampUp: [], prime: [5, 6], tailOff: [7, 8, 9] },
       Southeast: { rampUp: [4], prime: [5], tailOff: [6] },
     },
   },
@@ -230,7 +234,7 @@ export const SEASONAL_DATA: SeasonalItem[] = [
   {
     name: 'Wild Mushrooms — Chanterelle', type: 'produce',
     regions: {
-      Northeast: { rampUp: [9], prime: [10], tailOff: [11] },
+      Northeast: { rampUp: [7], prime: [8], tailOff: [9] },
       Midwest: { rampUp: [9], prime: [10], tailOff: [11] },
       West: { rampUp: [10], prime: [11], tailOff: [12] },
     },
