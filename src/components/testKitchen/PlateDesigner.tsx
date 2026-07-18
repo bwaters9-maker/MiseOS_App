@@ -184,6 +184,18 @@ const PlateDesigner: React.FC = () => {
     setComponents(prev => prev.map(c => (c.id === selectedId ? { ...c, ...patch } : c)));
   };
 
+  /** Removes the color key entirely (rather than setting it to undefined,
+   * which Firestore rejects) so the component falls back to the type's
+   * default color again. */
+  const handleResetColor = () => {
+    if (!selectedId) return;
+    setComponents(prev => prev.map(c => {
+      if (c.id !== selectedId) return c;
+      const { color, ...rest } = c;
+      return rest;
+    }));
+  };
+
   const handleDeleteSelected = () => {
     if (!selectedId) return;
     setComponents(prev => prev.filter(c => c.id !== selectedId));
@@ -441,7 +453,7 @@ const PlateDesigner: React.FC = () => {
               onClick={e => e.stopPropagation()}
               style={{ cursor: 'grab', touchAction: 'none' }}
             >
-              <PlateComponentShape type={c.type} techniqueId={c.techniqueId} />
+              <PlateComponentShape type={c.type} techniqueId={c.techniqueId} color={c.color} />
               {selectedId === c.id && (
                 <circle r={46} fill="none" stroke="var(--color-teal)" strokeWidth={2} strokeDasharray="5 4" />
               )}
@@ -460,7 +472,7 @@ const PlateDesigner: React.FC = () => {
               <span className="flex items-center gap-[8px] text-xs font-bold text-navy">
                 <span
                   className="w-[13px] h-[13px] rounded-full shrink-0"
-                  style={{ backgroundColor: PLATE_COMPONENT_COLORS[selected.type] }}
+                  style={{ backgroundColor: selected.color ?? PLATE_COMPONENT_COLORS[selected.type] }}
                 />
                 {componentLabel(selected)}
               </span>
@@ -472,6 +484,27 @@ const PlateDesigner: React.FC = () => {
                 <Trash2 className="w-3.5 h-3.5" /> Delete
               </button>
             </div>
+
+            {selected.type === 'sauceTechnique' && (
+              <div className="flex items-center gap-[8px]">
+                <span className="text-[10px] font-bold uppercase text-slate w-[40px]">Color</span>
+                <input
+                  type="color"
+                  value={selected.color ?? PLATE_COMPONENT_COLORS.sauceTechnique}
+                  onChange={e => updateSelected({ color: e.target.value })}
+                  className="w-[34px] h-[24px] rounded-[5px] border border-line cursor-pointer p-0 bg-transparent"
+                />
+                {selected.color && (
+                  <button
+                    type="button"
+                    onClick={handleResetColor}
+                    className="text-[10px] font-bold uppercase text-slate hover:text-navy transition-colors duration-[144ms]"
+                  >
+                    Reset to Default
+                  </button>
+                )}
+              </div>
+            )}
 
             <div className="flex flex-wrap items-center gap-[13px]">
               <div className="flex items-center gap-[5px]">
