@@ -40,12 +40,16 @@ ANTHROPIC_API_KEY
 
 Firebase config also accepts non-prefixed `FIREBASE_*` keys (see `src/firebaseConfig.ts`).
 
-`ANTHROPIC_API_KEY` must never carry a `VITE_` prefix — Vite embeds `VITE_*` vars into the client bundle, which would ship the key to the browser. It is read only by `server.ts`, never imported in `src/`.
+`ANTHROPIC_API_KEY` must never carry a `VITE_` prefix — Vite embeds `VITE_*` vars into the client bundle, which would ship the key to the browser. It is read only by `server.ts` locally, never imported in `src/`. The deployed Cloud Function (`functions/`) does not read this `.env` at all — it needs `ANTHROPIC_API_KEY` set separately as a Functions secret (`firebase functions:secrets:set ANTHROPIC_API_KEY`) before it can be deployed. See the AI feature section below.
 
 ## Project structure
 
 ```
 server.ts                        Express entry point
+functions/                        Deployed Cloud Functions (own package.json/tsconfig, Node 20)
+  src/
+    aiProxyHandler.ts              Shared /api/ai proxy core — imported by both this and server.ts
+    index.ts                       Cloud Function entry points (currently just `ai`)
 src/
   main.tsx                       React root
   App.tsx                        View router (viewMap + lazy loading)
@@ -314,9 +318,18 @@ Directory CRUD with the same collapsible-add-form / inline-edit / two-step-delet
 
 ## AI feature (TestKitchenHub)
 
-The browser never talks to Anthropic directly. `TestKitchenHub.tsx` posts `{ system, messages, max_tokens }` to `POST /api/ai` on the Express server; `server.ts` calls `https://api.anthropic.com/v1/messages` server-side with `ANTHROPIC_API_KEY` (read from `process.env`, never a `VITE_` var) and relays Anthropic's JSON response back verbatim, including its `{ error: { message } }` shape on failure. Model is `claude-sonnet-4-6`, default max 1024 tokens.
+The browser never talks to Anthropic directly, and no AI feature ever ships an Anthropic key to the client. Every AI call goes through `POST /api/ai`, and every request to it must carry a Firebase ID token (`Authorization: Bearer <idToken>`) — rejected with 401 if missing or invalid.
 
-Any future AI feature must follow this same proxy pattern — no `fetch` to `api.anthropic.com` from `src/`, no Anthropic key in a `VITE_*` env var. `server.ts` has no Firestore access by design (a dumb proxy) — regional context (below) is composed client-side into `system` before the request goes out, not injected server-side.
+`/api/ai` has two runtimes, both wrapping the same shared handler (`functions/src/aiProxyHandler.ts`) so there is one implementation of "verify the token, log the uid, forward to Anthropic," not two that can drift:
+
+- **Local dev**: `server.ts`'s Express route. `initializeApp({ projectId })` at startup is enough for `verifyIdToken()` (a JWT signature check against Google's public keys) — no service account key needed just to run `npm run dev`. `ANTHROPIC_API_KEY` comes from `process.env` (`.env`, never a `VITE_` var).
+- **Deployed (Hosting)**: the `ai` Cloud Function (`functions/src/index.ts`), reached via a Firebase Hosting rewrite (`/api/ai` → the function, `firebase.json`). `ANTHROPIC_API_KEY` is a Functions secret (`firebase functions:secrets:set ANTHROPIC_API_KEY`, Secret Manager-backed via `defineSecret`) — never in `.env`, never committed, never client-visible.
+
+Every verified request logs `{ event: 'ai_proxy_request', uid, timestamp }` (Cloud Logging in prod, the local terminal in dev) — logging only, never written to Firestore — so a cost spike can be traced back to a specific account.
+
+Client side: every `/api/ai` caller attaches the token via `getAiAuthHeader()` (`src/lib/ai.ts`) — `callAi()` (the shared helper most callers use) includes it automatically; the few raw-`fetch` callers that need `tools` or multi-turn `messages` (Ingredient Advisor, TestKitchenHub's trend-verify pass and Sous chat) import `getAiAuthHeader()` directly. Any future AI feature must go through one of these, not a new raw `fetch('/api/ai')` with hand-rolled headers.
+
+`TestKitchenHub.tsx` posts `{ system, messages, max_tokens }`; the proxy relays Anthropic's JSON response back verbatim, including its `{ error: { message } }` shape on failure. Model is `claude-sonnet-4-6`, default max 1024 tokens. Neither runtime has Firestore access by design (a dumb proxy) — regional context (below) is composed client-side into `system` before the request goes out, not injected server-side.
 
 The proxy accepts an optional `tools` array, whitelisted to exactly Anthropic's server-side web-search tool (`{ type: 'web_search_20250305', name: 'web_search' }`) — any other tool request is rejected with a 400. Used only by the Ingredient Advisor. Web search bills per-search on top of tokens.
 
