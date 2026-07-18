@@ -53,9 +53,9 @@ export default function App() {
 }
 
 const AuthGate: React.FC = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, restaurantId, restaurantIdLoaded, signOut } = useAuth();
 
-  if (loading) {
+  if (loading || (user && !restaurantIdLoaded)) {
     return (
       <div className="min-h-screen bg-bg-cool flex items-center justify-center">
         <p className="text-xs text-slate font-body uppercase tracking-wider">Loading…</p>
@@ -65,6 +65,26 @@ const AuthGate: React.FC = () => {
 
   if (!user) {
     return <SignIn />;
+  }
+
+  if (!restaurantId) {
+    return (
+      <div className="min-h-screen bg-bg-cool flex items-center justify-center p-[21px]">
+        <div className="max-w-[377px] text-center space-y-[13px]">
+          <p className="text-sm font-bold text-navy">Account not fully configured</p>
+          <p className="text-xs text-slate">
+            Your account isn't linked to a restaurant yet. Contact your administrator to finish setup.
+          </p>
+          <button
+            type="button"
+            onClick={() => signOut()}
+            className="text-xs font-bold uppercase tracking-wider text-teal hover:opacity-80"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
