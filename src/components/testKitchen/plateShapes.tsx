@@ -1,5 +1,6 @@
 import React from 'react';
 import { findSauceTechnique } from './sauceTechniques';
+import { findStructure } from './plateStructures';
 import type { PlateShape, PlateComponentType } from '../../types';
 
 /**
@@ -128,19 +129,35 @@ export const PLATE_COMPONENT_COLORS: Record<PlateComponentType, string> = {
   sauceTechnique: '#7A4A63',
 };
 
-/** Sauce technique blueprints are authored in 1000x1000 space; this scales
- * them down to the same footprint the other components use on the 400-unit
- * canvas. Picker thumbnails render the raw 1000x1000 geometry directly
- * instead (viewBox="0 0 1000 1000"), so this only applies at placement time. */
-export const SAUCE_TECHNIQUE_SCALE = 0.16;
+/** Sauce techniques and solid-element structures are both authored in
+ * 1000x1000 blueprint space; this scales them down to the same footprint
+ * the other components use on the 400-unit canvas. Picker thumbnails
+ * render the raw 1000x1000 geometry directly instead (viewBox="0 0 1000
+ * 1000"), so this only applies at placement time. */
+export const BLUEPRINT_SCALE = 0.16;
 
 const EDGE_STROKE = 'rgba(0,0,0,0.18)';
 
-/** Renders one component shape centered at local (0,0) — wrap in a <g transform>. `color` overrides the type's default (currently only settable on sauceTechnique via the Selected Item panel). */
-export const PlateComponentShape: React.FC<{ type: PlateComponentType; techniqueId?: string; color?: string }> = ({ type, techniqueId, color }) => {
+/** Shared wrapper for anything authored in 1000x1000 blueprint space —
+ * scales it into the canvas footprint and adds a full-footprint invisible
+ * hit target (fill="transparent", not "none" — transparent still hit-
+ * tests), since several assets are mostly open space between thin strokes
+ * and would otherwise be unselectable/undraggable from most of their own
+ * visible area. */
+const BlueprintRender: React.FC<{ Render: React.FC<{ color: string }>; color: string }> = ({ Render, color }) => (
+  <g transform={`scale(${BLUEPRINT_SCALE}) translate(-500,-500)`}>
+    <rect x={0} y={0} width={1000} height={1000} fill="transparent" />
+    <Render color={color} />
+  </g>
+);
+
+/** Renders one component shape centered at local (0,0) — wrap in a <g transform>. `color` overrides the type's default (currently only settable on sauceTechnique via the Selected Item panel). `structureId` selects a named structural variant for protein/starch/vegetable/garnish — absent renders that type's original default shape. */
+export const PlateComponentShape: React.FC<{ type: PlateComponentType; techniqueId?: string; structureId?: string; color?: string }> = ({ type, techniqueId, structureId, color }) => {
   const fill = color ?? PLATE_COMPONENT_COLORS[type];
   switch (type) {
-    case 'protein':
+    case 'protein': {
+      const structure = findStructure(type, structureId);
+      if (structure) return <BlueprintRender Render={structure.Render} color={fill} />;
       return (
         <path
           d="M -38,-10 C -30,-28 10,-30 30,-14 C 46,-2 40,20 18,28 C -6,36 -34,24 -40,4 C -43,-2 -42,-6 -38,-10 Z"
@@ -149,7 +166,10 @@ export const PlateComponentShape: React.FC<{ type: PlateComponentType; technique
           strokeWidth={1.5}
         />
       );
-    case 'starch':
+    }
+    case 'starch': {
+      const structure = findStructure(type, structureId);
+      if (structure) return <BlueprintRender Render={structure.Render} color={fill} />;
       return (
         <path
           d="M -30,20 C -34,-4 -14,-26 10,-24 C 34,-22 42,2 34,20 C 26,34 -22,34 -30,20 Z"
@@ -158,7 +178,10 @@ export const PlateComponentShape: React.FC<{ type: PlateComponentType; technique
           strokeWidth={1.5}
         />
       );
-    case 'vegetable':
+    }
+    case 'vegetable': {
+      const structure = findStructure(type, structureId);
+      if (structure) return <BlueprintRender Render={structure.Render} color={fill} />;
       return (
         <g fill={fill} stroke={EDGE_STROKE} strokeWidth={1.5}>
           <circle cx={-14} cy={-6} r={10} />
@@ -166,6 +189,7 @@ export const PlateComponentShape: React.FC<{ type: PlateComponentType; technique
           <circle cx={0} cy={14} r={11} />
         </g>
       );
+    }
     case 'sauceSmear':
       return (
         <path
@@ -183,7 +207,9 @@ export const PlateComponentShape: React.FC<{ type: PlateComponentType; technique
           <circle cx={24} cy={16} r={6} />
         </g>
       );
-    case 'garnish':
+    case 'garnish': {
+      const structure = findStructure(type, structureId);
+      if (structure) return <BlueprintRender Render={structure.Render} color={fill} />;
       return (
         <g fill={fill} stroke={EDGE_STROKE} strokeWidth={1}>
           <path d="M 0,4 C -6,-10 -4,-26 0,-34 C 4,-26 6,-10 0,4 Z" transform="rotate(-24)" />
@@ -191,19 +217,11 @@ export const PlateComponentShape: React.FC<{ type: PlateComponentType; technique
           <path d="M 0,4 C -6,-10 -4,-26 0,-34 C 4,-26 6,-10 0,4 Z" />
         </g>
       );
+    }
     case 'sauceTechnique': {
       const technique = findSauceTechnique(techniqueId);
       if (!technique) return null;
-      const Render = technique.Render;
-      return (
-        <g transform={`scale(${SAUCE_TECHNIQUE_SCALE}) translate(-500,-500)`}>
-          {/* Several techniques (e.g. Crosshatch Mesh) are mostly open space
-              between thin strokes — without this, clicking the gaps between
-              lines would miss the shape entirely and never select/drag it. */}
-          <rect x={0} y={0} width={1000} height={1000} fill="transparent" />
-          <Render color={fill} />
-        </g>
-      );
+      return <BlueprintRender Render={technique.Render} color={fill} />;
     }
   }
 };
