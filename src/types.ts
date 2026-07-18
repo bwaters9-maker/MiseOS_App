@@ -134,6 +134,14 @@ export interface PlateComponent {
   z: number;
   /** Required when type is 'sauceTechnique' — id into the SAUCE_TECHNIQUES registry. */
   techniqueId?: string;
+  /**
+   * Per-instance color override (hex), set via the Selected Item panel's
+   * color picker. Sauce techniques are the only type this is currently
+   * editable for — real sauces vary far more in color than a protein or
+   * starch does. Absent means "use the type's PLATE_COMPONENT_COLORS
+   * default", so designs saved before this existed are unaffected.
+   */
+  color?: string;
 }
 
 export interface PlateDesign {
