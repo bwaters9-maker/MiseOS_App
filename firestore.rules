@@ -4,14 +4,23 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ===============================================================
-    // Assumed Data Model
+    // TRANSITIONAL — multi-tenant migration in progress
     // ===============================================================
     //
-    // Single-operator app: one authenticated chef account (created once in
-    // the Firebase console — no self-registration). Every collection below
-    // requires request.auth != null for all reads and writes; there is no
-    // per-document ownership or role hierarchy to enforce because there is
-    // only ever one signed-in identity.
+    // This ruleset allows BOTH the old flat top-level collections
+    // (pre-migration shape) AND the new restaurants/{restaurantId}/...
+    // subcollections (post-migration shape) simultaneously, so the
+    // currently-deployed app (still reading/writing flat paths) keeps
+    // working unaffected while scripts/migrateToRestaurantSubcollections.ts
+    // copies data into the new shape and the app code is rewired to
+    // read/write it. The "TRANSITIONAL ONLY" section below is temporary
+    // and gets deleted once that cutover is verified — see CLAUDE.md's
+    // multi-tenant migration notes for status.
+    //
+    // Tenant isolation (new shape only): every authenticated user's ID
+    // token carries a restaurantId custom claim, set only via the Admin
+    // SDK (scripts/manageChefAccount.ts) — never client-settable. A user
+    // may read/write only restaurants/{their own restaurantId}/... .
     //
     // Collection: prepItems      — see src/types.ts PrepItem
     // Collection: recipes        — see src/types.ts Recipe / RecipeLine
@@ -58,6 +67,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isOwner(restaurantId) {
+      return isAuthenticated() && request.auth.token.restaurantId == restaurantId;
+    }
+
     // ===============================================================
     // Domain Validators
     // ===============================================================
@@ -84,15 +97,57 @@ service cloud.firestore {
     }
 
     // ===============================================================
-    // Collection Rules
+    // New: restaurant-scoped subcollections
     // ===============================================================
     //
-    // Everything except `ingredients` is a plain authenticated-read/write
-    // gate — the only real threat model for a single-operator internal tool
-    // is an unauthenticated stranger hitting the database directly, not the
-    // one signed-in chef corrupting their own data. `ingredients` gets a
-    // full shape validator on top because invoice-extracted and AI-suggested
-    // data flows into it (see components/ingredients/InvoicePriceUpdate.tsx).
+    // Every collection lives once here, once in the TRANSITIONAL ONLY
+    // section below. When the transitional section is deleted after
+    // cutover, this becomes the entire ruleset (plus /users/{uid}).
+
+    match /restaurants/{restaurantId} {
+      match /prepItems/{id}          { allow read, write: if isOwner(restaurantId); }
+      match /recipes/{id}            { allow read, write: if isOwner(restaurantId); }
+      match /features/{id}           { allow read, write: if isOwner(restaurantId); }
+      match /staff/{id}               { allow read, write: if isOwner(restaurantId); }
+      match /shifts/{id}              { allow read, write: if isOwner(restaurantId); }
+      match /events/{id}              { allow read, write: if isOwner(restaurantId); }
+      match /alerts/{id}              { allow read, write: if isOwner(restaurantId); }
+      match /crib_notes/{id}          { allow read, write: if isOwner(restaurantId); }
+      match /timers/{id}               { allow read, write: if isOwner(restaurantId); }
+      match /station_presets/{id}     { allow read, write: if isOwner(restaurantId); }
+      match /recipe_categories/{id}   { allow read, write: if isOwner(restaurantId); }
+      match /recipe_collections/{id}  { allow read, write: if isOwner(restaurantId); }
+      match /event_types/{id}         { allow read, write: if isOwner(restaurantId); }
+      match /clients/{id}             { allow read, write: if isOwner(restaurantId); }
+      match /vendors/{id}              { allow read, write: if isOwner(restaurantId); }
+      match /restaurant_profile/{id}   { allow read, write: if isOwner(restaurantId); }
+      match /trend_reports/{id}        { allow read, write: if isOwner(restaurantId); }
+
+      match /ingredients/{id} {
+        allow read: if isOwner(restaurantId);
+        allow create: if isOwner(restaurantId) && isValidIngredient(request.resource.data);
+        allow update: if isOwner(restaurantId) && isValidIngredient(request.resource.data);
+        allow delete: if isOwner(restaurantId);
+      }
+    }
+
+    // ===============================================================
+    // Per-user metadata — application-level only, never used for
+    // tenant-isolation enforcement (that's the restaurantId claim
+    // above). Written only by the Admin SDK; a client can read its own
+    // doc and nothing else, and can never write here at all.
+    // ===============================================================
+
+    match /users/{uid} {
+      allow read: if isAuthenticated() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // ===============================================================
+    // TRANSITIONAL ONLY — old flat top-level paths, pre-migration
+    // shape. DELETE this entire section once the cutover to
+    // restaurants/{restaurantId}/... is deployed and verified.
+    // ===============================================================
 
     match /prepItems/{id}          { allow read, write: if isAuthenticated(); }
     match /recipes/{id}            { allow read, write: if isAuthenticated(); }
