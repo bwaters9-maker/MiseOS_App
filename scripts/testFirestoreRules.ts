@@ -115,6 +115,34 @@ async function main() {
     );
   });
 
+  await check('plateDesigns: owner can create in own restaurant', async () => {
+    await assertSucceeds(
+      setDoc(doc(chefA.firestore(), 'restaurants/restaurant-a/plateDesigns/p1'), {
+        name: 'Seared Scallop',
+        plateShape: 'round-rimmed',
+        components: [],
+        createdAt: '2026-07-18T00:00:00.000Z',
+        updatedAt: '2026-07-18T00:00:00.000Z',
+      })
+    );
+  });
+
+  await check('plateDesigns: chef B cannot read chef A\'s design', async () => {
+    await assertFails(getDoc(doc(chefB.firestore(), 'restaurants/restaurant-a/plateDesigns/p1')));
+  });
+
+  await check('plateDesigns: chef B cannot write into restaurant A', async () => {
+    await assertFails(
+      setDoc(doc(chefB.firestore(), 'restaurants/restaurant-a/plateDesigns/p2'), { name: 'x' })
+    );
+  });
+
+  await check('plateDesigns: unauthenticated denied', async () => {
+    await assertFails(
+      setDoc(doc(anon.firestore(), 'restaurants/restaurant-a/plateDesigns/p3'), { name: 'x' })
+    );
+  });
+
   await testEnv.cleanup();
 
   console.log(`\n${passed} passed, ${failed} failed.`);
