@@ -135,6 +135,14 @@ export interface PlateComponent {
   /** Required when type is 'sauceTechnique' — id into the SAUCE_TECHNIQUES registry. */
   techniqueId?: string;
   /**
+   * For protein/starch/vegetable/garnish — id into that type's structure
+   * registry (see plateStructures.tsx) when the chef picked a named
+   * variant (e.g. "Seared Duck Breast") instead of the type's plain
+   * default shape. Absent means "render the original default shape", so
+   * every design saved before this existed is unaffected.
+   */
+  structureId?: string;
+  /**
    * Per-instance color override (hex), set via the Selected Item panel's
    * color picker. Sauce techniques are the only type this is currently
    * editable for — real sauces vary far more in color than a protein or
