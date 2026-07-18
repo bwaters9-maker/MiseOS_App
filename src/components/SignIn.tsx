@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { LogIn, Loader2, AlertTriangle } from 'lucide-react';
 import { useAuth } from './AuthContext';
+import { APP_TAGLINE } from '../lib/appParams';
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   'auth/invalid-credential': 'Wrong email or password.',
@@ -42,7 +43,7 @@ export const SignIn: React.FC = () => {
             <span className="font-display font-extrabold tracking-[-0.02em] text-lg whitespace-nowrap">
               <span className="text-saffron-text">Incendium</span><span className="text-navy">Phi</span>
             </span>
-            <p className="text-[10px] text-slate font-medium">Culinary Chaos Decoded.</p>
+            <p className="text-[10px] text-slate font-medium">{APP_TAGLINE}</p>
           </div>
         </div>
 

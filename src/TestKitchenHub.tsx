@@ -8,6 +8,7 @@ import { useKitchenSelector } from './components/KitchenStateContext';
 import { db } from './firebaseConfig';
 import { doc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 import { regionForState, itemsForRegion, type SeasonalItemForRegion } from './lib/seasonalData';
+import { APP_NAME, APP_TAGLINE, APP_SHORT_DESC } from './lib/appParams';
 import type { RestaurantProfile, TrendReport, TrendCard, PricingTrendItem } from './types';
 
 interface Message {
@@ -776,8 +777,8 @@ export default function TestKitchenHub() {
                   </span>
                 </div>
                 <div className="sm-print-only items-center justify-between mt-[21px] pt-[8px] border-t" style={{ display: 'none', borderColor: '#DCE4EC' }}>
-                  <p className="sm-word-saffron text-[11px] font-display font-bold tracking-wide">Culinary Chaos Decoded.</p>
-                  <p className="sm-sub text-[9px]">IncendiumPhi · Back of House System</p>
+                  <p className="sm-word-saffron text-[11px] font-display font-bold tracking-wide">{APP_TAGLINE}</p>
+                  <p className="sm-sub text-[9px]">{APP_NAME} · {APP_SHORT_DESC}</p>
                 </div>
               </div>
             )}
