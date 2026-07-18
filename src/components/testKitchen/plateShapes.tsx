@@ -136,9 +136,9 @@ export const SAUCE_TECHNIQUE_SCALE = 0.16;
 
 const EDGE_STROKE = 'rgba(0,0,0,0.18)';
 
-/** Renders one component shape centered at local (0,0) — wrap in a <g transform>. */
-export const PlateComponentShape: React.FC<{ type: PlateComponentType; techniqueId?: string }> = ({ type, techniqueId }) => {
-  const fill = PLATE_COMPONENT_COLORS[type];
+/** Renders one component shape centered at local (0,0) — wrap in a <g transform>. `color` overrides the type's default (currently only settable on sauceTechnique via the Selected Item panel). */
+export const PlateComponentShape: React.FC<{ type: PlateComponentType; techniqueId?: string; color?: string }> = ({ type, techniqueId, color }) => {
+  const fill = color ?? PLATE_COMPONENT_COLORS[type];
   switch (type) {
     case 'protein':
       return (
