@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { onSnapshot, addDoc, deleteDoc, updateDoc, getDocs } from 'firebase/firestore';
+import { addDoc, deleteDoc, updateDoc, getDocs } from 'firebase/firestore';
 import { rCollection, rDoc } from './lib/firestorePaths';
 import { useRestaurantId } from './components/AuthContext';
 import { KitchenTimer, PrepStation } from './types';
 import { formatDuration } from './utils';
 import { Play, Pause, RotateCcw, Plus, Trash2, Clock, Bell } from 'lucide-react';
 
-export const KitchenTimers: React.FC = () => {
+interface KitchenTimersProps {
+  timers: KitchenTimer[];
+}
+
+export const KitchenTimers: React.FC<KitchenTimersProps> = ({ timers }) => {
   const restaurantId = useRestaurantId();
-  const [timers, setTimers] = useState<KitchenTimer[]>([]);
   const [stations, setStations] = useState<PrepStation[]>([]);
   const [tick, setTick] = useState(0);
 
@@ -28,15 +31,6 @@ export const KitchenTimers: React.FC = () => {
       }
     };
     fetchStations();
-  }, [restaurantId]);
-
-  // Set up the live listener for the timers collection
-  useEffect(() => {
-    const unsubscribe = onSnapshot(rCollection(restaurantId, 'timers'), (snapshot) => {
-      const fetchedTimers = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as KitchenTimer));
-      setTimers(fetchedTimers);
-    });
-    return () => unsubscribe();
   }, [restaurantId]);
 
   // Trigger a re-render every second to update running timers

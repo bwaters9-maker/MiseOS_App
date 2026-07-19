@@ -4,6 +4,7 @@ import { AppHeader } from './components/AppHeader';
 import { KitchenStateProvider, useKitchenSelector } from './components/KitchenStateContext';
 import { AuthProvider, useAuth, useRestaurantId } from './components/AuthContext';
 import { SignIn } from './components/SignIn';
+import { useTimers } from './hooks/useTimers';
 import { setDoc } from 'firebase/firestore';
 import { rDoc } from './lib/firestorePaths';
 import type { UnitSystem } from './lib/units';
@@ -112,6 +113,7 @@ const AppShell: React.FC = () => {
   );
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const { timers } = useTimers();
 
   // targetFcPercent and menuTemplate now live on the restaurant profile doc
   // (migrated from App.tsx state + localStorage) — read fallback to the old
@@ -181,6 +183,7 @@ const AppShell: React.FC = () => {
           <Suspense fallback={<div className="p-12 text-center text-sm text-slate">Loading...</div>}>
             <ActiveViewRenderer
               view={activeView}
+              timers={timers}
               theme={theme}
               setTheme={setTheme}
               unitSystem={unitSystem}
