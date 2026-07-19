@@ -65,7 +65,6 @@ src/
   PrepChecklist.tsx              Par-level deficit tracking table
   TestKitchenHub.tsx             Test Kitchen — sub-tabs "Culinary Trends & Forecasts" and "The Menu Development Playground" (calls server-side /api/ai proxy); Playground chat runs on the shared Sous persona (src/lib/sousPersona.ts)
   Settings.tsx                   Theme toggle + station preset CRUD + recipe category CRUD
-  HistoricalAlerts.tsx           Alert History view — all alerts, severity/status filters, resolve/reopen toggle (writes `resolved` only)
   IngredientsTable.tsx           Master Pantry — static human-verified ingredient CRUD, unit conversion
   Vendors.tsx                    Vendor directory — supplier contacts, lead time, order days, linked-ingredients view; feeds Ingredient.vendorId
   Recipes.tsx                    Recipe Builder — list (Menu Recipes / Sub-Recipes) + editor + Live Cost Analysis
@@ -118,7 +117,7 @@ There is no router library. Navigation is a `useState` string in `App.tsx`. The 
 2. Add an entry to `viewMap` in `App.tsx`
 3. Add a `navItems` entry in `src/components/AppHeader.tsx`
 
-Current nav tabs (in order): Dashboard · Staff · Events & Clients · Recipes · Prep List · Alert History · Test Kitchen · Settings
+Current nav tabs (in order): Dashboard · Staff · Events & Clients · Recipes · Prep List · Test Kitchen · Settings
 
 **Recipes** (`view: 'recipes'`, `src/RecipesHub.tsx`) is a merged entry point over three previously-separate top-level views — Recipes, Menu, and Features (nightly specials) — each still its own untouched component with its own internal heading; `RecipesHub` is a thin sub-tab switcher (Recipe Builder / Menu / Features) with no logic of its own beyond keeping the sub-tab in sync with `selectedRecipeId` (so jumping to a specific recipe from Menu or Events & Clients always lands on the Recipe Builder sub-tab).
 
@@ -147,7 +146,6 @@ The Recipe Builder sub-tab also carries a "View Menu" button (`onViewMenu` prop)
 | `shifts` | `useKitchenState`, `Staff.tsx`, `DailyCribSheet`, `ChefDashboard` — planned shifts, joined to `staff` for display |
 | `events` | `useKitchenState`, `EventCalendar`, `DailyCribSheet` — `clientId?` optionally links to `clients`; `attendees` renamed from `covers` (old docs read via a code-level fallback, no data migration) |
 | `clients` | `useKitchenState`, `EventCalendar` — catering/events client directory |
-| `alerts` | `useKitchenState`, `DailyCribSheet`, `HistoricalAlerts` |
 | `crib_notes` | `useKitchenState`, `DailyCribSheet` |
 | `station_presets` | `useStationPresets` (now actually consumed — by `Staff.tsx`'s shift form and `ChefDashboard.tsx`'s coverage check; previously an orphaned hook), `Settings.tsx` (own inline query, CRUD) |
 | `ingredients` | `useKitchenState`, `IngredientsTable.tsx` |
@@ -157,8 +155,6 @@ The Recipe Builder sub-tab also carries a "View Menu" button (`onViewMenu` prop)
 | `recipe_categories` | `useRecipeCategories`, `Settings.tsx`, `Recipes.tsx` — seeded with Sides/Sauces/Salads/Soups/Proteins/Desserts if empty |
 | `recipe_collections` | `useRecipeCollections`, `RecipeCollections.tsx`, `Menu.tsx` — seasonal menu-recipe groupings; at most one doc has `active: true` (activation is a batch write flipping every doc); not seeded |
 | `event_types` | `useEventTypes`, `Settings.tsx`, `EventCalendar` — seeded with Wedding/Private Dining/Buyout/Bridal Shower/Corporate/Celebration of Life/Special Event if empty |
-
-`alerts`: crib sheet shows `resolved === false` only; Alert History shows all.
 
 ## Canonical types (`src/types.ts`)
 
@@ -177,7 +173,6 @@ The Recipe Builder sub-tab also carries a "View Menu" button (`onViewMenu` prop)
 | `TentativeMenuLine` | Tentative menu line on an event: `{ course, text, recipeId? }` — `text` is the display label either way (free-typed, or the linked recipe's name); `recipeId` optionally points at a `recipeType: 'menu'` recipe for cost projection |
 | `EventChangeLogEntry` | Append-only change log entry on an event: `{ date, text }` — entries are never edited or deleted once written, either manually logged by the chef or auto-appended when attendees changes or a tentative menu line is added/removed/swapped |
 | `KitchenEvent` | Event (title, date, time, attendees?, notes?, eventType?: string, clientId?: string → Client, milestones?: EventMilestone[], tentativeMenu?: TentativeMenuLine[], changeLog?: EventChangeLogEntry[]) |
-| `KitchenAlert` | Alert (message, severity, resolved, timestamp) |
 | `CribNote` | Freeform crib note (date, content, author) |
 | `TrendCard` | One editorial trend card in Test Kitchen's Culinary Trends & Forecasts: `{ headline, description, category, isViralBridge? }` — AI-generated per refresh, never auto-fetched |
 | `PricingTrendItem` | One line of AI pricing commentary: `{ item, direction: 'up' \| 'down', movement: 'short-term' \| 'structural', note }` — informational only, never linked to a real `Ingredient` |
@@ -223,7 +218,6 @@ Note: `useKitchenState.ts` also defines `PrepItem` locally (pre-existing duplica
 - **Known compliance gaps on already-brand-kit screens** (token values are correct; component-level rules from the spec are not yet applied, since that requires per-component judgment calls the infra pass deliberately didn't make): `ChefDashboard.tsx`'s solid `bg-navy` Add Feature submit button doesn't yet follow the new "primary = saffron bg + navy text" button rule, and its `hover:bg-navy-deep` now resolves to a dark-teal accent hover rather than a darker navy (visually slightly off, not broken); rainbow category-badge treatments, cost-delta color rules (never green), and full numeral→`font-mono` scoping haven't been swept on these screens.
 - **Not started:** the ~24-screen legacy dark-zinc migration (unchanged list below) — those screens keep their existing `zinc-`/`emerald-` Tailwind classes untouched; the rename pass touched their strings only (e.g. `ErrorBoundary.tsx`'s crash-recovery copy) without retheming them, so they remain visually on the old dark-zinc aesthetic until their own pass.
 - ~~Test Kitchen — Culinary Trends & Forecasts~~ ✓ (Phase B) — brand kit throughout: `bg-surface` cards, navy/slate text, saffron only as signal (Viral Bridge badge, category tags, seasonal "prime" highlight). The Menu Development Playground sub-tab is also on brand kit already (confirmed 2026-07-16: zero `zinc`/`slate`/`gray` classes anywhere in `TestKitchenHub.tsx`; the studio-layout redesign in `7d244ff` moved it onto `bg-surface`/`text-navy`/`text-slate`/`border-line` tokens) — this was previously mis-documented here as "dark-zinc" and pending. Note the Playground's Plate Design and Ingredient Palette panels are themed but still explicit placeholders ("...will be embedded here in a later phase") — a functional-completeness gap, not a theming one.
-- ~~Alert History~~ ✓ — rebuilt from placeholder into the real view (live `alerts` from kitchen state, severity + active/resolved filters, resolve/reopen writes) directly on the brand kit: `bg-surface` card, navy/slate text, navy filter pills, saffron as the warning signal, red-400 kept for critical per the kit's unchanged danger color.
 - Pending: Daily Crib Sheet, Features, Staff, Events & Clients, Ingredients (Master Pantry), Vendors, Recipes, Prep Checklist, Settings, Menu.
 
 ## Invoice Price Update (components/ingredients/InvoicePriceUpdate.tsx)
@@ -290,7 +284,6 @@ The app's landing page and command center — default view on sign-in (`view: 'd
 - **Today's Events**: today's events from `useKitchenState`'s `events`, resolved against `clients` for display name (same `clientsById` map pattern as `EventCalendar.tsx`). No events = plain empty state.
 - **Tonight's Features**: read-only list of today's active (not 86'd, within `activeFrom`/`activeTo`) features — the exact same filter `DailyCribSheet.tsx`'s own "Features Tonight" card uses. No inline 86-toggle here (see the write-exception note above); a "Manage Features" link navigates to the full `Features.tsx` view for that.
 - **Quick Actions**: a button to Crib Sheet (`onNavigate`, threaded down from `App.tsx`'s `setActiveView`), plus "Add Feature" — opens an inline form (Manual Entry or From Recipe) that writes a new `features` doc via the shared `toDoc`/`FormState`/`BLANK` exported from `Features.tsx`, so the write shape can never drift between the two entry points.
-- **Alerts indicator**: a compact icon+count in the header, not a full card — links to Alert History. Red when there's at least one active (unresolved) alert, neutral otherwise.
 - Today's date is computed via the shared `todayDateKey()` helper (`src/utils.ts`) — see the app-wide date/time convention below.
 
 ## Vendor Management (Vendors.tsx)
@@ -434,7 +427,6 @@ path in BrainDumpModule.jsx."
 
 DAILY OPERATIONS
 - Dashboard / Crib Sheet (features tonight, events snapshot — print-optimized)
-- Alert History
 
 FEATURES (Specials)
 - Build nightly specials with course, description, cost, price
@@ -591,6 +583,7 @@ AI LAYER
 - Hostess Chat
 - 86'd Items (standalone `items86` collection — separate from `Feature.is86d`, which is live and unrelated)
 - Kitchen Timers (module + app-wide strip — redundant with the chef's own phone timers; single-user tool, no shared-screen case)
+- Alert History / alerts collection (viewer with no producer — Gemini/Base44 vestige; any future alerting gets designed badge-only around a real trigger)
 
 ### Master Pantry Mandate
 No live data feeds. No automatic mutation. No vendor-system
