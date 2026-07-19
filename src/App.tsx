@@ -1,11 +1,9 @@
 import React, { Suspense, useState, useEffect, useRef } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AppHeader } from './components/AppHeader';
-import { TimerStrip } from './components/TimerStrip';
 import { KitchenStateProvider, useKitchenSelector } from './components/KitchenStateContext';
 import { AuthProvider, useAuth, useRestaurantId } from './components/AuthContext';
 import { SignIn } from './components/SignIn';
-import { useTimers } from './hooks/useTimers';
 import { setDoc } from 'firebase/firestore';
 import { rDoc } from './lib/firestorePaths';
 import type { UnitSystem } from './lib/units';
@@ -20,7 +18,6 @@ const RecipesHub = React.lazy(() => import('./RecipesHub'));
 const FeaturesView = React.lazy(() => import('./Features'));
 const TestKitchenHub = React.lazy(() => import('./TestKitchenHub'));
 const PrepChecklist = React.lazy(() => import('./PrepChecklist').then(m => ({ default: m.PrepChecklist })));
-const KitchenTimers = React.lazy(() => import('./KitchenTimers').then(m => ({ default: m.KitchenTimers })));
 const Settings = React.lazy(() => import('./Settings').then(m => ({ default: m.Settings })));
 const AlertHistory = React.lazy(() => import('./HistoricalAlerts').then(m => ({ default: m.HistoricalAlerts })));
 
@@ -33,7 +30,6 @@ const viewMap: { [key: string]: React.LazyExoticComponent<React.ComponentType<an
   recipes: RecipesHub,
   features: FeaturesView,
   prep: PrepChecklist,
-  timers: KitchenTimers,
   'alert-history': AlertHistory,
   'test-kitchen': TestKitchenHub,
   settings: Settings,
@@ -114,7 +110,6 @@ const AppShell: React.FC = () => {
   );
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const { timers } = useTimers();
 
   // targetFcPercent and menuTemplate now live on the restaurant profile doc
   // (migrated from App.tsx state + localStorage) — read fallback to the old
@@ -179,13 +174,11 @@ const AppShell: React.FC = () => {
   return (
     <div className="h-screen w-full overflow-x-hidden bg-bg-cool text-navy antialiased font-body flex flex-col">
       <AppHeader activeView={activeView} onNavigate={setActiveView} />
-      <TimerStrip timers={timers} />
       <main className="flex-1 min-h-0 overflow-y-auto py-6">
         <ErrorBoundary>
           <Suspense fallback={<div className="p-12 text-center text-sm text-slate">Loading...</div>}>
             <ActiveViewRenderer
               view={activeView}
-              timers={timers}
               theme={theme}
               setTheme={setTheme}
               unitSystem={unitSystem}

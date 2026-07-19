@@ -19,7 +19,7 @@ interface AppModule {
 const APP_MODULES: AppModule[] = [
   {
     name: 'Dashboard',
-    description: "Today's command center — station coverage for today's shifts, today's events, tonight's active features, and quick actions (Kitchen Timers, Crib Sheet, Add Feature). A read-only snapshot; Add Feature is the one write it does.",
+    description: "Today's command center — station coverage for today's shifts, today's events, tonight's active features, and quick actions (Crib Sheet, Add Feature). A read-only snapshot; Add Feature is the one write it does.",
   },
   {
     name: 'Staff',

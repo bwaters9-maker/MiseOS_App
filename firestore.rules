@@ -21,7 +21,6 @@ service cloud.firestore {
     // Collection: events         — see src/types.ts KitchenEvent
     // Collection: alerts         — see src/types.ts KitchenAlert
     // Collection: crib_notes     — see src/types.ts CribNote
-    // Collection: timers         — see src/types.ts KitchenTimer
     // Collection: station_presets  — { name: string }
     // Collection: recipe_categories — see src/types.ts RecipeCategory
     // Collection: event_types    — see src/types.ts EventTypePreset
@@ -103,7 +102,6 @@ service cloud.firestore {
       match /events/{id}              { allow read, write: if isOwner(restaurantId); }
       match /alerts/{id}              { allow read, write: if isOwner(restaurantId); }
       match /crib_notes/{id}          { allow read, write: if isOwner(restaurantId); }
-      match /timers/{id}               { allow read, write: if isOwner(restaurantId); }
       match /station_presets/{id}     { allow read, write: if isOwner(restaurantId); }
       match /recipe_categories/{id}   { allow read, write: if isOwner(restaurantId); }
       match /recipe_collections/{id}  { allow read, write: if isOwner(restaurantId); }

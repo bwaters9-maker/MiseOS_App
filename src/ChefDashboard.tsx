@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Users, CalendarDays, AlertTriangle, Clock, Printer, Star, Plus, X } from 'lucide-react';
+import { LayoutDashboard, Users, CalendarDays, AlertTriangle, Printer, Star, Plus, X } from 'lucide-react';
 import { addDoc } from 'firebase/firestore';
 import { rCollection } from './lib/firestorePaths';
 import { useKitchenSelector } from './components/KitchenStateContext';
@@ -216,12 +216,6 @@ export default function ChefDashboard({ onNavigate }: ChefDashboardProps) {
       <div className="bg-surface border border-line rounded-card p-[21px]">
         <h2 className="text-xs font-bold uppercase tracking-widest text-navy mb-[13px]">Quick Actions</h2>
         <div className="flex flex-wrap gap-[13px]">
-          <button
-            onClick={() => onNavigate?.('timers')}
-            className="flex items-center gap-[8px] px-[13px] py-[8px] bg-navy text-cream rounded-card text-xs font-bold hover:bg-navy-deep transition-colors duration-[144ms]"
-          >
-            <Clock className="w-3.5 h-3.5" /> Kitchen Timers
-          </button>
           <button
             onClick={() => onNavigate?.('dashboard')}
             className="flex items-center gap-[8px] px-[13px] py-[8px] bg-surface border border-line rounded-card text-xs font-bold text-navy hover:border-teal transition-colors duration-[144ms]"

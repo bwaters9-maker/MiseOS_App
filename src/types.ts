@@ -439,16 +439,3 @@ export interface CribNote {
   content: string;
   author?: string;
 }
-
-/**
- * Represents an active countdown timer in the kitchen.
- */
-export interface KitchenTimer {
-  id: string;
-  label: string;
-  station: string;
-  durationMs: number;
-  elapsedMs: number;
-  status: 'running' | 'paused' | 'idle';
-  startTime?: number;
-}
