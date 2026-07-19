@@ -1,6 +1,7 @@
 import React, { Suspense, useState, useEffect, useRef } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AppHeader } from './components/AppHeader';
+import { TimerStrip } from './components/TimerStrip';
 import { KitchenStateProvider, useKitchenSelector } from './components/KitchenStateContext';
 import { AuthProvider, useAuth, useRestaurantId } from './components/AuthContext';
 import { SignIn } from './components/SignIn';
@@ -178,6 +179,7 @@ const AppShell: React.FC = () => {
   return (
     <div className="h-screen w-full overflow-x-hidden bg-bg-cool text-navy antialiased font-body flex flex-col">
       <AppHeader activeView={activeView} onNavigate={setActiveView} />
+      <TimerStrip timers={timers} />
       <main className="flex-1 min-h-0 overflow-y-auto py-6">
         <ErrorBoundary>
           <Suspense fallback={<div className="p-12 text-center text-sm text-slate">Loading...</div>}>
