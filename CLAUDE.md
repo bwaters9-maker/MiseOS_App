@@ -80,6 +80,7 @@ src/
     AlertDialog.tsx
     CribComponents.tsx           Shared Section wrapper
     GuestMenuPreview.tsx         Guest-facing menu templates (Classic / Clean), print-optimized
+    TimerStrip.tsx                App-wide persistent kitchen timer strip — see the Kitchen Timer Strip section below
 
     ingredients/
       InvoicePriceUpdate.tsx     Photo/PDF invoice → AI-extracted line items → human-confirmed price writes
@@ -101,6 +102,7 @@ src/
     useStationPresets.ts         Firestore listener for station_presets collection
     useRecipeCategories.ts       Firestore listener for recipe_categories collection, seeds defaults if empty
     useRecipeCollections.ts      Firestore listener for recipe_collections collection, exposes activeCollection (no seeding)
+    useTimers.ts                  Single Firestore listener for the timers collection, lifted to AppShell and shared by KitchenTimers.tsx and TimerStrip.tsx (no duplicate listeners)
 
   lib/
     costEngine.ts                recipeCost / costPerPortion / fcPercent / suggestedPrice / wouldCreateCycle + computeCostPerBaseUnit
@@ -150,7 +152,7 @@ The Recipe Builder sub-tab also carries a "View Menu" button (`onViewMenu` prop)
 | `clients` | `useKitchenState`, `EventCalendar` — catering/events client directory |
 | `alerts` | `useKitchenState`, `DailyCribSheet`, `HistoricalAlerts` |
 | `crib_notes` | `useKitchenState`, `DailyCribSheet` |
-| `timers` | `KitchenTimers.tsx` |
+| `timers` | `useTimers` (single listener, lifted to `AppShell`) — consumed by `KitchenTimers.tsx` and `TimerStrip.tsx`, see the Kitchen Timer Strip section below |
 | `station_presets` | `useStationPresets` (now actually consumed — by `Staff.tsx`'s shift form and `ChefDashboard.tsx`'s coverage check; previously an orphaned hook), `Settings.tsx` (own inline query, CRUD), `KitchenTimers.tsx` (own inline query, unchanged) |
 | `ingredients` | `useKitchenState`, `IngredientsTable.tsx` |
 | `vendors` | `useKitchenState`, `Vendors.tsx`, `IngredientsTable.tsx` — `Ingredient.vendorId` optionally links to `vendors`; deleting a vendor clears `vendorId` on every linked ingredient (`deleteField()`) rather than orphaning the reference |
@@ -295,6 +297,19 @@ The app's landing page and command center — default view on sign-in (`view: 'd
 - **Quick Actions**: buttons to Kitchen Timers and Crib Sheet (`onNavigate`, threaded down from `App.tsx`'s `setActiveView`), plus "Add Feature" — opens an inline form (Manual Entry or From Recipe) that writes a new `features` doc via the shared `toDoc`/`FormState`/`BLANK` exported from `Features.tsx`, so the write shape can never drift between the two entry points.
 - **Alerts indicator**: a compact icon+count in the header, not a full card — links to Alert History. Red when there's at least one active (unresolved) alert, neutral otherwise.
 - Today's date is computed via the shared `todayDateKey()` helper (`src/utils.ts`) — see the app-wide date/time convention below.
+
+## Kitchen Timer Strip (TimerStrip.tsx)
+
+A persistent, app-wide indicator for running/expired kitchen timers, visible from every view — not just the Kitchen Timers screen itself (reached from `ChefDashboard.tsx`'s Kitchen Timers Quick Action, unchanged, for full CRUD). The strip itself is read-only display + alerting; no timer CRUD changed for this feature.
+
+- **Single shared listener**: `src/hooks/useTimers.ts` (matches the `useStationPresets`/`useRecipeCategories` one-hook-per-collection convention) owns the one `onSnapshot` on the `timers` collection. Called once in `AppShell` (`App.tsx`) and prop-drilled as `timers` to both `KitchenTimers.tsx` and `TimerStrip.tsx` — the same pattern already used for `theme`/`unitSystem`/etc. `KitchenTimers.tsx` no longer runs its own listener; its CRUD functions (`addTimer`/`deleteTimer`/`toggleTimer`/`resetTimer`/`adjustTimerDuration`) are unchanged.
+- **Placement**: `TimerStrip` sits between `AppHeader` and `<main>` in `AppShell`'s flex column — outside `<main>`'s scroll region, so no `position: sticky` is needed (avoids the sticky-offset-stacking problem a variable-height, wrapping header would otherwise create).
+- **Visibility**: renders whenever at least one timer has `status: 'running'`, OR at least one timer is expired and not yet acknowledged — the second clause matters because pausing an already-expired timer (a real, pre-existing action) must not silently drop the alarm flag just because it's no longer "running." Otherwise renders `null` — zero DOM, no persistent empty-state chrome, same convention as the header's compact alerts indicator.
+- **Saffron is reserved for the expired/alarm state only**, per the brand kit's signal-color rule — running, non-expired timers render in navy/slate/border-line. An expired timer gets a saffron border/background, saffron text, a bouncing bell icon, and a one-tap acknowledge button. Acknowledging silences the alarm and drops the saffron treatment, but the chip stays visible if the timer is still `status: 'running'` past its duration — acknowledge silences, it does not stop the timer.
+- **Acknowledged state is ephemeral and client-only** — an in-memory `Set<string>` of timer IDs local to `TimerStrip`, never written to Firestore. An id drops automatically once its timer is no longer expired (reset, restarted) or no longer exists (deleted), so re-arming a timer doesn't require a separate un-acknowledge step. It resets on page reload by design — silence is an in-session dismissal, not a persisted preference, so an already-expired timer alarms again after a fresh load.
+- **Audio**: Web Audio API (`AudioContext` + oscillator, no bundled audio asset), repeating every 1200ms while anything is expired-and-unacknowledged. Autoplay policy requires a prior user gesture — the strip arms one shared `AudioContext` on the first `pointerdown`/`keydown` anywhere in the app, then never again. If a timer is already expired before that first gesture, the alarm is silently blocked until the gesture lands, then plays immediately as part of arming rather than waiting on the next Firestore change. The visual saffron flag is unaffected by arming state — only audio is gated.
+- **Print**: the strip's root carries the existing global `.no-print` utility class (`index.css`, inside the page-level `@media print` block) — this suppresses it under any printable view (Crib Sheet, Guest Menu Preview, and any future one) automatically, without each view needing its own rule.
+- **Bug found and fixed during this work**: `KitchenTimers.tsx`'s `toggleTimer`/`resetTimer` previously wrote `startTime: undefined` via `updateDoc()`, which Firestore rejects outright (`Unsupported field value: undefined`) — Pause and Reset were silently failing entirely, with the exception only visible in the console. Fixed to use `deleteField()`, the same pattern already used elsewhere in this codebase (e.g. clearing `Ingredient.vendorId` on vendor deletion).
 
 ## Vendor Management (Vendors.tsx)
 
