@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Sparkles, RefreshCw, Send, AlertCircle, ExternalLink, Flame, TrendingUp, TrendingDown, ChevronDown, CalendarDays, Printer } from 'lucide-react';
-import PlateDesigner from './components/testKitchen/PlateDesigner';
 import { SOUS_SYSTEM_PROMPT } from './lib/sousPersona';
 import { APP_KNOWLEDGE_CONTEXT } from './lib/sousAppKnowledge';
 import { withRegionContext } from './lib/regionContext';
@@ -842,21 +841,15 @@ export default function TestKitchenHub() {
               )}
             </div>
 
-            {/* CENTER: Plate Design — largest zone, contains Ingredient Palette sub-section */}
+            {/* CENTER: Plate Design — placeholder pending plate photography */}
             <div className="lg:col-span-2 h-full min-h-0">
               <div className="bg-surface border border-line rounded-card p-[21px] h-full min-h-0 flex flex-col">
                 <div className="border-b border-line pb-[13px] mb-[13px] shrink-0">
                   <p className="text-[10px] text-slate uppercase tracking-wider">Working Dish</p>
                   <h2 className="text-lg font-display font-bold text-navy">Untitled Dish</h2>
                 </div>
-                <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-4 gap-[13px]">
-                  <div className="md:col-span-3 min-h-0 overflow-y-auto">
-                    <PlateDesigner />
-                  </div>
-                  <div className="md:col-span-1 min-h-0 overflow-y-auto bg-bg-cool border border-line rounded-card p-[13px]">
-                    <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[8px]">Ingredient Palette</h3>
-                    <p className="text-xs text-slate leading-relaxed italic">Placeholder — a searchable ingredient palette will live here in a later phase.</p>
-                  </div>
+                <div className="flex-1 min-h-0 flex items-center justify-center">
+                  <p className="text-xs text-slate leading-relaxed italic text-center max-w-xs">Plate photos coming — shot guidance and image capture.</p>
                 </div>
               </div>
             </div>

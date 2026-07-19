@@ -106,63 +106,6 @@ export interface RecipeCollection {
 }
 
 /**
- * Test Kitchen Phase D — Plate Designer. A standalone visual layout tool,
- * not linked to Recipe / RecipeLine — no cost or nutrition implications.
- */
-export type PlateShape = 'round-rimmed' | 'coupe' | 'bowl' | 'wide-rim-bowl' | 'rectangle' | 'square' | 'offset';
-
-/**
- * 'sauceSmear' / 'sauceDots' are v1.0 sauce shapes — kept only so designs
- * saved before v1.1's technique registry (see sauceTechniques.tsx) keep
- * loading and rendering unchanged. Not offered in the palette anymore;
- * new sauce placements are always 'sauceTechnique'.
- */
-export type PlateComponentType = 'protein' | 'starch' | 'vegetable' | 'sauceSmear' | 'sauceDots' | 'garnish' | 'sauceTechnique';
-
-/**
- * One placed item on the plate. `x`/`y`/`scale`/`rotation` are all in the
- * canvas's own 0-400 SVG viewBox coordinate space, not screen pixels.
- */
-export interface PlateComponent {
-  id: string;
-  type: PlateComponentType;
-  x: number;
-  y: number;
-  scale: number;
-  rotation: number;
-  /** Stacking order — higher renders on top. Mutated by bring-forward/send-backward. */
-  z: number;
-  /** Required when type is 'sauceTechnique' — id into the SAUCE_TECHNIQUES registry. */
-  techniqueId?: string;
-  /**
-   * For protein/starch/vegetable/garnish — id into that type's structure
-   * registry (see plateStructures.tsx) when the chef picked a named
-   * variant (e.g. "Seared Duck Breast") instead of the type's plain
-   * default shape. Absent means "render the original default shape", so
-   * every design saved before this existed is unaffected.
-   */
-  structureId?: string;
-  /**
-   * Per-instance color override (hex), set via the Selected Item panel's
-   * color picker. Sauce techniques are the only type this is currently
-   * editable for — real sauces vary far more in color than a protein or
-   * starch does. Absent means "use the type's PLATE_COMPONENT_COLORS
-   * default", so designs saved before this existed are unaffected.
-   */
-  color?: string;
-}
-
-export interface PlateDesign {
-  id: string;
-  /** Dish name — free text, same allowed exception as other name fields. */
-  name: string;
-  plateShape: PlateShape;
-  components: PlateComponent[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-/**
  * Guest-facing menu print/preview styling choice, selected from the Menu
  * view's Guest Preview toggle. Persisted in the `RestaurantProfile` doc
  * (`menuTemplate`), migrated from an earlier App.tsx + localStorage scheme.

@@ -32,10 +32,6 @@ service cloud.firestore {
     //   doc at a fixed id ("latest"), not a growing collection. Read-only
     //   editorial content — see Test Kitchen Phase B's hard boundary in
     //   CLAUDE.md: never written to by any pantry/costing code path.
-    // Collection: plateDesigns   — see src/types.ts PlateDesign; Test
-    //   Kitchen Phase D plate designer. Standalone — not linked to
-    //   recipes, no cost/nutrition implications.
-    //
     // Ingredient fields (src/types.ts):
     //   - name: string (required, 1-200 chars)
     //   - category: string (required) — IngredientCategory enum
@@ -108,7 +104,6 @@ service cloud.firestore {
       match /vendors/{id}              { allow read, write: if isOwner(restaurantId); }
       match /restaurant_profile/{id}   { allow read, write: if isOwner(restaurantId); }
       match /trend_reports/{id}        { allow read, write: if isOwner(restaurantId); }
-      match /plateDesigns/{id}         { allow read, write: if isOwner(restaurantId); }
 
       match /ingredients/{id} {
         allow read: if isOwner(restaurantId);

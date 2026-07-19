@@ -39,7 +39,7 @@ const APP_MODULES: AppModule[] = [
   },
   {
     name: 'Test Kitchen',
-    description: "Two sub-tabs: Culinary Trends & Forecasts (an AI-generated, read-only editorial trend briefing plus a seasonal sourcing matrix — never touches the pantry or costing) and The Menu Development Playground (chat with Sous, plus a plate-design canvas for sketching plating with a component palette of proteins, starches, vegetables, sauces, and garnishes).",
+    description: "Two sub-tabs: Culinary Trends & Forecasts (an AI-generated, read-only editorial trend briefing plus a seasonal sourcing matrix — never touches the pantry or costing) and The Menu Development Playground (chat with Sous to brainstorm new dishes).",
   },
   {
     name: 'Settings',
