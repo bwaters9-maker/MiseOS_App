@@ -424,15 +424,6 @@ export interface Vendor {
   notes?: string;
 }
 
-export interface KitchenAlert {
-  id: string;
-  message: string;
-  severity: 'info' | 'warning' | 'critical';
-  resolved: boolean;
-  timestamp: string;
-  station?: string;
-}
-
 export interface CribNote {
   id: string;
   date: string;

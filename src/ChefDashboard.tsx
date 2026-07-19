@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Users, CalendarDays, AlertTriangle, Printer, Star, Plus, X } from 'lucide-react';
+import { LayoutDashboard, Users, CalendarDays, Printer, Star, Plus, X } from 'lucide-react';
 import { addDoc } from 'firebase/firestore';
 import { rCollection } from './lib/firestorePaths';
 import { useKitchenSelector } from './components/KitchenStateContext';
@@ -8,7 +8,7 @@ import { useStationPresets } from './hooks/useStationPresets';
 import { featureFieldsFromRecipe } from './lib/costEngine';
 import { COURSES, BLANK as BLANK_FEATURE, toDoc as featureToDoc, type FormState as FeatureFormState } from './Features';
 import { todayDateKey, formatTime12h } from './utils';
-import type { Employee, Shift, KitchenEvent, Client, KitchenAlert, Feature, Recipe, Ingredient } from './types';
+import type { Employee, Shift, KitchenEvent, Client, Feature, Recipe, Ingredient } from './types';
 
 interface ChefDashboardProps {
   onNavigate?: (view: string) => void;
@@ -20,7 +20,6 @@ export default function ChefDashboard({ onNavigate }: ChefDashboardProps) {
   const shifts = (useKitchenSelector((s: any) => s.shifts) as Shift[]) ?? [];
   const events = (useKitchenSelector((s: any) => s.events) as KitchenEvent[]) ?? [];
   const clients = (useKitchenSelector((s: any) => s.clients) as Client[]) ?? [];
-  const alerts = (useKitchenSelector((s: any) => s.alerts) as KitchenAlert[]) ?? [];
   const features = (useKitchenSelector((s: any) => s.features) as Feature[]) ?? [];
   const allRecipes = (useKitchenSelector((s: any) => s.recipes) as Recipe[]) ?? [];
   const allIngredients = (useKitchenSelector((s: any) => s.ingredients) as Ingredient[]) ?? [];
@@ -43,8 +42,6 @@ export default function ChefDashboard({ onNavigate }: ChefDashboardProps) {
   const todayEvents = [...events]
     .filter(e => e.date === todayStr)
     .sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''));
-
-  const activeAlerts = alerts.filter(a => !a.resolved);
 
   // Same "tonight" rule as DailyCribSheet's Features Tonight card.
   const tonightFeatures = features.filter(f => {
@@ -96,18 +93,6 @@ export default function ChefDashboard({ onNavigate }: ChefDashboardProps) {
           </h1>
           <p className="text-xs text-slate mt-[5px]">{todayLabel}</p>
         </div>
-        <button
-          onClick={() => onNavigate?.('alert-history')}
-          className={`flex items-center gap-[8px] px-[13px] py-[8px] rounded-card border transition-colors duration-[144ms] ${
-            activeAlerts.length > 0
-              ? 'text-red-400 border-red-400/40 bg-red-400/10 hover:bg-red-400/20'
-              : 'text-slate border-line hover:text-navy'
-          }`}
-          title="View Alert History"
-        >
-          <AlertTriangle className="w-4 h-4" />
-          <span className="text-xs font-bold tabular-nums">{activeAlerts.length}</span>
-        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-[21px] mb-[21px] items-start">

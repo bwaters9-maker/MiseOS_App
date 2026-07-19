@@ -19,7 +19,6 @@ service cloud.firestore {
     // Collection: staff          — see src/types.ts Employee
     // Collection: shifts         — see src/types.ts Shift
     // Collection: events         — see src/types.ts KitchenEvent
-    // Collection: alerts         — see src/types.ts KitchenAlert
     // Collection: crib_notes     — see src/types.ts CribNote
     // Collection: station_presets  — { name: string }
     // Collection: recipe_categories — see src/types.ts RecipeCategory
@@ -100,7 +99,6 @@ service cloud.firestore {
       match /staff/{id}               { allow read, write: if isOwner(restaurantId); }
       match /shifts/{id}              { allow read, write: if isOwner(restaurantId); }
       match /events/{id}              { allow read, write: if isOwner(restaurantId); }
-      match /alerts/{id}              { allow read, write: if isOwner(restaurantId); }
       match /crib_notes/{id}          { allow read, write: if isOwner(restaurantId); }
       match /station_presets/{id}     { allow read, write: if isOwner(restaurantId); }
       match /recipe_categories/{id}   { allow read, write: if isOwner(restaurantId); }

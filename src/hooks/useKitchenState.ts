@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { onSnapshot, DocumentData, DocumentSnapshot, QuerySnapshot, QueryDocumentSnapshot, FirestoreError } from 'firebase/firestore';
 import { rCollection, rDoc } from '../lib/firestorePaths';
-import type { Feature, Employee, Shift, KitchenEvent, KitchenAlert, CribNote, Ingredient, Recipe, Client, Vendor, RestaurantProfile, TrendReport } from '../types';
+import type { Feature, Employee, Shift, KitchenEvent, CribNote, Ingredient, Recipe, Client, Vendor, RestaurantProfile, TrendReport } from '../types';
 
 // Based on firebase-blueprint.json
 export interface PrepItem {
@@ -25,7 +25,6 @@ export const useKitchenState = (restaurantId: string) => {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [events, setEvents] = useState<KitchenEvent[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
-  const [alerts, setAlerts] = useState<KitchenAlert[]>([]);
   const [cribNotes, setCribNotes] = useState<CribNote[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -101,14 +100,6 @@ export const useKitchenState = (restaurantId: string) => {
       (err: FirestoreError) => { setError(err); }
     );
 
-    const unsubAlerts = onSnapshot(
-      rCollection(restaurantId, 'alerts'),
-      (snapshot: QuerySnapshot<DocumentData>) => {
-        setAlerts(snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as KitchenAlert)));
-      },
-      (err: FirestoreError) => { setError(err); }
-    );
-
     const unsubCribNotes = onSnapshot(
       rCollection(restaurantId, 'crib_notes'),
       (snapshot: QuerySnapshot<DocumentData>) => {
@@ -165,7 +156,6 @@ export const useKitchenState = (restaurantId: string) => {
       unsubShifts();
       unsubEvents();
       unsubClients();
-      unsubAlerts();
       unsubCribNotes();
       unsubIngredients();
       unsubVendors();
@@ -174,5 +164,5 @@ export const useKitchenState = (restaurantId: string) => {
     };
   }, [restaurantId]);
 
-  return { prepItems, setPrepItems, recipes, setRecipes, features, staff, shifts, events, clients, alerts, cribNotes, ingredients, vendors, restaurantProfile, restaurantProfileLoaded, trendReport, trendReportLoaded, loading, error };
+  return { prepItems, setPrepItems, recipes, setRecipes, features, staff, shifts, events, clients, cribNotes, ingredients, vendors, restaurantProfile, restaurantProfileLoaded, trendReport, trendReportLoaded, loading, error };
 };

@@ -38,10 +38,6 @@ const APP_MODULES: AppModule[] = [
     description: "Par-level deficit tracking — what's short against today's par levels and needs prepping.",
   },
   {
-    name: 'Alert History',
-    description: 'Full history of kitchen alerts, filterable by severity and resolved/active status.',
-  },
-  {
     name: 'Test Kitchen',
     description: "Two sub-tabs: Culinary Trends & Forecasts (an AI-generated, read-only editorial trend briefing plus a seasonal sourcing matrix — never touches the pantry or costing) and The Menu Development Playground (chat with Sous, plus a plate-design canvas for sketching plating with a component palette of proteins, starches, vegetables, sauces, and garnishes).",
   },

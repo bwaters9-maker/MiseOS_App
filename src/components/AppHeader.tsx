@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, ClipboardList, History, Sparkles, Settings, Menu, X, Users, CalendarDays, ChefHat, LogOut } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Sparkles, Settings, Menu, X, Users, CalendarDays, ChefHat, LogOut } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { APP_NAME_ACCENT, APP_NAME_BASE } from '../lib/appParams';
 
@@ -14,7 +14,6 @@ const navItems = [
   { view: 'events', label: 'Events & Clients', icon: CalendarDays },
   { view: 'recipes', label: 'Recipes', icon: ChefHat },
   { view: 'prep', label: 'Prep List', icon: ClipboardList },
-  { view: 'alert-history', label: 'Alert History', icon: History },
   { view: 'test-kitchen', label: 'Test Kitchen', icon: Sparkles },
   { view: 'settings', label: 'Settings', icon: Settings },
 ];

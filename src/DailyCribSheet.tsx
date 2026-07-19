@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Printer, Star, Users, CalendarDays, AlertTriangle, ClipboardList } from 'lucide-react';
+import { Printer, Star, Users, CalendarDays, ClipboardList } from 'lucide-react';
 import { useKitchenSelector } from './components/KitchenStateContext';
 import { todayDateKey, formatTime12h } from './utils';
-import type { Feature, Employee, Shift, KitchenEvent, KitchenAlert, CribNote } from './types';
+import type { Feature, Employee, Shift, KitchenEvent, CribNote } from './types';
 
 const CARD = 'crib-card bg-zinc-950 border border-zinc-800 rounded-[13px] p-[21px]';
 const LABEL = 'crib-section-header text-[10px] font-black uppercase tracking-[0.15em] flex items-center gap-[8px] mb-[13px]';
@@ -18,18 +18,11 @@ const fcColor = (fc: number) =>
 const readAttendees = (e: KitchenEvent): number | undefined =>
   e.attendees ?? (e as unknown as { covers?: number }).covers;
 
-const alertVariant = (severity: KitchenAlert['severity']) => {
-  if (severity === 'critical') return { badge: `${BADGE} text-red-300 border-red-900 bg-red-950/30`, accent: 'border-l-2 border-l-red-700 pl-[8px]' };
-  if (severity === 'warning')  return { badge: `${BADGE} text-amber-300 border-amber-900 bg-amber-950/30`, accent: 'border-l-2 border-l-amber-700 pl-[8px]' };
-  return { badge: `${BADGE} text-zinc-400 border-zinc-700 bg-zinc-900/30`, accent: '' };
-};
-
 const DailyCribSheet: React.FC = () => {
   const features  = (useKitchenSelector((s: any) => s.features)  as Feature[])     ?? [];
   const staff     = (useKitchenSelector((s: any) => s.staff)     as Employee[])    ?? [];
   const shifts    = (useKitchenSelector((s: any) => s.shifts)    as Shift[])       ?? [];
   const events    = (useKitchenSelector((s: any) => s.events)    as KitchenEvent[]) ?? [];
-  const alerts    = (useKitchenSelector((s: any) => s.alerts)    as KitchenAlert[]) ?? [];
   const cribNotes = (useKitchenSelector((s: any) => s.cribNotes) as CribNote[])    ?? [];
 
   const [printTime, setPrintTime] = useState('');
@@ -50,9 +43,6 @@ const DailyCribSheet: React.FC = () => {
   const todayEvents = [...events]
     .filter(e => e.date === todayStr)
     .sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''));
-
-  const activeAlerts = alerts.filter(a => !a.resolved);
-  const hasCritical  = activeAlerts.some(a => a.severity === 'critical');
 
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
@@ -214,35 +204,6 @@ const DailyCribSheet: React.FC = () => {
                           ))}
                         </div>
                       )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* ACTIVE ALERTS */}
-          <div className={CARD}>
-            <h2 className={`${LABEL} ${hasCritical ? 'text-red-400' : 'text-amber-400'}`}>
-              <AlertTriangle className="w-3.5 h-3.5" />
-              Active Alerts
-            </h2>
-            {activeAlerts.length === 0 ? (
-              <p className={EMPTY}>No active alerts.</p>
-            ) : (
-              <div>
-                {activeAlerts.map(a => {
-                  const v = alertVariant(a.severity);
-                  return (
-                    <div key={a.id} className={`${ROW} ${v.accent}`}>
-                      <div className="flex items-baseline gap-[13px] min-w-0">
-                        <span className={`${v.badge} shrink-0`}>{a.severity}</span>
-                        <span className="text-zinc-200 truncate">{a.message}</span>
-                      </div>
-                      <div className="flex items-baseline gap-[8px] shrink-0">
-                        {a.station && <span className="text-zinc-500">{a.station}</span>}
-                        <span className="text-zinc-600 tabular-nums">{a.timestamp}</span>
-                      </div>
                     </div>
                   );
                 })}
