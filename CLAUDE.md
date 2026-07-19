@@ -63,7 +63,6 @@ src/
   Staff.tsx                      Employee directory + shift scheduling — feeds Crib Sheet and Chef's Dashboard (today's shifts only). Shift station select sources from `useStationPresets()` (live, chef-customizable) rather than a hardcoded list — see Chef's Dashboard section. Schedule section carries a List/Calendar toggle (`components/staff/ScheduleCalendar.tsx`) merging shifts with Events — see the Staff Schedule Calendar section below.
   EventCalendar.tsx              Events & Clients — event/client CRUD, grouped by date, upcoming/past split, feeds Crib Sheet; clicking an event opens EventDetailView, which can also be deep-linked into directly via a `selectedEventId` prop (used by the Staff schedule calendar)
   PrepChecklist.tsx              Par-level deficit tracking table
-  KitchenTimers.tsx              Multi-station countdown timers (Firestore-backed)
   TestKitchenHub.tsx             Test Kitchen — sub-tabs "Culinary Trends & Forecasts" and "The Menu Development Playground" (calls server-side /api/ai proxy); Playground chat runs on the shared Sous persona (src/lib/sousPersona.ts)
   Settings.tsx                   Theme toggle + station preset CRUD + recipe category CRUD
   HistoricalAlerts.tsx           Alert History view — all alerts, severity/status filters, resolve/reopen toggle (writes `resolved` only)
@@ -80,7 +79,6 @@ src/
     AlertDialog.tsx
     CribComponents.tsx           Shared Section wrapper
     GuestMenuPreview.tsx         Guest-facing menu templates (Classic / Clean), print-optimized
-    TimerStrip.tsx                App-wide persistent kitchen timer strip — see the Kitchen Timer Strip section below
 
     ingredients/
       InvoicePriceUpdate.tsx     Photo/PDF invoice → AI-extracted line items → human-confirmed price writes
@@ -102,7 +100,6 @@ src/
     useStationPresets.ts         Firestore listener for station_presets collection
     useRecipeCategories.ts       Firestore listener for recipe_categories collection, seeds defaults if empty
     useRecipeCollections.ts      Firestore listener for recipe_collections collection, exposes activeCollection (no seeding)
-    useTimers.ts                  Single Firestore listener for the timers collection, lifted to AppShell and shared by KitchenTimers.tsx and TimerStrip.tsx (no duplicate listeners)
 
   lib/
     costEngine.ts                recipeCost / costPerPortion / fcPercent / suggestedPrice / wouldCreateCycle + computeCostPerBaseUnit
@@ -133,7 +130,7 @@ The Recipe Builder sub-tab also carries a "View Menu" button (`onViewMenu` prop)
 
 **Prep List** (`view: 'prep'`) — label only; still `PrepChecklist.tsx`, same par-level deficit table, unchanged.
 
-**Chef's Dashboard split — complete.** `ChefDashboard.tsx` is the landing page/command center: today's schedule with station coverage, today's events, Tonight's Features, quick actions, a compact alerts indicator. Kitchen Timers and Crib Sheet are Quick Action buttons from the Dashboard rather than top-level nav tabs — both keep their `viewMap` keys (`timers`, `dashboard`) so `onNavigate` calls still resolve; only their `navItems` entries were removed. Features management moved the same way: `Features.tsx` keeps its `viewMap` key (`features`, newly added) and is reached via the Dashboard's "Manage Features" link — full edit/delete/86-toggle/schedule-ahead capability is unchanged, just no longer a nav tab or a RecipesHub sub-tab.
+**Chef's Dashboard split — complete.** `ChefDashboard.tsx` is the landing page/command center: today's schedule with station coverage, today's events, Tonight's Features, quick actions, a compact alerts indicator. Crib Sheet is a Quick Action button from the Dashboard rather than a top-level nav tab — it keeps its `viewMap` key (`dashboard`) so `onNavigate` calls still resolve; only its `navItems` entry was removed. Features management moved the same way: `Features.tsx` keeps its `viewMap` key (`features`, newly added) and is reached via the Dashboard's "Manage Features" link — full edit/delete/86-toggle/schedule-ahead capability is unchanged, just no longer a nav tab or a RecipesHub sub-tab.
 
 **Dashboard's one write exception**: everything else on `ChefDashboard.tsx` is a read-only snapshot. "Add Feature" (a Quick Action) is the sole exception — it creates a new `features` doc, either a manual entry or a one-time snapshot from a picked recipe (`featureFieldsFromRecipe`, `costEngine.ts`). "Tonight's Features" itself has no interactive controls (no inline 86-toggle) — that would be a second write path on a view meant to stay a snapshot; toggling still happens on the full Features view.
 
@@ -152,8 +149,7 @@ The Recipe Builder sub-tab also carries a "View Menu" button (`onViewMenu` prop)
 | `clients` | `useKitchenState`, `EventCalendar` — catering/events client directory |
 | `alerts` | `useKitchenState`, `DailyCribSheet`, `HistoricalAlerts` |
 | `crib_notes` | `useKitchenState`, `DailyCribSheet` |
-| `timers` | `useTimers` (single listener, lifted to `AppShell`) — consumed by `KitchenTimers.tsx` and `TimerStrip.tsx`, see the Kitchen Timer Strip section below |
-| `station_presets` | `useStationPresets` (now actually consumed — by `Staff.tsx`'s shift form and `ChefDashboard.tsx`'s coverage check; previously an orphaned hook), `Settings.tsx` (own inline query, CRUD), `KitchenTimers.tsx` (own inline query, unchanged) |
+| `station_presets` | `useStationPresets` (now actually consumed — by `Staff.tsx`'s shift form and `ChefDashboard.tsx`'s coverage check; previously an orphaned hook), `Settings.tsx` (own inline query, CRUD) |
 | `ingredients` | `useKitchenState`, `IngredientsTable.tsx` |
 | `vendors` | `useKitchenState`, `Vendors.tsx`, `IngredientsTable.tsx` — `Ingredient.vendorId` optionally links to `vendors`; deleting a vendor clears `vendorId` on every linked ingredient (`deleteField()`) rather than orphaning the reference |
 | `restaurant_profile` | `useKitchenState`, `App.tsx`, `Settings.tsx` — singleton doc at the fixed id `main` (not a growing collection); every field optional, missing doc is a valid state |
@@ -183,7 +179,6 @@ The Recipe Builder sub-tab also carries a "View Menu" button (`onViewMenu` prop)
 | `KitchenEvent` | Event (title, date, time, attendees?, notes?, eventType?: string, clientId?: string → Client, milestones?: EventMilestone[], tentativeMenu?: TentativeMenuLine[], changeLog?: EventChangeLogEntry[]) |
 | `KitchenAlert` | Alert (message, severity, resolved, timestamp) |
 | `CribNote` | Freeform crib note (date, content, author) |
-| `KitchenTimer` | Countdown timer |
 | `TrendCard` | One editorial trend card in Test Kitchen's Culinary Trends & Forecasts: `{ headline, description, category, isViralBridge? }` — AI-generated per refresh, never auto-fetched |
 | `PricingTrendItem` | One line of AI pricing commentary: `{ item, direction: 'up' \| 'down', movement: 'short-term' \| 'structural', note }` — informational only, never linked to a real `Ingredient` |
 | `TrendReport` | Singleton doc at `trend_reports/latest`: `{ generatedAt, cards: TrendCard[], pricingTrends: PricingTrendItem[] }` — replaces an old, unused `recipe_scores`-shaped type left over from an orphaned Base44 script that wrote to the same collection name but was never wired into the app (deleted, see Orphaned files below) |
@@ -225,11 +220,11 @@ Note: `useKitchenState.ts` also defines `PrepItem` locally (pre-existing duplica
 
 **Brand v1.1 migration status (2026-07-16)** — infra landed in one pass; per-screen migration is separate follow-up work, not yet started beyond what was already brand-kit v1.0:
 - **Done:** token system (colors/fonts/radii) rewritten in `src/index.css`/`design-tokens.json`; Google Fonts swapped in `index.html`; Day/Service surface toggle wired end-to-end (`App.tsx` state → `data-surface` attribute → CSS cascade → Settings' Surface toggle) — every already-brand-kit-v1.0 screen re-colors correctly under Service mode automatically, with zero component-level changes, because those screens only ever referenced tokens; full product rename MiseOS → **IncendiumPhi** across all live code, docs, and config (slogan: "Culinary Chaos Decoded."); new Φ mark SVGs live at `public/brand/` (`phi-primary.svg` currentColor, `phi-tile.svg` app-icon/nav-badge, `phi-favicon.svg`, `phi-flame.svg` + `phi-flame-mono.svg` expressive-only ≥64px) — copied verbatim from the design project, never hand-redrawn; `AppHeader.tsx`/`SignIn.tsx` carry the new mark + Study-A wordmark lockup, replacing the old navy "M" square + "MISEOS"/"The Pass"/"System Operator Matrix" badge (that badge/tagline combo is retired — not part of any sanctioned lockup in the spec).
-- **Known compliance gaps on already-brand-kit screens** (token values are correct; component-level rules from the spec are not yet applied, since that requires per-component judgment calls the infra pass deliberately didn't make): `ChefDashboard.tsx`'s two solid `bg-navy` CTA buttons (Kitchen Timers quick action, Add Feature submit) don't yet follow the new "primary = saffron bg + navy text" button rule, and their `hover:bg-navy-deep` now resolves to a dark-teal accent hover rather than a darker navy (visually slightly off, not broken); rainbow category-badge treatments, cost-delta color rules (never green), and full numeral→`font-mono` scoping haven't been swept on these screens.
+- **Known compliance gaps on already-brand-kit screens** (token values are correct; component-level rules from the spec are not yet applied, since that requires per-component judgment calls the infra pass deliberately didn't make): `ChefDashboard.tsx`'s solid `bg-navy` Add Feature submit button doesn't yet follow the new "primary = saffron bg + navy text" button rule, and its `hover:bg-navy-deep` now resolves to a dark-teal accent hover rather than a darker navy (visually slightly off, not broken); rainbow category-badge treatments, cost-delta color rules (never green), and full numeral→`font-mono` scoping haven't been swept on these screens.
 - **Not started:** the ~24-screen legacy dark-zinc migration (unchanged list below) — those screens keep their existing `zinc-`/`emerald-` Tailwind classes untouched; the rename pass touched their strings only (e.g. `ErrorBoundary.tsx`'s crash-recovery copy) without retheming them, so they remain visually on the old dark-zinc aesthetic until their own pass.
 - ~~Test Kitchen — Culinary Trends & Forecasts~~ ✓ (Phase B) — brand kit throughout: `bg-surface` cards, navy/slate text, saffron only as signal (Viral Bridge badge, category tags, seasonal "prime" highlight). The Menu Development Playground sub-tab is also on brand kit already (confirmed 2026-07-16: zero `zinc`/`slate`/`gray` classes anywhere in `TestKitchenHub.tsx`; the studio-layout redesign in `7d244ff` moved it onto `bg-surface`/`text-navy`/`text-slate`/`border-line` tokens) — this was previously mis-documented here as "dark-zinc" and pending. Note the Playground's Plate Design and Ingredient Palette panels are themed but still explicit placeholders ("...will be embedded here in a later phase") — a functional-completeness gap, not a theming one.
 - ~~Alert History~~ ✓ — rebuilt from placeholder into the real view (live `alerts` from kitchen state, severity + active/resolved filters, resolve/reopen writes) directly on the brand kit: `bg-surface` card, navy/slate text, navy filter pills, saffron as the warning signal, red-400 kept for critical per the kit's unchanged danger color.
-- Pending: Daily Crib Sheet, Features, Staff, Events & Clients, Ingredients (Master Pantry), Vendors, Recipes, Prep Checklist, Kitchen Timers, Settings, Menu.
+- Pending: Daily Crib Sheet, Features, Staff, Events & Clients, Ingredients (Master Pantry), Vendors, Recipes, Prep Checklist, Settings, Menu.
 
 ## Invoice Price Update (components/ingredients/InvoicePriceUpdate.tsx)
 
@@ -291,25 +286,12 @@ Build order item 16, part 1 (Sharing is part 2, not yet designed — it needs a 
 The app's landing page and command center — default view on sign-in (`view: 'dashboard-home'`, first nav position, labeled "Dashboard"). Today only; read-only with one deliberate exception (Add Feature — see below), purely a snapshot derived from `useKitchenState`. Crib Sheet remains a separate, unchanged top-level view (`view: 'dashboard'`, reached only via the Quick Actions button now, not the nav) — the two will diverge further once Crib Sheet becomes print-only.
 
 - **Today's Schedule**: every configured station preset (`useStationPresets()`) renders as its own row — covered stations show the assigned employee(s) and times, an uncovered station (no shift assigned today) shows a bold red "Uncovered" badge. Shifts with no station assigned surface separately underneath, never silently dropped. A plain one-line summary ("No shifts scheduled today" / "N shifts today") sits above the breakdown so the zero-shift case is stated outright, not just implied by an all-uncovered list.
-- **Fixed a real bug while wiring this up**: `Staff.tsx`'s shift form previously sourced station options from its own hardcoded array (`['Sauté', 'Grill', 'Garde Manger', 'Pastry']`), completely ignoring the customizable `station_presets` collection — a chef who renamed or added a station in Settings could never actually assign a shift to it. `useStationPresets()` (previously an unused/orphaned hook) is now the single source of truth for both the shift form's options and the dashboard's coverage check — same one-source-of-truth principle as `isRecipeOnMenu`. The hook now falls back to the 4 original names only when `station_presets` is empty, matching the fallback `KitchenTimers.tsx` already had inline. Existing shifts keep whatever station string they were saved with regardless of later renames — there's no live join, just a stored string, same "survives until re-saved" convention as a deleted recipe category.
+- **Fixed a real bug while wiring this up**: `Staff.tsx`'s shift form previously sourced station options from its own hardcoded array (`['Sauté', 'Grill', 'Garde Manger', 'Pastry']`), completely ignoring the customizable `station_presets` collection — a chef who renamed or added a station in Settings could never actually assign a shift to it. `useStationPresets()` (previously an unused/orphaned hook) is now the single source of truth for both the shift form's options and the dashboard's coverage check — same one-source-of-truth principle as `isRecipeOnMenu`. The hook now falls back to the 4 original names only when `station_presets` is empty. Existing shifts keep whatever station string they were saved with regardless of later renames — there's no live join, just a stored string, same "survives until re-saved" convention as a deleted recipe category.
 - **Today's Events**: today's events from `useKitchenState`'s `events`, resolved against `clients` for display name (same `clientsById` map pattern as `EventCalendar.tsx`). No events = plain empty state.
 - **Tonight's Features**: read-only list of today's active (not 86'd, within `activeFrom`/`activeTo`) features — the exact same filter `DailyCribSheet.tsx`'s own "Features Tonight" card uses. No inline 86-toggle here (see the write-exception note above); a "Manage Features" link navigates to the full `Features.tsx` view for that.
-- **Quick Actions**: buttons to Kitchen Timers and Crib Sheet (`onNavigate`, threaded down from `App.tsx`'s `setActiveView`), plus "Add Feature" — opens an inline form (Manual Entry or From Recipe) that writes a new `features` doc via the shared `toDoc`/`FormState`/`BLANK` exported from `Features.tsx`, so the write shape can never drift between the two entry points.
+- **Quick Actions**: a button to Crib Sheet (`onNavigate`, threaded down from `App.tsx`'s `setActiveView`), plus "Add Feature" — opens an inline form (Manual Entry or From Recipe) that writes a new `features` doc via the shared `toDoc`/`FormState`/`BLANK` exported from `Features.tsx`, so the write shape can never drift between the two entry points.
 - **Alerts indicator**: a compact icon+count in the header, not a full card — links to Alert History. Red when there's at least one active (unresolved) alert, neutral otherwise.
 - Today's date is computed via the shared `todayDateKey()` helper (`src/utils.ts`) — see the app-wide date/time convention below.
-
-## Kitchen Timer Strip (TimerStrip.tsx)
-
-A persistent, app-wide indicator for running/expired kitchen timers, visible from every view — not just the Kitchen Timers screen itself (reached from `ChefDashboard.tsx`'s Kitchen Timers Quick Action, unchanged, for full CRUD). The strip itself is read-only display + alerting; no timer CRUD changed for this feature.
-
-- **Single shared listener**: `src/hooks/useTimers.ts` (matches the `useStationPresets`/`useRecipeCategories` one-hook-per-collection convention) owns the one `onSnapshot` on the `timers` collection. Called once in `AppShell` (`App.tsx`) and prop-drilled as `timers` to both `KitchenTimers.tsx` and `TimerStrip.tsx` — the same pattern already used for `theme`/`unitSystem`/etc. `KitchenTimers.tsx` no longer runs its own listener; its CRUD functions (`addTimer`/`deleteTimer`/`toggleTimer`/`resetTimer`/`adjustTimerDuration`) are unchanged.
-- **Placement**: `TimerStrip` sits between `AppHeader` and `<main>` in `AppShell`'s flex column — outside `<main>`'s scroll region, so no `position: sticky` is needed (avoids the sticky-offset-stacking problem a variable-height, wrapping header would otherwise create).
-- **Visibility**: renders whenever at least one timer has `status: 'running'`, OR at least one timer is expired and not yet acknowledged — the second clause matters because pausing an already-expired timer (a real, pre-existing action) must not silently drop the alarm flag just because it's no longer "running." Otherwise renders `null` — zero DOM, no persistent empty-state chrome, same convention as the header's compact alerts indicator.
-- **Saffron is reserved for the expired/alarm state only**, per the brand kit's signal-color rule — running, non-expired timers render in navy/slate/border-line. An expired timer gets a saffron border/background, saffron text, a bouncing bell icon, and a one-tap acknowledge button. Acknowledging silences the alarm and drops the saffron treatment, but the chip stays visible if the timer is still `status: 'running'` past its duration — acknowledge silences, it does not stop the timer.
-- **Acknowledged state is ephemeral and client-only** — an in-memory `Set<string>` of timer IDs local to `TimerStrip`, never written to Firestore. An id drops automatically once its timer is no longer expired (reset, restarted) or no longer exists (deleted), so re-arming a timer doesn't require a separate un-acknowledge step. It resets on page reload by design — silence is an in-session dismissal, not a persisted preference, so an already-expired timer alarms again after a fresh load.
-- **Audio**: Web Audio API (`AudioContext` + oscillator, no bundled audio asset), repeating every 1200ms while anything is expired-and-unacknowledged. Autoplay policy requires a prior user gesture — the strip arms one shared `AudioContext` on the first `pointerdown`/`keydown` anywhere in the app, then never again. If a timer is already expired before that first gesture, the alarm is silently blocked until the gesture lands, then plays immediately as part of arming rather than waiting on the next Firestore change. The visual saffron flag is unaffected by arming state — only audio is gated.
-- **Print**: the strip's root carries the existing global `.no-print` utility class (`index.css`, inside the page-level `@media print` block) — this suppresses it under any printable view (Crib Sheet, Guest Menu Preview, and any future one) automatically, without each view needing its own rule.
-- **Bug found and fixed during this work**: `KitchenTimers.tsx`'s `toggleTimer`/`resetTimer` previously wrote `startTime: undefined` via `updateDoc()`, which Firestore rejects outright (`Unsupported field value: undefined`) — Pause and Reset were silently failing entirely, with the exception only visible in the console. Fixed to use `deleteField()`, the same pattern already used elsewhere in this codebase (e.g. clearing `Ingredient.vendorId` on vendor deletion).
 
 ## Vendor Management (Vendors.tsx)
 
@@ -452,7 +434,6 @@ path in BrainDumpModule.jsx."
 
 DAILY OPERATIONS
 - Dashboard / Crib Sheet (features tonight, events snapshot — print-optimized)
-- Kitchen Timers (multi-station)
 - Alert History
 
 FEATURES (Specials)
@@ -609,6 +590,7 @@ AI LAYER
 - Training Dashboard
 - Hostess Chat
 - 86'd Items (standalone `items86` collection — separate from `Feature.is86d`, which is live and unrelated)
+- Kitchen Timers (module + app-wide strip — redundant with the chef's own phone timers; single-user tool, no shared-screen case)
 
 ### Master Pantry Mandate
 No live data feeds. No automatic mutation. No vendor-system
