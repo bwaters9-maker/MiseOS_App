@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { addDoc, deleteDoc, updateDoc, getDocs } from 'firebase/firestore';
+import { addDoc, deleteDoc, deleteField, updateDoc, getDocs } from 'firebase/firestore';
 import { rCollection, rDoc } from './lib/firestorePaths';
 import { useRestaurantId } from './components/AuthContext';
 import { KitchenTimer, PrepStation } from './types';
@@ -62,14 +62,14 @@ export const KitchenTimers: React.FC<KitchenTimersProps> = ({ timers }) => {
     if (!timer) return;
 
     const now = Date.now();
-    let updateData: Partial<KitchenTimer> = {};
+    let updateData: any = {};
 
     if (timer.status === 'running') {
       const sessionElapsed = now - (timer.startTime || now);
       updateData = {
         status: 'paused',
         elapsedMs: timer.elapsedMs + sessionElapsed,
-        startTime: undefined,
+        startTime: deleteField(),
       };
     } else {
       updateData = {
@@ -84,7 +84,7 @@ export const KitchenTimers: React.FC<KitchenTimersProps> = ({ timers }) => {
     await updateDoc(rDoc(restaurantId, 'timers', id), {
       status: 'idle',
       elapsedMs: 0,
-      startTime: undefined,
+      startTime: deleteField(),
     });
   };
 
