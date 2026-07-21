@@ -332,7 +332,6 @@ export default function TestKitchenHub() {
   const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
   const trendReport = useKitchenSelector((s: any) => s.trendReport) as TrendReport | null;
   const trendReportLoaded = useKitchenSelector((s: any) => s.trendReportLoaded) as boolean;
-  const [activeSubTab, setActiveSubTab] = useState<'trends' | 'optimizer'>('trends');
   const [userInput, setUserInput] = useState('');
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -475,20 +474,13 @@ export default function TestKitchenHub() {
   const regularCards = displayedReport?.cards.filter(c => !c.isViralBridge) ?? [];
 
   return (
-    <div className={`max-w-[1597px] mx-auto px-[21px] py-[34px] font-body ${activeSubTab === 'optimizer' ? 'h-full flex flex-col min-h-0' : ''}`}>
-      <div className="border-b border-line pb-[21px] flex flex-col sm:flex-row justify-between items-start sm:items-end gap-[21px] shrink-0">
-        <div>
-          <h1 className="text-xl font-display font-bold tracking-tight text-navy">Test Kitchen</h1>
-          <p className="text-xs text-slate mt-[5px]">Develop new dishes with real-time AI assistance</p>
-        </div>
-        <div className="flex gap-[3px] bg-bg-cool p-[3px] rounded-tile border border-line">
-          <button onClick={() => setActiveSubTab('trends')} className={`px-[13px] py-[8px] text-xs font-bold tracking-tight rounded-card transition-colors duration-[144ms] ${activeSubTab === 'trends' ? 'bg-surface text-navy shadow-sm' : 'bg-transparent text-slate hover:text-navy'}`}>Culinary Trends & Forecasts</button>
-          <button onClick={() => setActiveSubTab('optimizer')} className={`px-[13px] py-[8px] text-xs font-bold tracking-tight rounded-card transition-colors duration-[144ms] flex items-center gap-[8px] ${activeSubTab === 'optimizer' ? 'bg-surface text-navy shadow-sm' : 'bg-transparent text-slate hover:text-navy'}`}><Sparkles className="w-3.5 h-3.5" /> The Menu Development Playground</button>
-        </div>
+    <div className="max-w-[1597px] mx-auto px-[21px] py-[34px] font-body">
+      <div className="border-b border-line pb-[21px]">
+        <h1 className="text-xl font-display font-bold tracking-tight text-navy">Test Kitchen</h1>
+        <p className="text-xs text-slate mt-[5px]">Develop new dishes with real-time AI assistance</p>
       </div>
 
-      {activeSubTab === 'trends' && (
-        <div className="space-y-[34px] mt-[21px]">
+      <div className="space-y-[34px] mt-[21px]">
 
           {/* REFRESH HEADER */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-[13px]">
@@ -787,11 +779,13 @@ export default function TestKitchenHub() {
             )}
           </div>
         </div>
-      )}
 
-      {activeSubTab === 'optimizer' && (
-        <div className="flex-1 min-h-0 mt-[21px]">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-[21px] h-full min-h-0">
+      <div className="mt-[34px]">
+        <h2 className="text-sm font-display font-bold text-navy border-t border-line pt-[21px] flex items-center gap-[8px]">
+          <Sparkles className="w-3.5 h-3.5 text-teal" /> The Menu Development Playground
+        </h2>
+        <div className="mt-[21px]">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-[21px] h-[610px]">
             {/* LEFT COLUMN, FULL HEIGHT: chat — message list scrolls internally, input pinned at bottom */}
             <div className="lg:col-span-1 h-full min-h-0 flex flex-col gap-[13px]">
               <div className="bg-surface border border-line rounded-card p-[21px] flex-1 min-h-0 flex flex-col">
@@ -861,7 +855,7 @@ export default function TestKitchenHub() {
             </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
