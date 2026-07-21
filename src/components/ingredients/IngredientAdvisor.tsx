@@ -3,7 +3,7 @@ import { Compass, X, Search, ExternalLink, AlertTriangle } from 'lucide-react';
 import { useKitchenSelector } from '../KitchenStateContext';
 import { withRegionContext } from '../../lib/regionContext';
 import { ADVISOR_SYSTEM_PROMPT } from '../../lib/advisorPersona';
-import { getAiAuthHeader } from '../../lib/ai';
+import { getAiAuthHeader, AI_SIGNED_OUT_MESSAGE } from '../../lib/ai';
 import type { RestaurantProfile } from '../../types';
 
 interface SourceLink {
@@ -77,7 +77,10 @@ export const IngredientAdvisor: React.FC<IngredientAdvisorProps> = ({ isOpen, on
         }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error?.message || `API error: ${response.status}`);
+      if (!response.ok) {
+        if (response.status === 401) throw new Error(AI_SIGNED_OUT_MESSAGE);
+        throw new Error(data.error?.message || `API error: ${response.status}`);
+      }
       const extracted = extractResult(data.content);
       if (!extracted.text) throw new Error('No advisory text returned. Try again.');
       setResult(extracted);

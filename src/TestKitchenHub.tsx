@@ -3,7 +3,7 @@ import { Sparkles, RefreshCw, Send, AlertCircle, ExternalLink, Flame, TrendingUp
 import { SOUS_SYSTEM_PROMPT } from './lib/sousPersona';
 import { APP_KNOWLEDGE_CONTEXT } from './lib/sousAppKnowledge';
 import { withRegionContext } from './lib/regionContext';
-import { callAi, parseAiJson, getAiAuthHeader } from './lib/ai';
+import { callAi, parseAiJson, getAiAuthHeader, AI_SIGNED_OUT_MESSAGE } from './lib/ai';
 import { todayDateKey } from './utils';
 import { useKitchenSelector } from './components/KitchenStateContext';
 import { useRestaurantId } from './components/AuthContext';
@@ -391,6 +391,7 @@ export default function TestKitchenHub() {
         }),
       });
       if (!response.ok) {
+        if (response.status === 401) throw new Error(AI_SIGNED_OUT_MESSAGE);
         const errorData = await response.json();
         throw new Error(errorData.error?.message || `API error: ${response.status}`);
       }
