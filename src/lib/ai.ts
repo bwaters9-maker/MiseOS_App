@@ -11,12 +11,20 @@ import { auth } from '../firebaseConfig';
 
 export type AiContent = string | Array<Record<string, any>>;
 
-/** Empty object if signed out — the server's 401 handles that case; every
- * caller of this is already gated behind AuthGate, so it's always present
- * in practice. */
+/** Shown whenever an AI call can't authenticate — auth.currentUser is null
+ * (a stale/half-dead session AuthGate hasn't caught up to yet) or the
+ * server rejects the token as expired. Sign Out (AppHeader) is the actual
+ * recovery path — it's what forces a fresh onAuthStateChanged and drops
+ * AuthGate to the real sign-in screen. */
+export const AI_SIGNED_OUT_MESSAGE = 'Session expired — sign out and sign back in.';
+
+/** Throws AI_SIGNED_OUT_MESSAGE instead of silently returning {} when
+ * signed out, so a caller can never fire a doomed request — every
+ * /api/ai caller awaits this before its fetch. */
 export const getAiAuthHeader = async (): Promise<Record<string, string>> => {
   const token = await auth.currentUser?.getIdToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  if (!token) throw new Error(AI_SIGNED_OUT_MESSAGE);
+  return { Authorization: `Bearer ${token}` };
 };
 
 export const callAi = async (system: string, content: AiContent, maxTokens: number): Promise<string> => {
@@ -31,6 +39,7 @@ export const callAi = async (system: string, content: AiContent, maxTokens: numb
   });
   const data = await response.json().catch(() => null);
   if (!response.ok) {
+    if (response.status === 401) throw new Error(AI_SIGNED_OUT_MESSAGE);
     throw new Error(data?.error?.message || `AI request failed (${response.status}).`);
   }
   const text = data?.content?.[0]?.text;
