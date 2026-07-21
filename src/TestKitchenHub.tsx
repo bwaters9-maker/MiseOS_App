@@ -10,6 +10,7 @@ import { useRestaurantId } from './components/AuthContext';
 import { setDoc, getDocs, deleteDoc } from 'firebase/firestore';
 import { rCollection, rDoc } from './lib/firestorePaths';
 import { regionForState, itemsForRegion, type SeasonalItemForRegion } from './lib/seasonalData';
+import type { UnitSystem } from './lib/units';
 import { monthStatus } from './components/testkitchen/trendsDisplay';
 import TrendsReferenceRail from './components/testkitchen/TrendsReferenceRail';
 import DishBuildPanel from './components/testkitchen/DishBuildPanel';
@@ -169,7 +170,11 @@ const pruneTrendHistory = async (restaurantId: string) => {
 // MAIN VIEW
 // ===================================================================
 
-export default function TestKitchenHub() {
+interface TestKitchenHubProps {
+  unitSystem: UnitSystem;
+}
+
+export default function TestKitchenHub({ unitSystem }: TestKitchenHubProps) {
   const restaurantId = useRestaurantId();
   const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
   const trendReport = useKitchenSelector((s: any) => s.trendReport) as TrendReport | null;
@@ -398,7 +403,7 @@ export default function TestKitchenHub() {
 
             {/* RIGHT: Recipe Build */}
             <div className="lg:col-span-1 h-full min-h-0">
-              <DishBuildPanel />
+              <DishBuildPanel messages={messages} unitSystem={unitSystem} />
             </div>
           </div>
         </div>
