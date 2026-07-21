@@ -71,6 +71,39 @@ export interface Recipe {
 }
 
 /**
+ * One ingredient line inside a Test Kitchen dish draft (see `DishDraft`).
+ * `ingredientId` is copied verbatim from the live Master Pantry list by the
+ * extraction pass if a mention matches an existing ingredient by name —
+ * never invented. `qty`/`unit` are the AI's best-effort read of the
+ * conversation, not yet converted to canonical base units; that conversion
+ * happens only once a line is kept and handed off to a real `RecipeLine`.
+ */
+export interface DishDraftLine {
+  ingredientId: string | null;
+  name: string;
+  qty: number;
+  unit: string;
+  note?: string;
+}
+
+/**
+ * Client-only draft of a dish pulled from a Test Kitchen Sous conversation
+ * via a structured AI extraction pass — never written to Firestore as its
+ * own document. The chef reviews and confirms before any of it becomes a
+ * real `Recipe` doc; `notInPantry` mirrors the same fallback convention as
+ * `Recipes.tsx`'s "Build From Pantry" prompt so an unmatched ingredient
+ * mention is always surfaced, never silently dropped.
+ */
+export interface DishDraft {
+  dishName: string;
+  batchYield: { qty: number; measureType: MeasureType } | null;
+  portions: number | null;
+  lines: DishDraftLine[];
+  notInPantry: string[];
+  methodSteps: string[];
+}
+
+/**
  * A chef-managed recipe category (Sides, Sauces, Salads, …), CRUD'd from
  * Settings the same way as station presets. `Recipe.categoryId` references
  * this by id; `Recipe.course` is kept in sync with the category's name at
