@@ -796,7 +796,6 @@ export default function TestKitchenHub() {
             <div className="lg:col-span-1 h-full min-h-0 flex flex-col gap-[13px]">
               <div className="bg-surface border border-line rounded-card p-[21px] flex-1 min-h-0 flex flex-col">
                 <div className="flex justify-between items-center border-b border-line pb-[13px] shrink-0">
-                  {/* "Chef Matthew" is a placeholder persona name pending a future onboarding customization setting */}
                   <div className="text-xs font-bold uppercase tracking-widest text-navy">Chef Matthew — Sous Chef</div>
                   <button onClick={handleNewSession} className="text-[10px] font-bold uppercase text-slate hover:text-navy flex items-center gap-[3px]">
                     <RefreshCw className="w-3 h-3" /> New Session
@@ -842,25 +841,8 @@ export default function TestKitchenHub() {
               )}
             </div>
 
-            {/* CENTER: Plate Design — placeholder pending plate photography */}
-            <div className="lg:col-span-2 h-full min-h-0">
-              <div className="bg-surface border border-line rounded-card p-[21px] h-full min-h-0 flex flex-col">
-                <div className="border-b border-line pb-[13px] mb-[13px] shrink-0">
-                  <p className="text-[10px] text-slate uppercase tracking-wider">Working Dish</p>
-                  <h2 className="text-lg font-display font-bold text-navy">Untitled Dish</h2>
-                </div>
-                <div className="flex-1 min-h-0 flex items-center justify-center">
-                  <p className="text-xs text-slate leading-relaxed italic text-center max-w-xs">Plate photos coming — shot guidance and image capture.</p>
-                </div>
-              </div>
-            </div>
-
-            {/* RIGHT: Trends (top) + Recipe Build (below) */}
+            {/* RIGHT: Recipe Build */}
             <div className="lg:col-span-1 h-full min-h-0 overflow-y-auto space-y-[21px]">
-              <div className="bg-surface border border-line rounded-card p-[21px]">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-navy border-b border-line pb-[8px] mb-[13px]">Trends for This Dish</h3>
-                <p className="text-xs text-slate leading-relaxed">Placeholder — dish-specific trend signals will surface here in a later phase.</p>
-              </div>
               <div className="bg-surface border border-line rounded-card p-[21px] space-y-[13px]">
                 <h3 className="text-xs font-bold uppercase tracking-widest text-navy border-b border-line pb-[8px]">Recipe Build</h3>
                 <div>
