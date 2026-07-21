@@ -12,6 +12,7 @@ import { rCollection, rDoc } from './lib/firestorePaths';
 import { regionForState, itemsForRegion, type SeasonalItemForRegion } from './lib/seasonalData';
 import { monthStatus } from './components/testkitchen/trendsDisplay';
 import TrendsReferenceRail from './components/testkitchen/TrendsReferenceRail';
+import DishBuildPanel from './components/testkitchen/DishBuildPanel';
 import type { RestaurantProfile, TrendReport, TrendCard, PricingTrendItem } from './types';
 
 interface Message {
@@ -396,22 +397,8 @@ export default function TestKitchenHub() {
             </div>
 
             {/* RIGHT: Recipe Build */}
-            <div className="lg:col-span-1 h-full min-h-0 overflow-y-auto space-y-[21px]">
-              <div className="bg-surface border border-line rounded-card p-[21px] space-y-[13px]">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-navy border-b border-line pb-[8px]">Recipe Build</h3>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[3px]">Yield</p>
-                  <p className="text-xs text-slate italic">Not yet specified.</p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[3px]">Ingredients</p>
-                  <p className="text-xs text-slate italic">No ingredients added yet.</p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[3px]">Method</p>
-                  <p className="text-xs text-slate italic">No method steps yet.</p>
-                </div>
-              </div>
+            <div className="lg:col-span-1 h-full min-h-0">
+              <DishBuildPanel />
             </div>
           </div>
         </div>
