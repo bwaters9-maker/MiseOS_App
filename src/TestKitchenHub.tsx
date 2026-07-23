@@ -172,9 +172,10 @@ const pruneTrendHistory = async (restaurantId: string) => {
 
 interface TestKitchenHubProps {
   unitSystem: UnitSystem;
+  onOpenRecipe: (recipeId: string) => void;
 }
 
-export default function TestKitchenHub({ unitSystem }: TestKitchenHubProps) {
+export default function TestKitchenHub({ unitSystem, onOpenRecipe }: TestKitchenHubProps) {
   const restaurantId = useRestaurantId();
   const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
   const trendReport = useKitchenSelector((s: any) => s.trendReport) as TrendReport | null;
@@ -403,7 +404,7 @@ export default function TestKitchenHub({ unitSystem }: TestKitchenHubProps) {
 
             {/* RIGHT: Recipe Build */}
             <div className="lg:col-span-1 h-full min-h-0">
-              <DishBuildPanel messages={messages} unitSystem={unitSystem} />
+              <DishBuildPanel messages={messages} unitSystem={unitSystem} onOpenRecipe={onOpenRecipe} />
             </div>
           </div>
         </div>

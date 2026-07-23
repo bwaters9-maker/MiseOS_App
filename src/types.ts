@@ -96,7 +96,9 @@ export interface DishDraftLine {
  */
 export interface DishDraft {
   dishName: string;
-  batchYield: { qty: number; measureType: MeasureType } | null;
+  /** `unit` is the AI's best-effort display unit, same as a line's `unit`
+   * — not yet converted to canonical base units; that happens at hand-off. */
+  batchYield: { qty: number; measureType: MeasureType; unit: string } | null;
   portions: number | null;
   lines: DishDraftLine[];
   notInPantry: string[];

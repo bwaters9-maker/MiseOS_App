@@ -9,20 +9,26 @@
  * Reads ingredients/restaurantProfile directly via useKitchenSelector
  * (same pattern as IngredientAdvisor) rather than having them threaded
  * down as props — no new Firestore listener, reuses the ones
- * useKitchenState.ts already owns. `messages` (the chat transcript) and
- * `unitSystem` come from the parent since they're not part of the shared
- * kitchen state.
+ * useKitchenState.ts already owns. `messages` (the chat transcript),
+ * `unitSystem`, and `onOpenRecipe` come from the parent since they're not
+ * part of the shared kitchen state.
  *
- * The "Send to Recipe Builder" hand-off (addDoc + navigation) lands in
- * the next build step — the button stays disabled-only for now.
+ * "Send to Recipe Builder" writes through the same rCollection(...,
+ * 'recipes') / addDoc path Recipes.tsx itself uses — no new collection,
+ * no bypass of the established data model — then hands off via
+ * onOpenRecipe, the same prop AppShell already threads to every view for
+ * jumping into the Recipe Builder on a specific recipe.
  */
 import React, { useState } from 'react';
 import { ChefHat, AlertCircle } from 'lucide-react';
+import { addDoc } from 'firebase/firestore';
 import { useKitchenSelector } from '../KitchenStateContext';
+import { useRestaurantId } from '../AuthContext';
+import { rCollection } from '../../lib/firestorePaths';
 import { callAi, parseAiJson } from '../../lib/ai';
 import { withRegionContext } from '../../lib/regionContext';
-import type { UnitSystem } from '../../lib/units';
-import type { DishDraft, DishDraftLine, Ingredient, MeasureType, RestaurantProfile } from '../../types';
+import { toBase, displayUnitsFor, defaultDisplayUnit, type UnitSystem, type DisplayUnit } from '../../lib/units';
+import type { DishDraft, DishDraftLine, Ingredient, MeasureType, Recipe, RecipeLine, RestaurantProfile } from '../../types';
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -32,6 +38,7 @@ interface ChatMessage {
 interface DishBuildPanelProps {
   messages: ChatMessage[];
   unitSystem: UnitSystem;
+  onOpenRecipe: (recipeId: string) => void;
 }
 
 const MEASURE_TYPES: MeasureType[] = ['weight', 'volume', 'each'];
@@ -39,11 +46,11 @@ const MEASURE_TYPES: MeasureType[] = ['weight', 'volume', 'each'];
 const DISH_DRAFT_SYSTEM_PROMPT = (unitSystem: UnitSystem): string => `You are extracting a working recipe draft from a chef's brainstorming conversation with a sous chef, so it can be reviewed and sent to the kitchen's Recipe Builder for costing. You will receive the full chat transcript and the restaurant's Master Pantry as a JSON list of { id, name }.
 
 Respond with ONLY valid JSON, no markdown, no commentary, in exactly this shape:
-{"dishName":"...","batchYield":{"qty":0,"measureType":"weight"},"portions":0,"lines":[{"ingredientId":"...","qty":0,"unit":"...","note":"..."}],"notInPantry":["..."],"methodSteps":["..."]}
+{"dishName":"...","batchYield":{"qty":0,"measureType":"weight","unit":"..."},"portions":0,"lines":[{"ingredientId":"...","qty":0,"unit":"...","note":"..."}],"notInPantry":["..."],"methodSteps":["..."]}
 
 Rules:
 - "dishName" is the working name of the dish under discussion. Use "" if no name or clear concept has emerged yet.
-- "batchYield": "qty" is the total batch size as a plain number, "measureType" is exactly one of "weight", "volume", "each". Set "batchYield" to null (the whole field, not just qty) if the conversation gives no real basis for a batch size — never guess one.
+- "batchYield": "qty" is the total batch size as a plain number, "measureType" is exactly one of "weight", "volume", "each", "unit" is one of the same units listed below for ingredient lines (matching measureType — "each" for measureType "each"). Set "batchYield" to null (the whole field, not just qty) if the conversation gives no real basis for a batch size — never guess one.
 - "portions" is the number of servings as a plain integer, or null if not discussed.
 - "lines" is one entry per ingredient genuinely part of this dish that matches an item in the provided pantry list by name.
   - "ingredientId" must be copied exactly from the provided pantry list. Never invent an ingredient or an id that is not in the list.
@@ -65,8 +72,9 @@ const normalizeDishDraft = (parsed: any, ingredients: Ingredient[]): DishDraft =
 
   const rawYield = parsed?.batchYield;
   const batchYield =
-    rawYield && typeof rawYield.qty === 'number' && rawYield.qty > 0 && MEASURE_TYPES.includes(rawYield.measureType)
-      ? { qty: rawYield.qty, measureType: rawYield.measureType as MeasureType }
+    rawYield && typeof rawYield.qty === 'number' && rawYield.qty > 0
+      && MEASURE_TYPES.includes(rawYield.measureType) && typeof rawYield.unit === 'string' && rawYield.unit.trim()
+      ? { qty: rawYield.qty, measureType: rawYield.measureType as MeasureType, unit: rawYield.unit.trim() }
       : null;
 
   const portions = typeof parsed?.portions === 'number' && parsed.portions > 0 ? Math.round(parsed.portions) : null;
@@ -92,7 +100,8 @@ const normalizeDishDraft = (parsed: any, ingredients: Ingredient[]): DishDraft =
   return { dishName, batchYield, portions, lines, notInPantry, methodSteps };
 };
 
-export default function DishBuildPanel({ messages, unitSystem }: DishBuildPanelProps) {
+export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: DishBuildPanelProps) {
+  const restaurantId = useRestaurantId();
   const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
   const ingredients = useKitchenSelector((s: any) => s.ingredients) as Ingredient[];
 
@@ -100,6 +109,8 @@ export default function DishBuildPanel({ messages, unitSystem }: DishBuildPanelP
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
   const [keptLines, setKeptLines] = useState<Set<number>>(new Set());
+  const [handingOff, setHandingOff] = useState(false);
+  const [handOffError, setHandOffError] = useState<string | null>(null);
 
   const toggleLine = (index: number) => {
     setKeptLines(prev => {
@@ -136,6 +147,53 @@ export default function DishBuildPanel({ messages, unitSystem }: DishBuildPanelP
 
   const canHandOff = !!draft && !!draft.dishName.trim() && !!draft.batchYield && draft.portions != null;
 
+  /** Resolves an AI-returned display unit against what's actually valid
+   * for a measure type, falling back to the system default when it
+   * doesn't match — same defensive pattern Recipes.tsx's acceptSuggestion
+   * uses for pantry-suggestion units. */
+  const resolveUnit = (aiUnit: string, measureType: MeasureType): DisplayUnit => {
+    const validUnits = displayUnitsFor(measureType, unitSystem) as string[];
+    return (validUnits.includes(aiUnit) ? aiUnit : defaultDisplayUnit(measureType, unitSystem)) as DisplayUnit;
+  };
+
+  const handleSendToRecipeBuilder = async () => {
+    if (!draft || !draft.batchYield || draft.portions == null || !draft.dishName.trim()) return;
+    setHandingOff(true);
+    setHandOffError(null);
+    try {
+      const yieldUnit = resolveUnit(draft.batchYield.unit, draft.batchYield.measureType);
+      const lines: RecipeLine[] = draft.lines
+        .filter((_, i) => keptLines.has(i))
+        .map((line): RecipeLine => {
+          const ing = ingredients.find(i => i.id === line.ingredientId);
+          const unit = ing ? resolveUnit(line.unit, ing.measureType) : ('each' as DisplayUnit);
+          return {
+            type: 'ingredient',
+            refId: line.ingredientId!,
+            qty: toBase(line.qty, unit),
+            ...(line.note && { note: line.note }),
+          };
+        });
+
+      const newRecipe: Omit<Recipe, 'id'> = {
+        name: draft.dishName.trim(),
+        recipeType: 'menu',
+        course: '',
+        batchYield: { qty: toBase(draft.batchYield.qty, yieldUnit), measureType: draft.batchYield.measureType },
+        portions: draft.portions,
+        lines,
+        methodSteps: draft.methodSteps,
+        updatedAt: new Date().toISOString(),
+      };
+      const ref = await addDoc(rCollection(restaurantId, 'recipes'), newRecipe);
+      onOpenRecipe(ref.id);
+    } catch (e: any) {
+      setHandOffError(e?.message || 'Could not create the recipe. Try again.');
+    } finally {
+      setHandingOff(false);
+    }
+  };
+
   return (
     <div className="bg-surface border border-line rounded-card p-[21px] h-full min-h-0 overflow-y-auto">
       <h3 className="text-xs font-bold uppercase tracking-widest text-navy border-b border-line pb-[8px]">Recipe Build</h3>
@@ -144,6 +202,13 @@ export default function DishBuildPanel({ messages, unitSystem }: DishBuildPanelP
         <div className="flex items-start justify-between gap-[8px] mt-[13px] text-[10px] text-red-400">
           <span className="flex items-start gap-[5px]"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-[1px]" />{extractError}</span>
           <button onClick={() => setExtractError(null)} className="text-slate hover:text-navy shrink-0 uppercase font-bold text-[9px]">Dismiss</button>
+        </div>
+      )}
+
+      {handOffError && (
+        <div className="flex items-start justify-between gap-[8px] mt-[13px] text-[10px] text-red-400">
+          <span className="flex items-start gap-[5px]"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-[1px]" />{handOffError}</span>
+          <button onClick={() => setHandOffError(null)} className="text-slate hover:text-navy shrink-0 uppercase font-bold text-[9px]">Dismiss</button>
         </div>
       )}
 
@@ -169,7 +234,7 @@ export default function DishBuildPanel({ messages, unitSystem }: DishBuildPanelP
           <div className="flex gap-[21px]">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[3px]">Yield</p>
-              <p className="text-xs text-navy">{draft.batchYield ? `${draft.batchYield.qty} ${draft.batchYield.measureType}` : 'Not specified'}</p>
+              <p className="text-xs text-navy">{draft.batchYield ? `${draft.batchYield.qty} ${draft.batchYield.unit}` : 'Not specified'}</p>
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[3px]">Portions</p>
@@ -218,17 +283,18 @@ export default function DishBuildPanel({ messages, unitSystem }: DishBuildPanelP
 
           <button
             onClick={handleExtract}
-            disabled={extracting}
+            disabled={extracting || handingOff}
             className="w-full px-[13px] py-[8px] rounded-[8px] border border-line text-navy text-[10px] font-bold uppercase tracking-wider disabled:opacity-40 hover:bg-bg-cool transition-colors duration-[144ms]"
           >
             {extracting ? 'Re-extracting…' : 'Re-extract from Chat'}
           </button>
 
           <button
-            disabled={!canHandOff}
+            onClick={handleSendToRecipeBuilder}
+            disabled={!canHandOff || handingOff}
             className="w-full px-[13px] py-[8px] rounded-[8px] bg-navy text-cream text-[10px] font-bold uppercase tracking-wider disabled:opacity-40 hover:opacity-90 transition-opacity duration-[144ms]"
           >
-            Send to Recipe Builder
+            {handingOff ? 'Sending…' : 'Send to Recipe Builder'}
           </button>
         </div>
       )}
