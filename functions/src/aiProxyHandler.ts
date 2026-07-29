@@ -83,9 +83,10 @@ export async function handleAiProxyRequest(
   }
 
   // Cap max_tokens so a single request can't run up an unbounded bill.
-  // Default stays 1024 when unset (applied at forward time below).
-  if (typeof max_tokens === 'number' && max_tokens > 2048) {
-    return { status: 400, body: { error: { message: 'max_tokens must not exceed 2048.' } } };
+  // 4096 clears the highest real caller (the Ingredient Advisor at 3000);
+  // default stays 1024 when unset (applied at forward time below).
+  if (typeof max_tokens === 'number' && max_tokens > 4096) {
+    return { status: 400, body: { error: { message: 'max_tokens must not exceed 4096.' } } };
   }
 
   // Bound the conversation payload — a runaway or abusive transcript
