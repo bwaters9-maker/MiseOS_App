@@ -20,7 +20,7 @@
  * jumping into the Recipe Builder on a specific recipe.
  */
 import React, { useState } from 'react';
-import { ChefHat, AlertCircle } from 'lucide-react';
+import { ChefHat, AlertCircle, Plus, X } from 'lucide-react';
 import { addDoc } from 'firebase/firestore';
 import { useKitchenSelector } from '../KitchenStateContext';
 import { useRestaurantId } from '../AuthContext';
@@ -28,7 +28,8 @@ import { rCollection } from '../../lib/firestorePaths';
 import { callAi, parseAiJson } from '../../lib/ai';
 import { withRegionContext } from '../../lib/regionContext';
 import { toBase, displayUnitsFor, defaultDisplayUnit, type UnitSystem, type DisplayUnit } from '../../lib/units';
-import type { DishDraft, DishDraftLine, Ingredient, MeasureType, Recipe, RecipeLine, RestaurantProfile } from '../../types';
+import { AiIngredientLookup } from '../ingredients/AiIngredientLookup';
+import type { DishDraft, DishDraftLine, Ingredient, MeasureType, Recipe, RecipeLine, RestaurantProfile, Vendor } from '../../types';
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -111,6 +112,7 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
   const restaurantId = useRestaurantId();
   const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
   const ingredients = useKitchenSelector((s: any) => s.ingredients) as Ingredient[];
+  const vendors = useKitchenSelector((s: any) => s.vendors) as Vendor[];
 
   const [draft, setDraft] = useState<DishDraft | null>(null);
   const [extracting, setExtracting] = useState(false);
@@ -118,6 +120,8 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
   const [keptLines, setKeptLines] = useState<Set<number>>(new Set());
   const [handingOff, setHandingOff] = useState(false);
   const [handOffError, setHandOffError] = useState<string | null>(null);
+  // The NOT-IN-PANTRY chip the chef is adding to the pantry, if any.
+  const [addingChip, setAddingChip] = useState<{ index: number; name: string } | null>(null);
 
   const toggleLine = (index: number) => {
     setKeptLines(prev => {
@@ -187,6 +191,28 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
         ? { ...prev, batchYield: { qty: prev.portions, measureType: 'each', unit: 'each' } }
         : prev,
     );
+  };
+
+  // The chef added a real pantry ingredient for a NOT-IN-PANTRY mention.
+  // Drop that mention (matched by normalized name, falling back to the chip
+  // the modal was opened from) and append it as a kept line with qty 0 /
+  // unit '' — so it surfaces as an Item-1 flagged line the chef completes,
+  // then keeps or discards like any other. Never auto-written elsewhere.
+  const handleIngredientAdded = (created?: { id: string; name: string }) => {
+    const chip = addingChip;
+    setAddingChip(null);
+    if (!chip || !created || !draft) return;
+    const norm = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ');
+    const createdNorm = norm(created.name);
+    const matchIdx = draft.notInPantry.findIndex(n => norm(n) === createdNorm);
+    const removeIdx = matchIdx >= 0 ? matchIdx : chip.index;
+    const newIndex = draft.lines.length;
+    setDraft({
+      ...draft,
+      notInPantry: draft.notInPantry.filter((_, i) => i !== removeIdx),
+      lines: [...draft.lines, { ingredientId: created.id, name: created.name, qty: 0, unit: '' }],
+    });
+    setKeptLines(prev => new Set(prev).add(newIndex));
   };
 
   const handleExtract = async () => {
@@ -281,6 +307,7 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
   };
 
   return (
+    <>
     <div className="bg-surface border border-line rounded-card p-[21px] h-full min-h-0 overflow-y-auto">
       <h3 className="text-xs font-bold uppercase tracking-widest text-navy border-b border-line pb-[8px]">Recipe Build</h3>
 
@@ -450,7 +477,16 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[5px]">Not in Pantry</p>
               <div className="flex flex-wrap gap-[5px]">
                 {draft.notInPantry.map((name, i) => (
-                  <span key={i} className="px-[8px] py-[2px] rounded-[13px] border border-line bg-bg-cool text-[10px] text-slate">{name}</span>
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setAddingChip({ index: i, name })}
+                    className="flex items-center gap-[3px] px-[8px] py-[2px] rounded-[13px] border border-line bg-bg-cool text-[10px] text-slate hover:border-teal hover:text-teal transition-colors duration-[144ms]"
+                    title={`Add ${name} to the pantry`}
+                  >
+                    <Plus className="w-3 h-3 shrink-0" />
+                    {name}
+                  </button>
                 ))}
               </div>
             </div>
@@ -485,5 +521,26 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
         </div>
       )}
     </div>
+
+    {addingChip && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/40 p-[21px]" onClick={() => setAddingChip(null)}>
+        <div className="w-full max-w-[440px] max-h-[85vh] overflow-y-auto bg-surface border border-line rounded-card shadow-2xl p-[21px]" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-[13px]">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-navy">Add to Pantry</h4>
+            <button type="button" onClick={() => setAddingChip(null)} className="text-slate hover:text-navy">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <AiIngredientLookup
+            unitSystem={unitSystem}
+            vendors={vendors}
+            initialName={addingChip.name}
+            onCancel={() => setAddingChip(null)}
+            onSaved={handleIngredientAdded}
+          />
+        </div>
+      </div>
+    )}
+    </>
   );
 }

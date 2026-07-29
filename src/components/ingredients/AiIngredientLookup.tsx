@@ -87,15 +87,20 @@ type Stage = 'name' | 'looking-up' | 'review' | 'failed' | 'manual';
 interface AiIngredientLookupProps {
   unitSystem: UnitSystem;
   vendors: Vendor[];
+  /** Seeds the name field (e.g. a Test Kitchen NOT-IN-PANTRY chip). */
+  initialName?: string;
   onCancel: () => void;
-  onSaved: () => void;
+  /** Receives the created doc's id + saved name so a caller can rematch
+   * to it (Test Kitchen add-to-pantry). Optional so existing callers that
+   * ignore it stay source-compatible. */
+  onSaved: (created?: { id: string; name: string }) => void;
 }
 
-export const AiIngredientLookup: React.FC<AiIngredientLookupProps> = ({ unitSystem, vendors, onCancel, onSaved }) => {
+export const AiIngredientLookup: React.FC<AiIngredientLookupProps> = ({ unitSystem, vendors, initialName, onCancel, onSaved }) => {
   const restaurantId = useRestaurantId();
   const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
   const [stage, setStage] = useState<Stage>('name');
-  const [name, setName] = useState('');
+  const [name, setName] = useState(initialName ?? '');
   const [error, setError] = useState<string | null>(null);
   const [reviewForm, setReviewFormRaw] = useState<FormState | null>(null);
   const [costEdited, setCostEdited] = useState(false);
@@ -136,8 +141,9 @@ export const AiIngredientLookup: React.FC<AiIngredientLookupProps> = ({ unitSyst
     if (!reviewForm || saving) return;
     setSaving(true);
     try {
-      await addDoc(rCollection(restaurantId, 'ingredients'), toProposalDoc(reviewForm, costEdited));
-      onSaved();
+      const payload = toProposalDoc(reviewForm, costEdited);
+      const ref = await addDoc(rCollection(restaurantId, 'ingredients'), payload);
+      onSaved({ id: ref.id, name: payload.name });
     } finally {
       setSaving(false);
     }
@@ -147,8 +153,9 @@ export const AiIngredientLookup: React.FC<AiIngredientLookupProps> = ({ unitSyst
     if (saving) return;
     setSaving(true);
     try {
-      await addDoc(rCollection(restaurantId, 'ingredients'), toDoc(manualForm));
-      onSaved();
+      const payload = toDoc(manualForm);
+      const ref = await addDoc(rCollection(restaurantId, 'ingredients'), payload);
+      onSaved({ id: ref.id, name: payload.name });
     } finally {
       setSaving(false);
     }
