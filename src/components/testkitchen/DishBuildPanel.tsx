@@ -120,6 +120,23 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
     });
   };
 
+  const updateLine = (index: number, patch: Partial<DishDraftLine>) => {
+    setDraft(prev => (prev ? { ...prev, lines: prev.lines.map((l, i) => (i === index ? { ...l, ...patch } : l)) } : prev));
+  };
+
+  /** A line needs chef attention when its unit isn't valid for the matched
+   * ingredient's measure type (the silent-substitution case Item 1 kills),
+   * when it carries no quantity, or when its ingredient has vanished from
+   * the pantry mid-session (no measure type to validate against — so it
+   * can only be discarded, never silently handed off through resolveUnit's
+   * 'each' fallback). A kept, flagged line blocks hand-off. */
+  const lineNeedsAttention = (line: DishDraftLine): boolean => {
+    const ing = ingredients.find(i => i.id === line.ingredientId);
+    if (!ing) return true;
+    const valid = displayUnitsFor(ing.measureType, unitSystem) as string[];
+    return !valid.includes(line.unit) || !(line.qty > 0);
+  };
+
   const handleExtract = async () => {
     setExtracting(true);
     setExtractError(null);
@@ -147,6 +164,10 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
 
   const canHandOff = !!draft && !!draft.dishName.trim() && !!draft.batchYield && draft.portions != null;
 
+  // Any kept line still carrying an invalid/missing unit or quantity blocks
+  // hand-off until the chef resolves or discards it (Item 1).
+  const hasUnresolvedLines = !!draft && draft.lines.some((l, i) => keptLines.has(i) && lineNeedsAttention(l));
+
   /** Resolves an AI-returned display unit against what's actually valid
    * for a measure type, falling back to the system default when it
    * doesn't match — same defensive pattern Recipes.tsx's acceptSuggestion
@@ -157,7 +178,7 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
   };
 
   const handleSendToRecipeBuilder = async () => {
-    if (!draft || !draft.batchYield || draft.portions == null || !draft.dishName.trim()) return;
+    if (!draft || !draft.batchYield || draft.portions == null || !draft.dishName.trim() || hasUnresolvedLines) return;
     setHandingOff(true);
     setHandOffError(null);
     try {
@@ -248,13 +269,56 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
               <p className="text-xs text-slate italic">No ingredients added yet.</p>
             ) : (
               <div className="space-y-[3px]">
-                {draft.lines.map((line, i) => (
-                  <label key={i} className="flex items-center gap-[8px] text-xs text-navy cursor-pointer">
-                    <input type="checkbox" checked={keptLines.has(i)} onChange={() => toggleLine(i)} className="accent-teal" />
-                    <span className="flex-1">{line.name}</span>
-                    <span className="text-slate shrink-0">{line.qty} {line.unit}</span>
-                  </label>
-                ))}
+                {draft.lines.map((line, i) => {
+                  const ing = ingredients.find(x => x.id === line.ingredientId);
+                  const kept = keptLines.has(i);
+                  const flagged = kept && lineNeedsAttention(line);
+                  const validUnits = ing ? displayUnitsFor(ing.measureType, unitSystem) : [];
+                  return (
+                    <div
+                      key={i}
+                      className={flagged ? 'rounded-[8px] border border-saffron bg-saffron-soft px-[8px] py-[5px]' : ''}
+                    >
+                      <label className="flex items-center gap-[8px] text-xs text-navy cursor-pointer">
+                        <input type="checkbox" checked={kept} onChange={() => toggleLine(i)} className="accent-teal" />
+                        <span className="flex-1">{line.name}</span>
+                        {flagged && ing ? (
+                          <span className="flex items-center gap-[5px] shrink-0">
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={line.qty > 0 ? line.qty : ''}
+                              onChange={e => { const n = parseFloat(e.target.value); updateLine(i, { qty: isFinite(n) ? n : 0 }); }}
+                              placeholder="qty"
+                              className="w-[52px] bg-surface border border-line rounded-[5px] px-[5px] py-[2px] text-xs text-navy font-mono text-right"
+                            />
+                            <select
+                              value={validUnits.includes(line.unit as DisplayUnit) ? line.unit : ''}
+                              onChange={e => updateLine(i, { unit: e.target.value })}
+                              className="bg-surface border border-line rounded-[5px] px-[5px] py-[2px] text-xs text-navy"
+                            >
+                              <option value="" disabled>unit</option>
+                              {validUnits.map(u => <option key={u} value={u}>{u}</option>)}
+                            </select>
+                          </span>
+                        ) : (
+                          <span className="text-slate shrink-0 font-mono">{line.qty} {line.unit}</span>
+                        )}
+                      </label>
+                      {flagged && (
+                        <p className="flex items-start gap-[5px] mt-[3px] text-[10px] text-saffron-text leading-snug">
+                          <AlertCircle className="w-3 h-3 shrink-0 mt-[1px]" />
+                          {!ing
+                            ? 'No longer in the pantry — discard this line.'
+                            : line.unit.trim()
+                              ? `"${line.unit}" isn't a valid ${ing.measureType} unit for ${ing.name} — set a quantity and unit.`
+                              : `Set a quantity and unit for ${ing.name}.`}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -291,7 +355,7 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
 
           <button
             onClick={handleSendToRecipeBuilder}
-            disabled={!canHandOff || handingOff}
+            disabled={!canHandOff || handingOff || hasUnresolvedLines}
             className="w-full px-[13px] py-[8px] rounded-[8px] bg-navy text-cream text-[10px] font-bold uppercase tracking-wider disabled:opacity-40 hover:opacity-90 transition-opacity duration-[144ms]"
           >
             {handingOff ? 'Sending…' : 'Send to Recipe Builder'}
