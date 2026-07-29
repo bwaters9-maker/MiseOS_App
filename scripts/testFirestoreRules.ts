@@ -48,6 +48,7 @@ async function main() {
     await setDoc(doc(db, 'restaurants/restaurant-b/recipes/r2'), { name: 'B Recipe' });
     await setDoc(doc(db, 'recipes/legacy1'), { name: 'Legacy Recipe' });
     await setDoc(doc(db, 'users/uid-a'), { restaurantId: 'restaurant-a', role: 'chef' });
+    await setDoc(doc(db, 'aiUsage/uid-a_2026-07-29'), { uid: 'uid-a', date: '2026-07-29', count: 5 });
   });
 
   const chefA = testEnv.authenticatedContext('uid-a', { restaurantId: 'restaurant-a' });
@@ -141,6 +142,18 @@ async function main() {
     await assertFails(
       setDoc(doc(anon.firestore(), 'restaurants/restaurant-a/plateDesigns/p3'), { name: 'x' })
     );
+  });
+
+  await check('aiUsage: client cannot read its own usage counter', async () => {
+    await assertFails(getDoc(doc(chefA.firestore(), 'aiUsage/uid-a_2026-07-29')));
+  });
+
+  await check('aiUsage: client cannot write a usage counter', async () => {
+    await assertFails(setDoc(doc(chefA.firestore(), 'aiUsage/uid-a_2026-07-29'), { count: 0 }));
+  });
+
+  await check('aiUsage: unauthenticated cannot read a usage counter', async () => {
+    await assertFails(getDoc(doc(anon.firestore(), 'aiUsage/uid-a_2026-07-29')));
   });
 
   await testEnv.cleanup();

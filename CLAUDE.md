@@ -155,6 +155,7 @@ The Recipe Builder sub-tab also carries a "View Menu" button (`onViewMenu` prop)
 | `recipe_categories` | `useRecipeCategories`, `Settings.tsx`, `Recipes.tsx` — seeded with Sides/Sauces/Salads/Soups/Proteins/Desserts if empty |
 | `recipe_collections` | `useRecipeCollections`, `RecipeCollections.tsx`, `Menu.tsx` — seasonal menu-recipe groupings; at most one doc has `active: true` (activation is a batch write flipping every doc); not seeded |
 | `event_types` | `useEventTypes`, `Settings.tsx`, `EventCalendar` — seeded with Wedding/Private Dining/Buyout/Bridal Shower/Corporate/Celebration of Life/Special Event if empty |
+| `aiUsage` | Server-only. Per-uid, per-UTC-day `/api/ai` request counter at `aiUsage/{uid}_{YYYY-MM-DD}`, written by the deployed Cloud Function (`functions/src/index.ts`) via the Admin SDK — never read or written by any client (`firestore.rules` denies all client access). Not surfaced in `useKitchenState` or any view. See the AI feature section |
 
 ## Canonical types (`src/types.ts`)
 
@@ -333,7 +334,9 @@ Every verified request logs `{ event: 'ai_proxy_request', uid, timestamp }` (Clo
 
 Client side: every `/api/ai` caller attaches the token via `getAiAuthHeader()` (`src/lib/ai.ts`) — `callAi()` (the shared helper most callers use) includes it automatically; the few raw-`fetch` callers that need `tools` or multi-turn `messages` (Ingredient Advisor, TestKitchenHub's trend-verify pass and Sous chat) import `getAiAuthHeader()` directly. Any future AI feature must go through one of these, not a new raw `fetch('/api/ai')` with hand-rolled headers.
 
-`TestKitchenHub.tsx` posts `{ system, messages, max_tokens }`; the proxy relays Anthropic's JSON response back verbatim, including its `{ error: { message } }` shape on failure. Model is `claude-sonnet-4-6`, default max 1024 tokens. Neither runtime has Firestore access by design (a dumb proxy) — regional context (below) is composed client-side into `system` before the request goes out, not injected server-side.
+`TestKitchenHub.tsx` posts `{ system, messages, max_tokens }`; the proxy relays Anthropic's JSON response back verbatim, including its `{ error: { message } }` shape on failure. Model is `claude-sonnet-4-6`, default max 1024 tokens. The proxy is otherwise a dumb relay — regional context (below) is composed client-side into `system` before the request goes out, not injected server-side.
+
+**One deliberate Firestore exception to the "dumb proxy" rule** (the per-uid daily quota, see AI request limits below): the deployed Cloud Function writes a single per-uid, per-UTC-day counter at `aiUsage/{uid}_{YYYY-MM-DD}` to enforce the daily cap. That is the proxy's *only* Firestore access, and it lives in the caller (`functions/src/index.ts`), never in the shared handler (`aiProxyHandler.ts`), which still imports no `firebase-admin` at all — the handler takes an injected `recordDailyUsage` callback, the same "caller supplies the capability" pattern as `verifyIdToken`. `server.ts` (local dev, no credentials) omits the callback, so local dev runs quota-free. The Express route (`server.ts`) therefore has no Firestore access; only the Cloud Function does.
 
 The proxy accepts an optional `tools` array, whitelisted to exactly Anthropic's server-side web-search tool (`{ type: 'web_search_20250305', name: 'web_search' }`) — any other tool request is rejected with a 400. Used only by the Ingredient Advisor. Web search bills per-search on top of tokens.
 

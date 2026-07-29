@@ -15,8 +15,20 @@
  * live "The default Firebase app does not exist" failure. Each caller
  * instead passes its own already-correctly-initialized verifyIdToken
  * function.
+ *
+ * Same pattern for the per-uid daily quota: the handler never touches
+ * Firestore directly. The caller that has Firestore access (the
+ * deployed Cloud Function) injects an optional `recordDailyUsage`
+ * callback that atomically increments the day's counter and returns
+ * the new count. server.ts (local dev) omits it, so local dev runs
+ * quota-free.
  */
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
+
+// Per-uid requests allowed per UTC day. Enforced only when a caller
+// supplies a recordDailyUsage counter (the deployed function does;
+// local dev does not).
+const DAILY_AI_LIMIT = 200;
 
 export interface AiProxyRequest {
   authHeader: string | undefined;
@@ -36,7 +48,8 @@ export interface AiProxyResult {
 export async function handleAiProxyRequest(
   req: AiProxyRequest,
   apiKey: string | undefined,
-  verifyIdToken: (idToken: string) => Promise<{ uid: string }>
+  verifyIdToken: (idToken: string) => Promise<{ uid: string }>,
+  recordDailyUsage?: (uid: string, dateKey: string) => Promise<number>
 ): Promise<AiProxyResult> {
   const { authHeader, body } = req;
 
@@ -93,6 +106,25 @@ export async function handleAiProxyRequest(
       return { status: 400, body: { error: { message: 'Only the web_search tool may be requested through this proxy.' } } };
     }
     allowedTools = tools;
+  }
+
+  // Per-uid daily quota. Fail-open by design: the per-request caps
+  // above already bound every call, so if the counter is unavailable
+  // (local dev has no credentials, or a Firestore hiccup in prod) we
+  // log and let the request through rather than take AI features down.
+  // Runs after the 400 validations so a malformed request never burns
+  // quota, and before the Anthropic forward so an over-limit request
+  // costs nothing.
+  if (recordDailyUsage) {
+    const dateKey = new Date().toISOString().slice(0, 10); // UTC day bucket
+    try {
+      const count = await recordDailyUsage(uid, dateKey);
+      if (count > DAILY_AI_LIMIT) {
+        return { status: 429, body: { error: { message: 'Daily AI limit reached — try again tomorrow.' } } };
+      }
+    } catch (err) {
+      console.warn('ai_proxy daily quota counter unavailable, allowing request:', err instanceof Error ? err.message : err);
+    }
   }
 
   try {

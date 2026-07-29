@@ -125,6 +125,19 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ===============================================================
+    // Per-uid daily AI request counters (aiUsage/{uid}_{YYYY-MM-DD}).
+    // Written ONLY by the /api/ai proxy via the Admin SDK, which
+    // bypasses these rules entirely — that is the proxy's sole
+    // Firestore touch (see CLAUDE.md's AI feature section). No client
+    // ever reads or writes here; this explicit deny documents that
+    // intent (the default-deny below would cover it regardless).
+    // ===============================================================
+
+    match /aiUsage/{id} {
+      allow read, write: if false;
+    }
+
     // Default deny for anything not explicitly matched above — this
     // now also covers the old flat top-level collection paths, which
     // no longer exist (migrated and deleted 2026-07-18).
