@@ -221,6 +221,14 @@ export default function TestKitchenHub({ unitSystem, onOpenRecipe }: TestKitchen
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
     setUserInput('');
+    // Cap the transcript sent per turn to the last 30 messages — the
+    // display above keeps the full history, only the request payload is
+    // trimmed. Anthropic requires the first message to be a user turn,
+    // so start the window at its first user message (a raw 30-slice of a
+    // long alternating transcript can begin on an assistant reply).
+    const windowed = updatedMessages.slice(-30);
+    const firstUserIdx = windowed.findIndex(msg => msg.role === 'user');
+    const requestMessages = firstUserIdx > 0 ? windowed.slice(firstUserIdx) : windowed;
     try {
       const response = await fetch('/api/ai', {
         method: 'POST',
@@ -231,7 +239,7 @@ export default function TestKitchenHub({ unitSystem, onOpenRecipe }: TestKitchen
         body: JSON.stringify({
           max_tokens: 2048,
           system: withRegionContext(`${SOUS_SYSTEM_PROMPT}\n\n${APP_KNOWLEDGE_CONTEXT}`, restaurantProfile),
-          messages: updatedMessages.map(msg => ({
+          messages: requestMessages.map(msg => ({
             role: msg.role === 'model' ? 'assistant' : 'user',
             content: msg.content,
           })),
