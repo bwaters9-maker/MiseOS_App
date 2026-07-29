@@ -69,6 +69,12 @@ export async function handleAiProxyRequest(
     return { status: 400, body: { error: { message: 'Request body must include a "messages" array.' } } };
   }
 
+  // Cap max_tokens so a single request can't run up an unbounded bill.
+  // Default stays 1024 when unset (applied at forward time below).
+  if (typeof max_tokens === 'number' && max_tokens > 2048) {
+    return { status: 400, body: { error: { message: 'max_tokens must not exceed 2048.' } } };
+  }
+
   let allowedTools: unknown[] | undefined;
   if (tools !== undefined) {
     if (
