@@ -204,6 +204,11 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
         portions: draft.portions,
         lines,
         methodSteps: draft.methodSteps,
+        // A freshly extracted dish is not on the menu until the chef puts it
+        // there deliberately from the Recipes library. Explicit false rather
+        // than relying on isRecipeOnMenu's `?? true` legacy default, which
+        // stays untouched so existing recipes keep their current behavior.
+        onMenu: false,
         updatedAt: new Date().toISOString(),
       };
       const ref = await addDoc(rCollection(restaurantId, 'recipes'), newRecipe);
