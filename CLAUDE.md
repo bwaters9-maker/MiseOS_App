@@ -340,6 +340,12 @@ Client side: every `/api/ai` caller attaches the token via `getAiAuthHeader()` (
 
 The proxy accepts an optional `tools` array, whitelisted to exactly Anthropic's server-side web-search tool (`{ type: 'web_search_20250305', name: 'web_search' }`) — any other tool request is rejected with a 400. Used only by the Ingredient Advisor. Web search bills per-search on top of tokens.
 
+**AI request limits** (enforced in `functions/src/aiProxyHandler.ts`, so both `server.ts` and the deployed function apply them identically — abuse/cost guardrails, P-016):
+- **`max_tokens` ≤ 2048** — a request over the cap is rejected with a 400; unset still defaults to 1024. (Sous chat sends 2048, exactly at the cap.)
+- **`messages` ≤ 40 entries** and the **serialized `messages` payload ≤ 100KB** — over either is a 400. Enforced only after `messages` is confirmed to be an array.
+- **Per-uid daily quota: 200 requests/UTC-day** — the 201st verified request in a day is rejected with a 429 (`"Daily AI limit reached — try again tomorrow."`). Counted via the injected `recordDailyUsage` callback (the `aiUsage/{uid}_{YYYY-MM-DD}` counter, above). The quota is checked *after* the 400 validations (a malformed request never burns quota) and *before* the Anthropic forward (an over-limit request costs nothing). **Fail-open**: if the counter read/write throws (local dev has no credentials; a Firestore hiccup in prod), the handler logs a warning and lets the request through — the per-request caps still bound every call, so AI features never go down because the meter is broken. Local dev, which supplies no counter, is therefore effectively quota-free. The message says "try again tomorrow" rather than "resets at midnight" because the bucket is UTC — reset is UTC midnight, not the chef's local midnight.
+- **Client-side companion cap**: `TestKitchenHub.tsx` sends only the last 30 Sous messages per turn (display keeps the full history), starting the window at its first user turn so the payload never begins on an assistant message. Keeps a long chat under the 40-message server cap.
+
 ## Ingredient Advisor (components/ingredients/IngredientAdvisor.tsx)
 
 Build order item 13. A read-only, web-search-grounded advisory modal on the Master Pantry view — opened from an "Advisor" header button (blank query) or a per-row compass icon (pre-filled with that ingredient's name).
