@@ -64,18 +64,25 @@ Rules:
 /** Defensive normalization, same posture as normalizeTrendResponse and
  * Recipes.tsx's handleBuildFromPantry — never trusts the model's
  * ingredientId blindly, always re-checks it against the live pantry. */
-const normalizeDishDraft = (parsed: any, ingredients: Ingredient[]): DishDraft => {
+const normalizeDishDraft = (parsed: any, ingredients: Ingredient[], unitSystem: UnitSystem): DishDraft => {
   const validIds = new Set(ingredients.map(i => i.id));
   const byId = new Map(ingredients.map(i => [i.id, i.name]));
 
   const dishName = typeof parsed?.dishName === 'string' ? parsed.dishName.trim() : '';
 
   const rawYield = parsed?.batchYield;
-  const batchYield =
-    rawYield && typeof rawYield.qty === 'number' && rawYield.qty > 0
-      && MEASURE_TYPES.includes(rawYield.measureType) && typeof rawYield.unit === 'string' && rawYield.unit.trim()
-      ? { qty: rawYield.qty, measureType: rawYield.measureType as MeasureType, unit: rawYield.unit.trim() }
-      : null;
+  let batchYield: DishDraft['batchYield'] = null;
+  if (rawYield && typeof rawYield.qty === 'number' && rawYield.qty > 0 && MEASURE_TYPES.includes(rawYield.measureType)) {
+    const measureType = rawYield.measureType as MeasureType;
+    const rawUnit = typeof rawYield.unit === 'string' ? rawYield.unit.trim() : '';
+    // Keep the qty + measureType extraction got right, but never trust the
+    // unit blindly: if it doesn't fit the measure type, blank it so the
+    // panel's unit select shows empty and the chef must pick — same posture
+    // as the line unit flag, so resolveUnit's fallback never fires for an
+    // untouched AI yield unit either.
+    const unit = (displayUnitsFor(measureType, unitSystem) as string[]).includes(rawUnit) ? rawUnit : '';
+    batchYield = { qty: rawYield.qty, measureType, unit };
+  }
 
   const portions = typeof parsed?.portions === 'number' && parsed.portions > 0 ? Math.round(parsed.portions) : null;
 
@@ -137,6 +144,51 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
     return !valid.includes(line.unit) || !(line.qty > 0);
   };
 
+  const setDishName = (name: string) => setDraft(prev => (prev ? { ...prev, dishName: name } : prev));
+
+  const setPortions = (raw: string) => {
+    const n = parseInt(raw, 10);
+    setDraft(prev => (prev ? { ...prev, portions: isFinite(n) && n > 0 ? n : null } : prev));
+  };
+
+  // batchYield stays the single source of truth (no parallel local state).
+  // A qty <= 0 clears it back to null so canHandOff — unchanged — reads
+  // "no yield" exactly as extraction's own null does; the measure-type and
+  // unit selects only apply once a qty exists, and default to a plated
+  // dish's each/each.
+  const setYieldQty = (raw: string) => {
+    const n = parseFloat(raw);
+    setDraft(prev => {
+      if (!prev) return prev;
+      if (!(n > 0)) return { ...prev, batchYield: null };
+      return {
+        ...prev,
+        batchYield: prev.batchYield ? { ...prev.batchYield, qty: n } : { qty: n, measureType: 'each', unit: 'each' },
+      };
+    });
+  };
+
+  const setYieldMeasureType = (measureType: MeasureType) => {
+    setDraft(prev =>
+      prev && prev.batchYield
+        ? { ...prev, batchYield: { ...prev.batchYield, measureType, unit: defaultDisplayUnit(measureType, unitSystem) } }
+        : prev,
+    );
+  };
+
+  const setYieldUnit = (unit: string) => {
+    setDraft(prev => (prev && prev.batchYield ? { ...prev, batchYield: { ...prev.batchYield, unit } } : prev));
+  };
+
+  // Plated-dish shortcut where yield-vs-portions is redundant.
+  const yieldSameAsPortions = () => {
+    setDraft(prev =>
+      prev && prev.portions != null && prev.portions > 0
+        ? { ...prev, batchYield: { qty: prev.portions, measureType: 'each', unit: 'each' } }
+        : prev,
+    );
+  };
+
   const handleExtract = async () => {
     setExtracting(true);
     setExtractError(null);
@@ -152,7 +204,7 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
       } catch {
         throw new Error('The AI response could not be read. Try again.');
       }
-      const normalized = normalizeDishDraft(parsed, ingredients);
+      const normalized = normalizeDishDraft(parsed, ingredients, unitSystem);
       setDraft(normalized);
       setKeptLines(new Set(normalized.lines.map((_, i) => i)));
     } catch (e: any) {
@@ -168,6 +220,14 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
   // hand-off until the chef resolves or discards it (Item 1).
   const hasUnresolvedLines = !!draft && draft.lines.some((l, i) => keptLines.has(i) && lineNeedsAttention(l));
 
+  // A batch yield whose unit isn't valid for its measure type — the
+  // untouched extracted draft normalizeDishDraft blanked to '' being the
+  // common case — must be resolved before hand-off, or resolveUnit would
+  // silently substitute the default on the empty string. Blocks Send the
+  // same way an unresolved line does.
+  const yieldNeedsAttention = !!draft && !!draft.batchYield
+    && !(displayUnitsFor(draft.batchYield.measureType, unitSystem) as string[]).includes(draft.batchYield.unit);
+
   /** Resolves an AI-returned display unit against what's actually valid
    * for a measure type, falling back to the system default when it
    * doesn't match — same defensive pattern Recipes.tsx's acceptSuggestion
@@ -178,7 +238,7 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
   };
 
   const handleSendToRecipeBuilder = async () => {
-    if (!draft || !draft.batchYield || draft.portions == null || !draft.dishName.trim() || hasUnresolvedLines) return;
+    if (!draft || !draft.batchYield || draft.portions == null || !draft.dishName.trim() || hasUnresolvedLines || yieldNeedsAttention) return;
     setHandingOff(true);
     setHandOffError(null);
     try {
@@ -254,17 +314,74 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
         <div className="mt-[13px] space-y-[13px]">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[3px]">Dish</p>
-            <p className="text-sm font-display font-bold text-navy">{draft.dishName || 'Untitled'}</p>
+            <input
+              type="text"
+              value={draft.dishName}
+              onChange={e => setDishName(e.target.value)}
+              placeholder="Name this dish"
+              className="w-full bg-surface border border-line rounded-[5px] px-[8px] py-[5px] text-sm font-display font-bold text-navy placeholder:font-body placeholder:font-normal placeholder:text-slate/60"
+            />
           </div>
 
           <div className="flex gap-[21px]">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[3px]">Yield</p>
-              <p className="text-xs text-navy">{draft.batchYield ? `${draft.batchYield.qty} ${draft.batchYield.unit}` : 'Not specified'}</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[3px]">Batch Yield</p>
+              <div className="flex items-center gap-[5px]">
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={draft.batchYield ? draft.batchYield.qty : ''}
+                  onChange={e => setYieldQty(e.target.value)}
+                  placeholder="qty"
+                  className="w-[56px] bg-surface border border-line rounded-[5px] px-[5px] py-[3px] text-xs text-navy font-mono text-right"
+                />
+                <select
+                  value={draft.batchYield?.measureType ?? 'each'}
+                  disabled={!draft.batchYield}
+                  onChange={e => setYieldMeasureType(e.target.value as MeasureType)}
+                  className="bg-surface border border-line rounded-[5px] px-[5px] py-[3px] text-xs text-navy disabled:opacity-40"
+                >
+                  {MEASURE_TYPES.map(mt => <option key={mt} value={mt}>{mt}</option>)}
+                </select>
+                <select
+                  value={draft.batchYield?.unit ?? ''}
+                  disabled={!draft.batchYield}
+                  onChange={e => setYieldUnit(e.target.value)}
+                  className="bg-surface border border-line rounded-[5px] px-[5px] py-[3px] text-xs text-navy disabled:opacity-40"
+                >
+                  <option value="" disabled>unit</option>
+                  {(draft.batchYield ? displayUnitsFor(draft.batchYield.measureType, unitSystem) : []).map(u => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={yieldSameAsPortions}
+                disabled={draft.portions == null || draft.portions <= 0}
+                className="mt-[3px] text-[10px] font-bold uppercase tracking-wider text-teal disabled:text-slate/40 disabled:cursor-not-allowed hover:opacity-80 transition-opacity duration-[144ms]"
+              >
+                Same as portions
+              </button>
+              {yieldNeedsAttention && (
+                <p className="flex items-start gap-[5px] mt-[3px] text-[10px] text-saffron-text leading-snug">
+                  <AlertCircle className="w-3 h-3 shrink-0 mt-[1px]" />
+                  Set a batch-yield unit.
+                </p>
+              )}
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[3px]">Portions</p>
-              <p className="text-xs text-navy">{draft.portions ?? 'Not specified'}</p>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={draft.portions ?? ''}
+                onChange={e => setPortions(e.target.value)}
+                placeholder="servings"
+                className="w-[64px] bg-surface border border-line rounded-[5px] px-[5px] py-[3px] text-xs text-navy font-mono text-right"
+              />
             </div>
           </div>
 
@@ -360,7 +477,7 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
 
           <button
             onClick={handleSendToRecipeBuilder}
-            disabled={!canHandOff || handingOff || hasUnresolvedLines}
+            disabled={!canHandOff || handingOff || hasUnresolvedLines || yieldNeedsAttention}
             className="w-full px-[13px] py-[8px] rounded-[8px] bg-navy text-cream text-[10px] font-bold uppercase tracking-wider disabled:opacity-40 hover:opacity-90 transition-opacity duration-[144ms]"
           >
             {handingOff ? 'Sending…' : 'Send to Recipe Builder'}
