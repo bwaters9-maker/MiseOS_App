@@ -75,6 +75,15 @@ export async function handleAiProxyRequest(
     return { status: 400, body: { error: { message: 'max_tokens must not exceed 2048.' } } };
   }
 
+  // Bound the conversation payload — a runaway or abusive transcript
+  // can't be forwarded no matter how it was assembled client-side.
+  if (messages.length > 40) {
+    return { status: 400, body: { error: { message: 'messages must not exceed 40 entries.' } } };
+  }
+  if (Buffer.byteLength(JSON.stringify(messages), 'utf8') > 100 * 1024) {
+    return { status: 400, body: { error: { message: 'messages payload must not exceed 100KB.' } } };
+  }
+
   let allowedTools: unknown[] | undefined;
   if (tools !== undefined) {
     if (
