@@ -7,7 +7,8 @@
     "dev": "node -e \"require('fs').rmSync('node_modules/.vite', { recursive: true, force: true })\" && cross-env NODE_ENV=development tsx server.ts",
     "build": "vite build",
     "start": "node -e \"try { require('fs').rmSync('dist', { recursive: true, force: true }); require('fs').rmSync('.vite', { recursive: true, force: true }); } catch(e) {}\" && npm run build && cross-env NODE_ENV=production tsx server.ts",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "dotenv": "^17.2.3",
@@ -36,6 +37,7 @@
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.3",
+    "vitest": "^4.1.10",
     "xlsx": "^0.18.5"
   }
 }
