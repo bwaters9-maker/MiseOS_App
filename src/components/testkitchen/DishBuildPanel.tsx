@@ -219,8 +219,14 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
     setExtracting(true);
     setExtractError(null);
     try {
+      // Cap the transcript to the same last-30, user-turn-anchored window the
+      // Sous chat sends per turn (TestKitchenHub.handleSubmit) — start at the
+      // first chef turn so a long window never opens on a sous reply.
+      const windowed = messages.slice(-30);
+      const firstUserIdx = windowed.findIndex(m => m.role === 'user');
+      const recentMessages = firstUserIdx > 0 ? windowed.slice(firstUserIdx) : windowed;
       const userContent = JSON.stringify({
-        transcript: messages.map(m => ({ role: m.role === 'model' ? 'sous' : 'chef', content: m.content })),
+        transcript: recentMessages.map(m => ({ role: m.role === 'model' ? 'sous' : 'chef', content: m.content })),
         pantry: ingredients.map(i => ({ id: i.id, name: i.name })),
       });
       const raw = await callAi(withRegionContext(DISH_DRAFT_SYSTEM_PROMPT(unitSystem), restaurantProfile), userContent, 2048);
