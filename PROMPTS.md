@@ -84,10 +84,11 @@ do.
 
 ## P-023 — NODE_ENV / Vite build mode fix
 
-**Status:** PARTIALLY EXECUTED (2026-08-21). Item 1's code half, item 3,
-and item 4 are done. Item 2 does not yet pass: the `NODE_ENV` line is
-still in `.env`, which is gitignored and machine-local. Remove that line
-and re-run item 2 to close this out.
+**Status:** DONE (2026-08-21). All four items complete. `npm run build`
+against the real `.env` now emits a true production bundle: `jsxDEV` and
+`C:/dev/miseos` occurrences are both 0, `PROD` is `true`, and
+`VITE_USER_NODE_ENV` is gone. Entry bundle 1,211,797 -> 1,005,321 bytes
+(-201.6 KB, -17.0%) measured on the post-P-018-merge tree.
 
 **Background:** `.env` carries `NODE_ENV=development` because `server.ts`
 throws on startup when it is unset. Vite loads that file into
