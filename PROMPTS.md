@@ -1,9 +1,31 @@
 # PROMPTS.md
 
-Decision log for changes to AI system prompts in this codebase. Each entry
-records what changed, why, and what it replaced — so a future edit to a
-persona or prompt has the reasoning behind the current version, not just
-the text itself.
+The Claude Code prompt queue and decision log for this codebase. Work is
+queued here as a numbered prompt before it is executed, and the reasoning
+behind what shipped is logged here afterward — so a future change has the
+thinking behind the current version, not just the result.
+
+**P-IDs are permanent.** A prompt keeps its number for the life of the
+repo. Nothing is ever renumbered, reused, or reordered to close a gap:
+CLAUDE.md, commit messages, and code comments all cite these IDs, and a
+renumber would silently repoint every one of those references. A new
+prompt takes the next number above the highest ID that has ever existed —
+including abandoned and superseded ones. Gaps in the sequence are normal
+and are left alone.
+
+**Decisions are logged under the ID that spawned them.** When executing a
+prompt forces a real judgment call — a constraint discovered mid-build, an
+approach rejected, an instruction that turned out to rest on a false
+premise — that reasoning belongs in this file under that prompt's ID, not
+scattered across commit messages. An entry may therefore grow after the
+work lands.
+
+**AI system-prompt changes are logged here too, but this file is not
+limited to them.** Persona and prompt rewrites (`sousPersona.ts`,
+`advisorPersona.ts`, the trends and extraction prompts) get the same
+treatment as any other work — what changed, why, and what it replaced.
+Entries predating this convention are dated rather than numbered and are
+left as written.
 
 ---
 
