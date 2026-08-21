@@ -647,9 +647,18 @@ Brian does the console legwork: create the Sentry project, paste the DSN into .e
 
 ---
 
-## P-019 — Recipe Build panel review pass: unit-swap flag, off-menu default, inline yield, add-to-pantry — ISSUED 2026-07-29 · CODE-COMPLETE, gated on live test
+## P-019 — Recipe Build panel review pass: unit-swap flag, off-menu default, inline yield, add-to-pantry — DONE 2026-08-21
 
-**Status:** All 5 items (4 planned + transcript-cap ride-along) built, diff-reviewed by Claude.ai per item, merged to main (fast-forward, branch deleted), pushed to origin — 0aea2ed / 9e2ec2b / 5ab7206 / 6abcf54 / 9febc70. NOT deployed. Flips to DONE after: credits topped up → chef test script below passes → `npm run build` + `firebase deploy --only hosting` (client-only change; no functions/rules deploy).
+**Status:** DONE 2026-08-21. All 5 items (4 planned + transcript-cap ride-along) built, diff-reviewed by Claude.ai per item, merged to main (fast-forward, branch deleted), pushed to origin — 0aea2ed / 9e2ec2b / 5ab7206 / 6abcf54 / 9febc70. The separate deploy this entry was waiting on never needed to happen: the code had already been live since P-022's hosting deploy, so the remaining gate was the chef script alone.
+
+**Live chef script — passed end to end on production (2026-08-21):**
+
+- **Corn** flagged each-unit and **shallots** flagged weight-unit. The script expected otherwise; the script's assumption was wrong and the app was right. Recorded as-is rather than adjusting the app to match the script.
+- **Butter** clean — no flag, correctly.
+- **Send gated** until every flagged line was resolved.
+- **"Same as portions"** filled the yield.
+- **Yuzu kosho**: not-in-pantry chip → AI lookup → pantry save → the flagged line rematched against the new pantry entry.
+- **Hand-off landed in the Builder** with 4 lines exactly as reviewed, `status: development`, off-menu, cost **$7.51 batch / $1.88 per portion**.
 
 **Decisions log additions (2026-07-29, during build):**
 - Item 1 hardening (Claude.ai review): hasUnresolvedLines enforced in the write-path early-return guard, not just the button disable. Bonus fix: a kept line whose ingredientId is null/vanished now blocks hand-off (previously wrote a broken refId).
@@ -1005,6 +1014,10 @@ no.
    app — **excluded from the sweep**. It also will not appear in a fresh
    clone, so grep results differ by machine; do not treat its absence as
    a clean sweep or its presence as a missed one.
+   Also rename the Development view header: `TestKitchenHub.tsx` still
+   reads "Test Kitchen" with the sub "Develop new dishes with real-time
+   AI assistance" — a P-022 leftover. Make it "Development" with a
+   one-line sub.
 4. Extraction prompt: strip any persona framing; keep the structured-output
    contract exactly. **Report the diff of the prompt before committing.**
 5. Mark P-014 RETIRED in PROMPTS.md with reason "superseded by P-026 per
