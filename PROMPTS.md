@@ -27,6 +27,21 @@ treatment as any other work — what changed, why, and what it replaced.
 Entries predating this convention are dated rather than numbered and are
 left as written.
 
+**Where things live (decided 2026-08-21).** Two homes, one rule each:
+
+- **Repo** — `CLAUDE.md`, `PROMPTS.md`, `SOUS-EVAL.md`. Claude Code
+  executes against these. If a prompt requires reading or changing a file
+  to do the work, it belongs here.
+- **OneDrive `miseos` folder** — `ROADMAP.json`,
+  `incendiumphi-dashboard.html`, `PARKING-LOT.md`, `BRIAN-TODO.md`.
+  Brian's and Claude.ai's upkeep. **Cited from the repo, never copied
+  in** — a repo entry may point at one of these by name and date, but the
+  file itself stays out of version control.
+
+The consequence to keep in mind: a citation to an OneDrive-side file cannot be
+verified from a clone. State enough in the repo entry that it still makes
+sense to someone who only has the repo.
+
 Every Claude Code prompt gets a permanent ID (P-001, P-002…). IDs are never reused or renumbered — a retired prompt keeps its number forever. Refer to prompts by ID only, never "the next one" or "prompt 2."
 
 **Statuses:** QUEUED (ready to paste) · ISSUED (pasted into Claude Code, in flight) · DONE (verified & committed) · RETIRED (superseded — see note)
@@ -507,7 +522,7 @@ ruling; they are not discarded with this prompt.
 
 **Origin:** Brian asked how to improve the Sous AI without coding (2026-07-20). Answer: the chef's contribution is judgment, not code — captured in SOUS-EVAL.md (repo root). Loop: Brian uses Sous in real work and logs misses (asked / got / should-have-said); Claude.ai converts the log into system-prompt corrections and few-shot examples; Code applies them; Brian re-judges against the same questions.
 
-**Gating:** does not run until SOUS-EVAL.md has enough entries to work from (~10 "fix" verdicts). No speculative prompt rewrites before evidence exists.
+**Gating:** n/a — retired.
 
 **Decisions log:**
 - 2026-07-20: SOUS-EVAL.md created with entry template (E-001 numbering, fix/keep verdicts). Regional Intelligence enrichment and pantry data quality are parallel no-code levers Brian owns directly in Settings — not part of this prompt.
