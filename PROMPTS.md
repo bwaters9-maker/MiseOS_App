@@ -172,3 +172,77 @@ run by hand before each attempt.
    (predeploy is per-target, so hosting should not invoke it).
 
 **Constraint:** Do not fix anything else — report additional issues only.
+
+---
+
+## P-025 — reportError delivery guarantee + dev-only forced-error trigger
+
+**Status:** QUEUED — not yet executed.
+
+**Background:** P-018's `reportError` is fire-and-forget. The callback is
+typed synchronous (`(err, uid) => void`), so `aiProxyHandler.ts` calls it
+without awaiting and returns the 502 immediately. A Cloud Run instance can
+be frozen between the response being sent and the capture completing, so a
+report can be lost — and after P-018's dynamic-import change the reporter
+now also has an `await import('@sentry/node')` to clear first, which
+widens that window. Server-side reporting is currently configured but has
+never been observed working end-to-end: the DSN is correct and the
+function is deployed, but no real proxy failure has occurred, so no event
+has ever left the server.
+
+**Scope:**
+
+1. Make the `reportError` callback async: `(err, uid) => Promise<void>` in
+   `AiProxyRequest`'s handler signature (`functions/src/aiProxyHandler.ts`).
+2. `await` it in the handler's catch path **before** returning the 502, so
+   the response is not sent until the report is handed off. Keep it
+   non-fatal — a reporting failure must never change the status or body
+   the caller sees.
+3. In the Cloud Function's reporter (`functions/src/index.ts`), call
+   `Sentry.flush(2000)` after `captureException` so the event is actually
+   transmitted before the instance can be frozen. Keep the dynamic import
+   and the cached module promise from P-018.
+4. **Keep the payload uid-only.** The system prompt, the messages, and
+   every other part of the request body stay out of the report. This is
+   the hard rule from P-018 and nothing here relaxes it.
+5. Update the tests for the new signature.
+6. **Dev-only forced-error trigger**, so delivery can be proven without
+   waiting for a real outage: if the request body contains
+   `{"__forceError": true}` AND the caller's uid appears in
+   `ALLOWED_TEST_UIDS` (env var, comma-separated), throw before the
+   Anthropic call so the catch path runs for real. `ALLOWED_TEST_UIDS` is
+   unset in production until Brian sets it, and **must be a complete
+   no-op when unset** — an unset or empty value means no uid can trigger
+   it, and `__forceError` in the body is ignored entirely. Verify the
+   no-op case explicitly; it is the property that matters most here.
+7. Document in CLAUDE.md — the Error reporting section for the delivery
+   guarantee, and the AI feature section for the trigger and its env var.
+
+**Constraint:** Do not fix anything else — report additional issues only.
+
+**Open questions for whoever runs this — decide and log the answer here:**
+
+- **Where in the pipeline does the forced throw belong?** It must be after
+  auth (an unauthenticated caller must never reach it) and after the 400
+  validations. Whether it lands before or after the per-uid daily quota
+  is a real choice: before means test throws are free, after means the
+  test exercises the same ordering a real request does. P-016's existing
+  rule is that a malformed request never burns quota and an over-limit
+  request never costs an Anthropic call.
+- **How does `ALLOWED_TEST_UIDS` reach the deployed function?** It is not
+  a secret, so `defineSecret` is the wrong tool, but `defineString` writes
+  a `functions/.env.<project>` file — and CLAUDE.md currently records a
+  deliberate decision to keep a second `.env` out of this repo (which is
+  why the Sentry DSN rides Secret Manager). Resolve that tension
+  explicitly rather than by accident; whichever way it goes, update the
+  CLAUDE.md note that documents the current reasoning.
+- **Does `Sentry.flush(2000)` belong on a 2s timeout?** It bounds a 502
+  response by up to two extra seconds on the failure path. Confirm that
+  is acceptable, or pick a shorter bound.
+
+**Security note:** the trigger is a deliberate on-demand failure path in a
+deployed function. It is gated behind auth plus an explicit uid allowlist,
+and the worst a listed uid can do is force 502s against their own account,
+but it is still a backdoor by construction — keep `ALLOWED_TEST_UIDS`
+unset except during an actual test, and never widen it to a whole
+environment.
