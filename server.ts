@@ -12,6 +12,20 @@ import http from 'http';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { handleAiProxyRequest } from './functions/src/aiProxyHandler.ts';
+
+// NODE_ENV must no longer live in .env: Vite loads that file into
+// process.env.NODE_ENV and derives its build mode from it, so a
+// NODE_ENV=development line there made `vite build` emit a development
+// bundle (see P-023). This server is the only thing that needed the
+// value set, so it supplies its own default instead. Runs after
+// `dotenv/config` (import side effects execute before the module body),
+// so an explicitly provided value — from the shell, or from the
+// cross-env prefix in the dev/start scripts — always wins.
+//
+// Unset now means development. An explicit but invalid value is still
+// rejected by the startup validation in startServer().
+process.env.NODE_ENV ??= 'development';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
