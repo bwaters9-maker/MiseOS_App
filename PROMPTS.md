@@ -980,13 +980,21 @@ no.
 3. Remove the Sous persona system prompt, the Sous name/avatar, and any
    "ask Sous" copy across the app. **Grep for Sous/sous and report every
    hit before deleting.** The Ingredient Advisor and Trends are untouched.
+   `SOUS-PROMPT-CURRENT.md` is gitignored local scratch, not part of the
+   app — **excluded from the sweep**. It also will not appear in a fresh
+   clone, so grep results differ by machine; do not treat its absence as
+   a clean sweep or its presence as a missed one.
 4. Extraction prompt: strip any persona framing; keep the structured-output
    contract exactly. **Report the diff of the prompt before committing.**
 5. Mark P-014 RETIRED in PROMPTS.md with reason "superseded by P-026 per
    2026-08-21 ruling". Retire the Chef Matthew parking-lot entry the same
    way.
 6. Typecheck, build, 144 tests, and add one test: the extraction prompt
-   contains no persona text. Commit per step.
+   contains no persona text. Correct CLAUDE.md's hand-off gate, which
+   currently documents only `canHandOff` — the real gate is
+   `canHandOff && !hasUnresolvedLines && !yieldNeedsAttention`
+   (`DishBuildPanel.tsx`). The docs describe a weaker gate than the code
+   enforces. Commit per step.
 
 **Constraints:**
 
@@ -1017,13 +1025,28 @@ Note that the doc hits outnumber the code hits. `PROMPTS.md`'s dated
 written, so retiring the persona does not mean rewriting that entry.
 Decide explicitly what happens to it rather than deleting it in a sweep.
 
-**Open question for whoever runs this — decide and log the answer here:**
+**Ruling (Brian, 2026-08-21) — item 2, refinement contract. Decided, not
+open.**
 
-- **Does the refinement call re-extract or patch?** Item 2 says each
-  refinement "returns a revised draft." Sending the prior draft plus the
-  refinement instruction and taking a whole new draft back is simpler and
-  keeps one output contract, but it can silently churn lines the chef
-  already reviewed and kept. Patching only what the instruction names
-  preserves review state but needs a second contract. The `keptLines` /
-  `hasUnresolvedLines` review state in `DishBuildPanel.tsx` is what is at
-  risk either way — settle this before writing the call.
+**One output contract.** A refinement call returns a **full revised
+draft**, same shape as the initial extraction — no second patch contract.
+The client reconciles it against the draft on screen, merging **by
+normalized ingredient name**:
+
+- **Chef-resolved lines keep the chef's edits**, unless the refinement
+  instruction names that ingredient. A line the chef already fixed is not
+  silently overwritten by the model's version of it.
+- **New lines arrive flagged**, so anything the revision introduces lands
+  in the same needs-attention state a fresh extraction would.
+- **Lines absent from the revision are dropped.** Omission is treated as
+  deliberate removal, not as an incomplete response.
+
+This keeps the model's job identical on every call while protecting the
+`keptLines` / `hasUnresolvedLines` review state in `DishBuildPanel.tsx` —
+the thing that was actually at risk from re-extraction.
+
+Note for the implementer: "normalized ingredient name" should reuse the
+existing normalization convention rather than inventing a second one —
+`InvoicePriceUpdate.tsx` already normalizes by lowercasing, stripping
+punctuation, and collapsing whitespace for its pantry matching. Confirm
+that is the right shared rule before writing a new one.
