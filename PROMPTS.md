@@ -149,10 +149,6 @@ another reason.
     saving is nearly identical (-200.7 vs -201.6 KB); the percentage
     differs only because P-018 enlarged the denominator. Kept for the
     record, not for citation.
-- **Still open:** the `NODE_ENV=development` line in `.env` has not been
-  removed, so scope item 2 does not yet pass against a real build. `.env`
-  is gitignored and machine-local — that edit is the operator's, not a
-  repo change.
 
 ---
 
@@ -214,7 +210,12 @@ has ever left the server.
 4. **Keep the payload uid-only.** The system prompt, the messages, and
    every other part of the request body stay out of the report. This is
    the hard rule from P-018 and nothing here relaxes it.
-5. Update the tests for the new signature.
+5. Write a test for `reportError`. Note this is authoring, not editing:
+   there is **no committed test for it today**. The 144-test suite covers
+   pure logic (`costEngine`, `nutritionEngine` and the like), and P-018's
+   verification of the catch path was a throwaway script that was never
+   committed. Budget for a new test, not a signature update to an
+   existing one.
 6. **Dev-only forced-error trigger**, so delivery can be proven without
    waiting for a real outage: if the request body contains
    `{"__forceError": true}` AND the caller's uid appears in
@@ -229,25 +230,30 @@ has ever left the server.
 
 **Constraint:** Do not fix anything else — report additional issues only.
 
-**Open questions for whoever runs this — decide and log the answer here:**
+**Rulings (Brian, 2026-08-21) — these are decided, not open. Implement as
+stated rather than re-litigating them.**
 
-- **Where in the pipeline does the forced throw belong?** It must be after
-  auth (an unauthenticated caller must never reach it) and after the 400
-  validations. Whether it lands before or after the per-uid daily quota
-  is a real choice: before means test throws are free, after means the
-  test exercises the same ordering a real request does. P-016's existing
-  rule is that a malformed request never burns quota and an over-limit
-  request never costs an Anthropic call.
-- **How does `ALLOWED_TEST_UIDS` reach the deployed function?** It is not
-  a secret, so `defineSecret` is the wrong tool, but `defineString` writes
-  a `functions/.env.<project>` file — and CLAUDE.md currently records a
-  deliberate decision to keep a second `.env` out of this repo (which is
-  why the Sentry DSN rides Secret Manager). Resolve that tension
-  explicitly rather than by accident; whichever way it goes, update the
-  CLAUDE.md note that documents the current reasoning.
-- **Does `Sentry.flush(2000)` belong on a 2s timeout?** It bounds a 502
-  response by up to two extra seconds on the failure path. Confirm that
-  is acceptable, or pick a shorter bound.
+- **The forced throw sits AFTER the quota check.** The point of the
+  trigger is to exercise the real failure path, so it runs in the same
+  position a genuine Anthropic failure would — after auth, after the 400
+  validations, and after the per-uid daily counter has been incremented.
+  A forced test error therefore consumes one request of that uid's daily
+  200; that cost is accepted deliberately. Note the consequence: repeated
+  delivery testing draws down the same bucket real usage does, so test
+  against an account whose quota headroom does not matter.
+- **`ALLOWED_TEST_UIDS` ships via `defineSecret`** — not because it is
+  secret (it is not; it is a list of uids), but because consistency with
+  the no-second-`.env` decision wins. `defineString` would write a
+  `functions/.env.<project>` file, and keeping that file out of the repo
+  is an existing, deliberate choice that the Sentry DSN already follows.
+  One configuration path for this function, not two. Add it to the `ai`
+  function's `secrets` array alongside `ANTHROPIC_API_KEY` and
+  `SENTRY_DSN`, and set it with `--data-file -` rather than the
+  interactive prompt (see the P-018 log for why that prompt is a trap).
+- **`Sentry.flush(2000)` stands.** The 2s bound on the 502 path is
+  accepted as written. Revisit only with measured evidence that it is
+  actually costing something — not on the basis that two seconds sounds
+  long.
 
 **Security note:** the trigger is a deliberate on-demand failure path in a
 deployed function. It is gated behind auth plus an explicit uid allowlist,
