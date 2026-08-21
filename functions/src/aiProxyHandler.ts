@@ -33,6 +33,13 @@
  * `reportError` instead; server.ts omits it, so local dev reports
  * nothing (mirroring the browser side, where an unset VITE_SENTRY_DSN
  * skips init).
+ *
+ * P-025 made that callback async and awaited: the 502 is not returned
+ * until the report has been handed off (and flushed), because a Cloud
+ * Run instance can be frozen the moment the response is sent, losing a
+ * fire-and-forget capture. Awaiting is bounded by the reporter's own
+ * flush timeout, and a reporting failure is caught and logged — it can
+ * never change the status or body the caller sees.
  */
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 
@@ -48,6 +55,7 @@ export interface AiProxyRequest {
     messages?: unknown;
     max_tokens?: number;
     tools?: unknown;
+    __forceError?: unknown;
   };
 }
 
@@ -61,7 +69,8 @@ export async function handleAiProxyRequest(
   apiKey: string | undefined,
   verifyIdToken: (idToken: string) => Promise<{ uid: string }>,
   recordDailyUsage?: (uid: string, dateKey: string) => Promise<number>,
-  reportError?: (err: unknown, uid: string) => void
+  reportError?: (err: unknown, uid: string) => Promise<void>,
+  allowedTestUids?: string
 ): Promise<AiProxyResult> {
   const { authHeader, body } = req;
 
@@ -165,7 +174,18 @@ export async function handleAiProxyRequest(
     // uid only — never the system prompt, the messages, or any part of
     // the request body. The uid is enough to tie a failure back to an
     // account, which is all the existing ai_proxy_request log carries.
-    reportError?.(err, uid);
+    //
+    // Awaited so the response is not sent until the report is handed off
+    // — an unawaited capture can die with a frozen instance. Wrapped so
+    // a reporting failure stays invisible to the caller: the 502 below
+    // is returned either way.
+    if (reportError) {
+      try {
+        await reportError(err, uid);
+      } catch (reportErr) {
+        console.warn('ai_proxy error report failed:', reportErr instanceof Error ? reportErr.message : reportErr);
+      }
+    }
     return { status: 502, body: { error: { message: 'Failed to reach Anthropic API.' } } };
   }
 }

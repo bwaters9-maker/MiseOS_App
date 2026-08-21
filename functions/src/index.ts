@@ -50,24 +50,27 @@ const sentryDsn = defineSecret('SENTRY_DSN');
 let sentryModule: Promise<typeof import('@sentry/node')> | null = null;
 let sentryInitialized = false;
 
-function reportError(err: unknown, uid: string) {
+// Awaited by the handler before it returns the 502 (P-025). flush() is
+// the point of the exercise: captureException only queues the event, and
+// a Cloud Run instance can be frozen the moment the response goes out,
+// so without flushing the report dies with the instance. The 2s bound
+// caps what this can add to an already-failing request.
+//
+// Rejections propagate to the handler, which catches and logs them —
+// reporting still cannot fail the request it describes.
+async function reportError(err: unknown, uid: string): Promise<void> {
   const dsn = sentryDsn.value();
   if (!dsn) return;
   sentryModule ??= import('@sentry/node');
-  void sentryModule
-    .then((Sentry) => {
-      if (!sentryInitialized) {
-        // Errors only — no tracesSampleRate, no profiling, no PII.
-        Sentry.init({ dsn, sendDefaultPii: false });
-        sentryInitialized = true;
-      }
-      // uid tag only. Nothing from the request body is ever attached.
-      Sentry.captureException(err, { tags: { uid } });
-    })
-    .catch((e) => {
-      // Reporting must never be able to fail the request it describes.
-      console.warn('sentry report failed:', e instanceof Error ? e.message : e);
-    });
+  const Sentry = await sentryModule;
+  if (!sentryInitialized) {
+    // Errors only — no tracesSampleRate, no profiling, no PII.
+    Sentry.init({ dsn, sendDefaultPii: false });
+    sentryInitialized = true;
+  }
+  // uid tag only. Nothing from the request body is ever attached.
+  Sentry.captureException(err, { tags: { uid } });
+  await Sentry.flush(2000);
 }
 
 // No explicit `cors` option: requests through the Hosting rewrite are
