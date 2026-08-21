@@ -7,10 +7,20 @@ import './index.css';
 
 // Errors only — no performance tracing (tracesSampleRate unset) and no
 // session replay (replayIntegration never added). A DSN is not a secret,
-// but it still comes from .env rather than being hardcoded. Unset is the
-// local-dev default: init is skipped entirely and every Sentry call
-// downstream is an inert no-op.
-const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
+// but it still comes from .env rather than being hardcoded.
+//
+// Production builds only. A DSN in .env is inlined into the dev bundle
+// too, so without this gate every local crash would burn free-tier
+// quota. Either condition failing skips init entirely and leaves every
+// Sentry call downstream an inert no-op.
+//
+// MODE, not PROD: .env carries NODE_ENV=development (server.ts requires
+// it), and Vite derives PROD/DEV from process.env.NODE_ENV — so PROD is
+// false even under `npm run build` in this repo, and gating on it would
+// disable Sentry in production. MODE is set by the Vite command itself:
+// 'production' for `vite build`, 'development' for the dev middleware.
+const isProdBuild = import.meta.env.MODE === 'production';
+const sentryDsn = isProdBuild ? import.meta.env.VITE_SENTRY_DSN : undefined;
 if (sentryDsn) {
   Sentry.init({
     dsn: sentryDsn,
