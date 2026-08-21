@@ -31,15 +31,11 @@ const APP_MODULES: AppModule[] = [
   },
   {
     name: 'Recipes',
-    description: 'Recipe Builder (menu recipes and sub-recipes with live cost, food-cost %, suggested pricing, and an FDA nutrition label), Menu (the operational cost/FC% view plus a guest-facing preview with Classic/Clean print templates), and Recipe Collections (seasonal groupings of menu recipes, one active at a time).',
+    description: 'Recipe Builder (menu recipes and sub-recipes with live cost, food-cost %, suggested pricing, and an FDA nutrition label), Menu (the operational cost/FC% view plus a guest-facing preview with Classic/Clean print templates), Recipe Collections (seasonal groupings of menu recipes, one active at a time), and Development — the dish-development workspace (formerly its own Test Kitchen tab): an AI-generated, read-only editorial trend briefing with pricing commentary and a seasonal sourcing matrix (never touches the pantry or costing), the Sous chat for brainstorming new dishes, and a Recipe Build panel that turns a chat into a real recipe.',
   },
   {
     name: 'Prep List',
     description: "Par-level deficit tracking — what's short against today's par levels and needs prepping.",
-  },
-  {
-    name: 'Test Kitchen',
-    description: "Two sub-tabs: Culinary Trends & Forecasts (an AI-generated, read-only editorial trend briefing plus a seasonal sourcing matrix — never touches the pantry or costing) and The Menu Development Playground (chat with Sous to brainstorm new dishes).",
   },
   {
     name: 'Settings',

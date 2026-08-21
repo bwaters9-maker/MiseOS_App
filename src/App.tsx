@@ -16,7 +16,6 @@ const StaffView = React.lazy(() => import('./Staff'));
 const EventsView = React.lazy(() => import('./EventCalendar'));
 const RecipesHub = React.lazy(() => import('./RecipesHub'));
 const FeaturesView = React.lazy(() => import('./Features'));
-const TestKitchenHub = React.lazy(() => import('./TestKitchenHub'));
 const PrepChecklist = React.lazy(() => import('./PrepChecklist').then(m => ({ default: m.PrepChecklist })));
 const Settings = React.lazy(() => import('./Settings').then(m => ({ default: m.Settings })));
 
@@ -29,7 +28,6 @@ const viewMap: { [key: string]: React.LazyExoticComponent<React.ComponentType<an
   recipes: RecipesHub,
   features: FeaturesView,
   prep: PrepChecklist,
-  'test-kitchen': TestKitchenHub,
   settings: Settings,
 };
 
