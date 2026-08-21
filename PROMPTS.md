@@ -135,11 +135,20 @@ another reason.
   runs bare `vite build` with no prefix. That is why removing it is safe:
   the two scripts that matter set it themselves, and `server.ts`'s new
   default covers a bare `tsx server.ts`.
-- **Measured effect of the fix** (simulated with a shell
-  `NODE_ENV=production`, which overrides the `.env` value): entry bundle
-  1,121,653 -> 916,145 bytes (-200.7 KB, -18.3%); all `dist/` JS
-  1,737,157 -> 1,299,405 bytes (-427.5 KB, -25.2%). `jsxDEV` and
-  `C:/dev/miseos` occurrences both drop from 2273 / 2271 to 0.
+- **Measured effect of the fix — authoritative figures:** entry bundle
+  **1,211,797 -> 1,005,321 bytes (-201.6 KB, -17.0%)**, measured on the
+  post-P-018-merge tree, which is the tree that shipped. `jsxDEV` and
+  `C:/dev/miseos` occurrences both drop from 2273 / 2271 to 0. These
+  match the Status line above.
+  - *Superseded:* an earlier measurement taken **before** the P-018
+    merge, simulated with a shell `NODE_ENV=production`, read 1,121,653
+    -> 916,145 bytes (-200.7 KB, -18.3%) for the entry bundle and
+    1,737,157 -> 1,299,405 bytes (-427.5 KB, -25.2%) for all `dist/` JS.
+    Both sides of that comparison predate the Sentry SDK, so the
+    percentage is not comparable to the shipped figure — the absolute
+    saving is nearly identical (-200.7 vs -201.6 KB); the percentage
+    differs only because P-018 enlarged the denominator. Kept for the
+    record, not for citation.
 - **Still open:** the `NODE_ENV=development` line in `.env` has not been
   removed, so scope item 2 does not yet pass against a real build. `.env`
   is gitignored and machine-local — that edit is the operator's, not a
