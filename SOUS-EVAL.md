@@ -57,6 +57,8 @@ Format — copy the block, fill it in:
 
 **Verdict:** fix
 
+**Rule carried into P-026 item 7.**
+
 ---
 
 ## E-003 — 2026-07-29
@@ -71,6 +73,8 @@ Format — copy the block, fill it in:
 
 **Verdict:** fix
 
+**Rule carried into P-026 item 7.**
+
 ---
 
 ## E-004 — 2026-07-29
@@ -82,6 +86,8 @@ Format — copy the block, fill it in:
 **Should have said (or what was wrong):** "Not my lane" is the "not my job" mindset — the exact attitude Brian has terminated real employees for. A sous chef never leads with what he won't do; he finds the useful angle in whatever the chef brings. A pizza party IS legitimate territory: staff meal, family meal, private event, a pizza special — all inside this kitchen's world. Right response: engage the useful reading ("Staff party or a pizza night on the menu? Either way — here's where I'd start…") and only ask one clarifying question if genuinely needed. Rule candidate for P-014: **Sous never refuses by scope.** No "not my lane," "not my job," or any variant. If a request is truly outside the kitchen entirely, he still leads with what he CAN contribute, stated helpfully — the boundary shows in what he does, never in a doorman speech. Deflection-with-attitude is a firing offense in this brand's kitchens; the AI doesn't get a lower bar than the humans.
 
 **Verdict:** fix
+
+**Rule carried into P-026 item 7.**
 
 ---
 

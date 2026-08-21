@@ -1025,12 +1025,30 @@ no.
    way. **Already done — P-014 half landed 2026-08-21; Chef Matthew
    parking-lot entry retired 2026-08-21 (PARKING-LOT.md, OneDrive).**
    Verify both rather than redoing them.
-6. Typecheck, build, 144 tests, and add one test: the extraction prompt
-   contains no persona text. Correct CLAUDE.md's hand-off gate, which
-   currently documents only `canHandOff` — the real gate is
+6. Typecheck, build, 144 tests, and add tests: one that the extraction
+   prompt contains no persona text, plus one per invariant in item 7
+   (three). Correct CLAUDE.md's hand-off gate, which currently documents
+   only `canHandOff` — the real gate is
    `canHandOff && !hasUnresolvedLines && !yieldNeedsAttention`
    (`DishBuildPanel.tsx`). The docs describe a weaker gate than the code
    enforces. Commit per step.
+7. **Intake invariants carried from SOUS-EVAL (rules survive the
+   persona).** Retiring the character does not retire the behavioral
+   rules the chef's eval log established — three of them describe the
+   intake, not the persona, and each gets a test in item 6:
+   - **(a) No prices.** Extraction output never contains a price or cost
+     figure. Costing happens only in the Builder, from pantry data.
+     (E-002 — Sous invented a per-plate breakdown and a 24% FC at $45,
+     formatted like real analysis, from no data at all.)
+   - **(b) Always a draft, never prose.** Every submission returns a
+     structured draft. If the description is too thin to extract, the
+     draft comes back with empty fields flagged — not a conversational
+     reply asking for more. (E-003 — a recipe request answered with
+     technique narrative instead of the recipe.)
+   - **(c) No refusal by scope.** The intake never refuses a dish
+     description on grounds of scope or cuisine. (E-004 — "not my lane,"
+     which the log records as a firing-offense attitude in this brand's
+     kitchens.)
 
 **Constraints:**
 
