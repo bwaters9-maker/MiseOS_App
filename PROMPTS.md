@@ -863,7 +863,35 @@ another reason.
 
 ## P-024 — firebase.json predeploy hook for functions
 
-**Status:** QUEUED — not yet executed.
+**Status:** DONE 2026-08-21. All three items verified against production.
+
+**Verification:**
+
+- **Item 2 — the hook rebuilds a deleted `lib/`.** `functions/lib` was
+  removed entirely, then `firebase deploy --only functions` run. The
+  deploy printed `Running command: npm --prefix functions run build` →
+  `tsc` → `Finished running predeploy script`, rebuilt `lib/` from
+  source, and packaged and updated `ai(us-central1)` from it. Without the
+  hook that deploy could not have succeeded at all — there would have
+  been no compiled entry point to discover. The source change carried
+  through: a header note added to `functions/src/index.ts` appears in the
+  rebuilt `lib/index.js`, and the package grew 52.98 KB → 53.2 KB.
+- **Item 3 — hosting does not invoke it.** `functions/lib` was deleted
+  again and `firebase deploy --only hosting` run; `lib/` stayed absent
+  and the hosting deploy completed normally. `predeploy` is per-target,
+  confirmed empirically rather than assumed.
+
+**Finding — the discovery timeout is marginal, not fixed.** The first
+deploy of this run failed at the analysis stage with "Cannot determine
+backend specification. Timeout after 10000" — the same P-018 failure,
+after the predeploy hook had already succeeded. An immediate retry, with
+no code change, deployed cleanly. The compiled module loads in ~1.3s
+locally, far inside the 10s budget, so this is the analysis subprocess
+being starved (it runs straight after `tsc`), not a real module-load
+cost. P-018's dynamic `@sentry/node` import reduced the pressure but did
+not eliminate it: expect an occasional first-attempt failure that a
+retry clears, and treat a repeat failure as a signal that something new
+was added at module scope.
 
 **Background:** `firebase deploy --only functions` uploads `functions/`
 and runs the compiled `lib/` named by `functions/package.json`'s `main`.
