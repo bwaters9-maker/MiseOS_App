@@ -7,7 +7,6 @@ import { defineSecret } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import * as Sentry from '@sentry/node';
 import { handleAiProxyRequest } from './aiProxyHandler.js';
 
 initializeApp();
@@ -35,19 +34,36 @@ const anthropicApiKey = defineSecret('ANTHROPIC_API_KEY');
 // no second .env file in the repo.
 const sentryDsn = defineSecret('SENTRY_DSN');
 
-// Lazy, once per instance: a secret's value is only readable at
-// runtime, not at module load. Errors only — no tracesSampleRate, no
-// profiling, no PII.
+// @sentry/node is imported dynamically, not at module scope. Importing
+// it eagerly costs ~1.4s of OpenTelemetry instrumentation setup, which
+// pushed this module past the 10s budget `firebase deploy --only
+// functions` allows for loading the code to discover its exports — the
+// deploy failed outright with "Cannot determine backend specification".
+// Nothing here needs Sentry until an actual proxy failure, and the
+// secret's value is only readable at runtime anyway, so the whole cost
+// moves off the discovery path. The module promise is cached, so an
+// instance pays it at most once.
+let sentryModule: Promise<typeof import('@sentry/node')> | null = null;
 let sentryInitialized = false;
+
 function reportError(err: unknown, uid: string) {
   const dsn = sentryDsn.value();
   if (!dsn) return;
-  if (!sentryInitialized) {
-    Sentry.init({ dsn, sendDefaultPii: false });
-    sentryInitialized = true;
-  }
-  // uid tag only. Nothing from the request body is ever attached.
-  Sentry.captureException(err, { tags: { uid } });
+  sentryModule ??= import('@sentry/node');
+  void sentryModule
+    .then((Sentry) => {
+      if (!sentryInitialized) {
+        // Errors only — no tracesSampleRate, no profiling, no PII.
+        Sentry.init({ dsn, sendDefaultPii: false });
+        sentryInitialized = true;
+      }
+      // uid tag only. Nothing from the request body is ever attached.
+      Sentry.captureException(err, { tags: { uid } });
+    })
+    .catch((e) => {
+      // Reporting must never be able to fail the request it describes.
+      console.warn('sentry report failed:', e instanceof Error ? e.message : e);
+    });
 }
 
 // No explicit `cors` option: requests through the Hosting rewrite are
