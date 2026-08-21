@@ -84,7 +84,10 @@ do.
 
 ## P-023 — NODE_ENV / Vite build mode fix
 
-**Status:** QUEUED — not yet executed.
+**Status:** PARTIALLY EXECUTED (2026-08-21). Item 1's code half, item 3,
+and item 4 are done. Item 2 does not yet pass: the `NODE_ENV` line is
+still in `.env`, which is gitignored and machine-local. Remove that line
+and re-run item 2 to close this out.
 
 **Background:** `.env` carries `NODE_ENV=development` because `server.ts`
 throws on startup when it is unset. Vite loads that file into
@@ -118,3 +121,25 @@ fixes the root cause.
 specifically to survive this bug. Once `PROD` is correct again, `MODE`
 still works and needs no change — revisit only if the two ever diverge for
 another reason.
+
+**Findings while executing (2026-08-21):**
+
+- **`.env.example` never carried `NODE_ENV`.** Only the real `.env` did.
+  That half of scope item 1 was a no-op, not an oversight — the example
+  file lists Firebase and Sentry values and nothing else.
+- **`npm run dev` and `npm start` were never relying on `.env` for it.**
+  Both already set it explicitly via `cross-env` (`NODE_ENV=development`
+  and `NODE_ENV=production` respectively). The `.env` line was therefore
+  doing nothing for the server and only affecting `npm run build`, which
+  runs bare `vite build` with no prefix. That is why removing it is safe:
+  the two scripts that matter set it themselves, and `server.ts`'s new
+  default covers a bare `tsx server.ts`.
+- **Measured effect of the fix** (simulated with a shell
+  `NODE_ENV=production`, which overrides the `.env` value): entry bundle
+  1,121,653 -> 916,145 bytes (-200.7 KB, -18.3%); all `dist/` JS
+  1,737,157 -> 1,299,405 bytes (-427.5 KB, -25.2%). `jsxDEV` and
+  `C:/dev/miseos` occurrences both drop from 2273 / 2271 to 0.
+- **Still open:** the `NODE_ENV=development` line in `.env` has not been
+  removed, so scope item 2 does not yet pass against a real build. `.env`
+  is gitignored and machine-local — that edit is the operator's, not a
+  repo change.
