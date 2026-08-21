@@ -1,9 +1,12 @@
 # SOUS-EVAL — Chef judgment log for the Sous AI
 
-Purpose: capture real Sous exchanges that missed the mark. Each entry becomes
-prompt corrections / few-shot examples under P-014. No coding needed here —
-just chef judgment. Add entries any time an answer smells off. Good answers
-worth preserving as examples can go in too (mark VERDICT: keep).
+Purpose: capture real Sous exchanges that missed the mark. Entries are
+evidence for Sous behavior rulings. P-014 (persona tuning) retired
+2026-08-21; E-001–E-006 justified retiring the persona outright (CLAUDE.md
+ruling 2026-08-21), resolved via P-026. New entries log extraction-intake
+failures only. No coding needed here — just chef judgment. Add entries any
+time an answer smells off. Good answers worth preserving as examples can go
+in too (mark VERDICT: keep).
 
 Format — copy the block, fill it in:
 
