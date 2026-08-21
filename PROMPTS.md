@@ -57,3 +57,42 @@ module ships, a nav tab is renamed, or a feature moves — it's the only
 source Sous is allowed to describe the app from, so if it drifts from the
 real app, Sous will describe features that don't exist or miss ones that
 do.
+
+---
+
+## P-023 — NODE_ENV / Vite build mode fix
+
+**Status:** QUEUED — not yet executed.
+
+**Background:** `.env` carries `NODE_ENV=development` because `server.ts`
+throws on startup when it is unset. Vite loads that file into
+`process.env.NODE_ENV` and derives `isProduction` from it, so `npm run
+build` builds in development mode: `import.meta.env.PROD` is `false` and
+`DEV` is `true` even in the production bundle, and `dist/` ships React's
+dev JSX runtime (`jsxDEV` calls carrying absolute local source paths and
+line numbers). Surfaced while wiring Sentry (P-018), where gating init on
+`PROD` removed the init call from the production bundle entirely — worked
+around there by gating on `MODE === 'production'` instead. This prompt
+fixes the root cause.
+
+**Scope:**
+
+1. Remove `NODE_ENV` from `.env` and `.env.example`. Make `server.ts`
+   default it to `development` when unset (`process.env.NODE_ENV ??=
+   'development'` or equivalent) so local behavior is unchanged and the
+   existing startup validation still rejects a bad explicit value.
+2. Confirm `npm run build` now emits a true production bundle: grep
+   `dist/` for `jsxDEV` (expect 0) and for `C:/dev/miseos` (expect 0).
+   Report the bundle size delta.
+3. Update CLAUDE.md's Error reporting section and the `.env.example`
+   Sentry comment to state that the browser SDK initializes only when
+   `MODE` is `production` AND `VITE_SENTRY_DSN` is set. Both currently
+   describe only the DSN condition.
+4. Typecheck, build, 144 tests, then commit.
+
+**Constraint:** Do not fix anything else — report additional issues only.
+
+**Note for whoever runs this:** P-018 gated Sentry on `MODE`, not `PROD`,
+specifically to survive this bug. Once `PROD` is correct again, `MODE`
+still works and needs no change — revisit only if the two ever diverge for
+another reason.
