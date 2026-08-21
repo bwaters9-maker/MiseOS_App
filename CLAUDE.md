@@ -496,6 +496,26 @@ Dashboard addition earns its place only if it survives that test — it
 stays read-only (Add Feature remains the sole write exception), it costs no
 scrolling, and it renders nothing at all when it has nothing to say.
 
+### Ruling 2026-08-21 — Sous persona retired; extraction intake stays
+
+The chat character (name, personality, open-ended culinary Q&A) is
+removed. Every logged Sous failure (SOUS-EVAL E-001–E-004) was a
+conversation failure, never an extraction failure.
+
+What remains is the intake: free-text dish description → structured draft
+(pantry-matched lines, yield, portions, cost) → Recipe Build panel →
+Builder. A short refinement thread stays for draft edits only ("make it 6
+portions", "swap butter for brown butter").
+
+No personality, no naming, no general Q&A — those overlap Trends and the
+Ingredient Advisor.
+
+**P-014 RETIRED (superseded). Parked "Chef Matthew personalization" entry
+RETIRED.**
+
+**Test:** does this surface do something the Builder form cannot? Intake
+yes; character no.
+
 ### Quality Standard — Non-Negotiable
 Every feature must pass: "Would a chef in the middle of a Friday
 dinner service use this, exactly as built, without frustration?"
