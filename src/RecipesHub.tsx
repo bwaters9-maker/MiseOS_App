@@ -20,6 +20,10 @@ interface RecipesHubProps {
   menuTemplate?: MenuTemplate;
   setMenuTemplate?: (t: MenuTemplate) => void;
   onOpenRecipe?: (recipeId: string) => void;
+  /** Pending sub-tab request from another view (e.g. the Dashboard's
+   * trends strip asking for Development); consumed once, then cleared. */
+  recipesSubTab?: string | null;
+  setRecipesSubTab?: (t: string | null) => void;
 }
 
 type RecipesSubTab = 'recipes' | 'menu' | 'collections' | 'development';
@@ -39,6 +43,15 @@ export default function RecipesHub(props: RecipesHubProps) {
   useEffect(() => {
     if (props.selectedRecipeId) setActiveSubTab('recipes');
   }, [props.selectedRecipeId]);
+
+  useEffect(() => {
+    const requested = props.recipesSubTab;
+    if (!requested) return;
+    if (requested === 'recipes' || requested === 'menu' || requested === 'collections' || requested === 'development') {
+      setActiveSubTab(requested);
+    }
+    props.setRecipesSubTab?.(null);
+  }, [props.recipesSubTab]);
 
   return (
     <div>

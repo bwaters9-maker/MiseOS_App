@@ -106,6 +106,10 @@ const AppShell: React.FC = () => {
   );
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  // A pending "open Recipes on this sub-tab" request, same cross-view
+  // mechanism as selectedRecipeId/selectedEventId — RecipesHub consumes it
+  // and clears it so returning to Recipes later doesn't re-force the tab.
+  const [recipesSubTab, setRecipesSubTab] = useState<string | null>(null);
 
   // targetFcPercent and menuTemplate now live on the restaurant profile doc
   // (migrated from App.tsx state + localStorage) — read fallback to the old
@@ -120,6 +124,11 @@ const AppShell: React.FC = () => {
 
   const openRecipeInBuilder = (recipeId: string) => {
     setSelectedRecipeId(recipeId);
+    setActiveView('recipes');
+  };
+
+  const openRecipesDevelopment = () => {
+    setRecipesSubTab('development');
     setActiveView('recipes');
   };
 
@@ -186,6 +195,9 @@ const AppShell: React.FC = () => {
               selectedRecipeId={selectedRecipeId}
               setSelectedRecipeId={setSelectedRecipeId}
               onOpenRecipe={openRecipeInBuilder}
+              recipesSubTab={recipesSubTab}
+              setRecipesSubTab={setRecipesSubTab}
+              onOpenDevelopment={openRecipesDevelopment}
               selectedEventId={selectedEventId}
               setSelectedEventId={setSelectedEventId}
               onOpenEvent={openEventDetail}
