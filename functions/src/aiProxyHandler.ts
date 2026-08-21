@@ -48,6 +48,29 @@ const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 // local dev does not).
 const DAILY_AI_LIMIT = 200;
 
+// Firebase uid shape. An allowlist entry that does not match is ignored
+// outright, so the `none` placeholder the secret ships with — and any
+// other stray string — can never enable the forced-error trigger. The
+// gate is deliberately a shape test rather than "is it non-empty":
+// treating a placeholder as an allowlisted uid is the failure that
+// would arm a backdoor in production.
+const FIREBASE_UID_SHAPE = /^[A-Za-z0-9]{20,36}$/;
+
+/**
+ * P-025 dev-only forced-error trigger. True only when `uid` appears in
+ * the comma-separated allowlist AND is itself uid-shaped. Unset, empty,
+ * whitespace, or a non-uid placeholder all return false — the trigger is
+ * a complete no-op unless a real uid was deliberately added.
+ */
+export function isForcedErrorAllowed(uid: string, allowedTestUids: string | undefined): boolean {
+  if (!allowedTestUids || !FIREBASE_UID_SHAPE.test(uid)) return false;
+  return allowedTestUids
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => FIREBASE_UID_SHAPE.test(entry))
+    .includes(uid);
+}
+
 export interface AiProxyRequest {
   authHeader: string | undefined;
   body: {
@@ -150,6 +173,15 @@ export async function handleAiProxyRequest(
   }
 
   try {
+    // Forced-error trigger (P-025). Deliberately inside the try and
+    // before the fetch, so it runs the genuine catch path — same
+    // position a real Anthropic failure occupies, after auth, after the
+    // 400 validations, and after the daily counter has been incremented
+    // (a forced error costs the tester one request of their own quota).
+    if (body?.__forceError === true && isForcedErrorAllowed(uid, allowedTestUids)) {
+      throw new Error('Forced error via __forceError (P-025 delivery test).');
+    }
+
     const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {

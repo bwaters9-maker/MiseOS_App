@@ -38,6 +38,14 @@ const anthropicApiKey = defineSecret('ANTHROPIC_API_KEY');
 // no second .env file in the repo.
 const sentryDsn = defineSecret('SENTRY_DSN');
 
+// Comma-separated uid allowlist for the P-025 forced-error trigger. Not
+// a secret either — it rides Secret Manager for the same reason the DSN
+// does: one configuration path for this function, no second .env in the
+// repo. Ships holding the placeholder `none`, which the uid-shape rule
+// in the handler rejects, so the trigger is inert until a real uid is
+// deliberately set for the duration of a test.
+const allowedTestUids = defineSecret('ALLOWED_TEST_UIDS');
+
 // @sentry/node is imported dynamically, not at module scope. Importing
 // it eagerly costs ~1.4s of OpenTelemetry instrumentation setup, which
 // pushed this module past the 10s budget `firebase deploy --only
@@ -78,7 +86,7 @@ async function reportError(err: unknown, uid: string): Promise<void> {
 // cross-origin browser call to this function's own URL gets no
 // Access-Control-* headers and is blocked by the browser — traffic is
 // expected to come through the Hosting rewrite, not this URL directly.
-export const ai = onRequest({ secrets: [anthropicApiKey, sentryDsn] }, async (req, res) => {
+export const ai = onRequest({ secrets: [anthropicApiKey, sentryDsn, allowedTestUids] }, async (req, res) => {
   if (req.method !== 'POST') {
     res.status(405).json({ error: { message: 'Method not allowed.' } });
     return;
@@ -89,7 +97,8 @@ export const ai = onRequest({ secrets: [anthropicApiKey, sentryDsn] }, async (re
     anthropicApiKey.value(),
     (idToken) => getAuth().verifyIdToken(idToken),
     recordDailyUsage,
-    reportError
+    reportError,
+    allowedTestUids.value()
   );
   res.status(result.status).json(result.body);
 });
