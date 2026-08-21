@@ -226,7 +226,11 @@ has ever left the server.
    no-op when it holds no real uid** — an unset, empty, or placeholder
    value means no uid can trigger it, and `__forceError` in the body is
    ignored entirely. Verify that case explicitly; it is the property
-   that matters most here.
+   that matters most here. Allowlist entries are honored only if they
+   match a Firebase uid shape (`/^[A-Za-z0-9]{20,36}$/`); anything else,
+   including the `none` placeholder, is ignored. The forced-error test
+   must include a case proving a non-uid entry never enables the
+   trigger.
 7. **Create the `ALLOWED_TEST_UIDS` secret BEFORE deploying** —
    `defineSecret` fails the deploy when the secret has no version (see the
    P-018 log, where exactly this blocked `firebase deploy --only
