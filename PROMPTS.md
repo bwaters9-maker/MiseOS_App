@@ -219,14 +219,23 @@ has ever left the server.
 6. **Dev-only forced-error trigger**, so delivery can be proven without
    waiting for a real outage: if the request body contains
    `{"__forceError": true}` AND the caller's uid appears in
-   `ALLOWED_TEST_UIDS` (env var, comma-separated), throw before the
-   Anthropic call so the catch path runs for real. `ALLOWED_TEST_UIDS` is
-   unset in production until Brian sets it, and **must be a complete
-   no-op when unset** — an unset or empty value means no uid can trigger
-   it, and `__forceError` in the body is ignored entirely. Verify the
-   no-op case explicitly; it is the property that matters most here.
-7. Document in CLAUDE.md — the Error reporting section for the delivery
-   guarantee, and the AI feature section for the trigger and its env var.
+   `ALLOWED_TEST_UIDS` (comma-separated; shipped via `defineSecret` per
+   Ruling 2), throw before the Anthropic call so the catch path runs for
+   real. `ALLOWED_TEST_UIDS` carries only a placeholder in production
+   until Brian sets a real uid, and the trigger **must be a complete
+   no-op when it holds no real uid** — an unset, empty, or placeholder
+   value means no uid can trigger it, and `__forceError` in the body is
+   ignored entirely. Verify that case explicitly; it is the property
+   that matters most here.
+7. **Create the `ALLOWED_TEST_UIDS` secret BEFORE deploying** —
+   `defineSecret` fails the deploy when the secret has no version (see the
+   P-018 log, where exactly this blocked `firebase deploy --only
+   functions`). Seed it with a single placeholder value like `none` via
+   `--data-file -`, then set it to a real uid only for the duration of a
+   test.
+8. Document in CLAUDE.md — the Error reporting section for the delivery
+   guarantee, and the AI feature section for the trigger and its config
+   value.
 
 **Constraint:** Do not fix anything else — report additional issues only.
 
