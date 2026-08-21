@@ -1,6 +1,10 @@
 /**
  * functions/src/index.ts
  * Cloud Function entry points.
+ *
+ * Deploys run `tsc` automatically: firebase.json's functions block has a
+ * predeploy hook (P-024), so lib/ is rebuilt from this source before the
+ * directory is packaged. Do not hand-build before deploying.
  */
 import { onRequest } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
