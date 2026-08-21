@@ -1040,11 +1040,25 @@ no.
      figure. Costing happens only in the Builder, from pantry data.
      (E-002 — Sous invented a per-plate breakdown and a 24% FC at $45,
      formatted like real analysis, from no data at all.)
+     - *Enforcement (decided, not open):* `normalizeDishDraft` strips
+       currency figures from **all** text fields — line notes, method
+       steps, variant notes. Client-side, so a model that emits a price
+       anyway cannot land one. The prompt instruction is retained as a
+       secondary measure, not the guarantee. **Test:** feed `"$12 per
+       plate"` inside a method step and assert the normalized output is
+       clean.
    - **(b) Always a draft, never prose.** Every submission returns a
      structured draft. If the description is too thin to extract, the
      draft comes back with empty fields flagged — not a conversational
      reply asking for more. (E-003 — a recipe request answered with
      technique narrative instead of the recipe.)
+     - *Guarantee (decided, not open):* it lives at the **client**, not
+       in the prompt. A parser rejection renders an empty, fully-flagged
+       draft captioned "Couldn't read that — try describing the dish
+       again" — **never an error toast**. Prose that fails to parse is
+       therefore indistinguishable, to the chef, from a description too
+       thin to extract: both produce a draft to work from. **Test:**
+       assert that state on parse failure.
    - **(c) No refusal by scope.** The intake never refuses a dish
      description on grounds of scope or cuisine. (E-004 — "not my lane,"
      which the log records as a firing-offense attitude in this brand's

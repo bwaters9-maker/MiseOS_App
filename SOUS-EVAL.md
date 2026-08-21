@@ -42,6 +42,8 @@ Format — copy the block, fill it in:
 
 **Verdict:** fix
 
+**No carried rule** — tour-guiding requires a conversational surface; dies with the persona (P-026).
+
 ---
 
 ## E-002 — 2026-07-22
