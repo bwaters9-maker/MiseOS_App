@@ -81,3 +81,31 @@ Format — copy the block, fill it in:
 **Verdict:** fix
 
 ---
+
+## E-005 — 2026-08-21
+
+**Asked:** "Add a splash of yuzu kosho" — typed as an instruction while building a dish.
+
+**Sous said:** A paragraph explaining why "a splash" is not a usable quantity, instead of adding the line.
+
+**Should have said (or what was wrong):** The chef was issuing an instruction, not opening a discussion. The line should have been added with a best-effort quantity, flagged for review — the panel already has a needs-attention state for exactly this. Explaining the imprecision back to a chef who used ordinary kitchen shorthand treats an instruction as conversation, and costs a turn to produce nothing.
+
+**Verdict:** fix — instruction treated as conversation.
+
+**Resolves via:** P-026. The intake replaces the chat surface: a refinement instruction goes straight to a revised draft, with anything imprecise arriving as a flagged line rather than a paragraph. Cited as evidence for the 2026-08-21 persona ruling.
+
+---
+
+## E-006 — 2026-08-21
+
+**Asked:** (during a dish build, after presenting options)
+
+**Sous said:** "Tell me which way you want to go and I'll get it built in Recipe Builder."
+
+**Should have said (or what was wrong):** It cannot build anything. Nothing reaches the Recipe Builder except through the chef pressing Send on a reviewed draft — that gate is the whole design (P-019: no unit reaches Firestore the chef didn't confirm). Claiming to build the recipe misrepresents where the control sits, and invites the chef to wait for something that will never happen.
+
+**Verdict:** fix — claims capability it lacks.
+
+**Resolves via:** P-026. With the persona gone there is no first person left to make the offer; the intake produces a draft and the chef's own Send is the only path into the Builder. Cited as evidence for the 2026-08-21 persona ruling.
+
+---
