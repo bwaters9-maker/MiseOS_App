@@ -274,3 +274,77 @@ and the worst a listed uid can do is force 502s against their own account,
 but it is still a backdoor by construction — keep `ALLOWED_TEST_UIDS`
 unset except during an actual test, and never widen it to a whole
 environment.
+
+---
+
+## P-026 — Replace Sous chat with extraction intake
+
+**Status:** QUEUED — not yet executed.
+
+**Background:** Implements the 2026-08-21 ruling in CLAUDE.md ("Sous
+persona retired; extraction intake stays"). The chat character goes; the
+free-text-to-structured-draft path stays. The test the ruling sets: does
+this surface do something the Builder form cannot? Intake yes; character
+no.
+
+**Scope:**
+
+1. On Recipes > Development, replace the Sous chat panel with a single
+   "Describe the dish" textarea + Extract button. Submit goes directly to
+   the existing extraction path (same prompt, same `normalizeDishDraft`,
+   same Recipe Build panel). No greeting, no persona system prompt.
+2. Below the draft, a refinement input: free text applied to the current
+   draft ("make it 6 portions"). Each refinement is one proxy call that
+   returns a revised draft; the chef reviews line changes in the panel as
+   today. Cap refinement history at 10 turns (P-016's 30-message window is
+   the hard ceiling; 10 is the UX limit).
+3. Remove the Sous persona system prompt, the Sous name/avatar, and any
+   "ask Sous" copy across the app. **Grep for Sous/sous and report every
+   hit before deleting.** The Ingredient Advisor and Trends are untouched.
+4. Extraction prompt: strip any persona framing; keep the structured-output
+   contract exactly. **Report the diff of the prompt before committing.**
+5. Mark P-014 RETIRED in PROMPTS.md with reason "superseded by P-026 per
+   2026-08-21 ruling". Retire the Chef Matthew parking-lot entry the same
+   way.
+6. Typecheck, build, 144 tests, and add one test: the extraction prompt
+   contains no persona text. Commit per step.
+
+**Constraints:**
+
+- The P-019 hand-off invariants are untouched and must still pass the
+  P-019 live script after this change: no unit reaches Firestore the chef
+  did not confirm, drafts start off-menu, and the `hasUnresolvedLines`
+  gate holds.
+- Do not fix anything else — report additional issues only.
+
+**Reference inventory (Sous/sous hits as of 2026-08-21, for scope item 3 —
+re-grep at execution time, do not trust this list):**
+
+| Hits | File |
+|---|---|
+| 27 | `CLAUDE.md` |
+| 26 | `SOUS-PROMPT-CURRENT.md` (gitignored local scratch) |
+| 14 | `PROMPTS.md` |
+| 9 | `src/lib/sousPersona.ts` |
+| 6 | `src/TestKitchenHub.tsx` |
+| 6 | `src/lib/sousAppKnowledge.ts` |
+| 5 | `src/components/testkitchen/DishBuildPanel.tsx` |
+| 4 | `AUDIT-2026-07-17.md` |
+| 1 each | `src/types.ts`, `src/Staff.tsx`, `src/RecipesHub.tsx`, `src/lib/dishDraftToRecipe.ts`, `docs-brand-v1.1-migration-scope.md` |
+
+Note that the doc hits outnumber the code hits. `PROMPTS.md`'s dated
+2026-07-18 entry carries the full persona canon and is a historical record
+— per this file's own convention, pre-convention entries are left as
+written, so retiring the persona does not mean rewriting that entry.
+Decide explicitly what happens to it rather than deleting it in a sweep.
+
+**Open question for whoever runs this — decide and log the answer here:**
+
+- **Does the refinement call re-extract or patch?** Item 2 says each
+  refinement "returns a revised draft." Sending the prior draft plus the
+  refinement instruction and taking a whole new draft back is simpler and
+  keeps one output contract, but it can silently churn lines the chef
+  already reviewed and kept. Patching only what the instruction names
+  preserves review state but needs a second contract. The `keptLines` /
+  `hasUnresolvedLines` review state in `DishBuildPanel.tsx` is what is at
+  risk either way — settle this before writing the call.
