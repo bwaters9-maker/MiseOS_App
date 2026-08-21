@@ -497,7 +497,13 @@ CONSTRAINTS:
 
 ---
 
-## P-014 — Sous persona tuning from chef eval log — QUEUED 2026-07-20
+## P-014 — Sous persona tuning from chef eval log — RETIRED 2026-08-21
+
+**Retired:** superseded by P-026 per the 2026-08-21 ruling in CLAUDE.md
+("Sous persona retired; extraction intake stays"). The persona this
+prompt would have tuned is being removed, so there is nothing left to
+tune. SOUS-EVAL.md's E-001–E-004 remain the evidence base for that
+ruling; they are not discarded with this prompt.
 
 **Origin:** Brian asked how to improve the Sous AI without coding (2026-07-20). Answer: the chef's contribution is judgment, not code — captured in SOUS-EVAL.md (OneDrive miseos folder). Loop: Brian uses Sous in real work and logs misses (asked / got / should-have-said); Claude.ai converts the log into system-prompt corrections and few-shot examples; Code applies them; Brian re-judges against the same questions.
 
@@ -1026,27 +1032,32 @@ written, so retiring the persona does not mean rewriting that entry.
 Decide explicitly what happens to it rather than deleting it in a sweep.
 
 **Ruling (Brian, 2026-08-21) — item 2, refinement contract. Decided, not
-open.**
+open. Supersedes the earlier merge-by-reconciliation version of this
+ruling.**
 
-**One output contract.** A refinement call returns a **full revised
-draft**, same shape as the initial extraction — no second patch contract.
-The client reconciles it against the draft on screen, merging **by
-normalized ingredient name**:
+**One output contract, and chef-kept lines are immutable to the model.**
+A refinement call returns a full revised draft, same shape as the initial
+extraction — no second patch contract. Applying it to the draft on screen:
 
-- **Chef-resolved lines keep the chef's edits**, unless the refinement
-  instruction names that ingredient. A line the chef already fixed is not
-  silently overwritten by the model's version of it.
-- **New lines arrive flagged**, so anything the revision introduces lands
-  in the same needs-attention state a fresh extraction would.
-- **Lines absent from the revision are dropped.** Omission is treated as
-  deliberate removal, not as an incomplete response.
+- **The model may add new lines**, which arrive flagged, in the same
+  needs-attention state a fresh extraction would produce.
+- **The model may modify lines the chef has not yet resolved.**
+- **The model never modifies or removes a kept line.** A line the chef has
+  resolved is immutable to the refinement, full stop.
+- **Omission from the revision is ignored.** A kept line missing from the
+  response stays; absence is not a removal signal.
 
-This keeps the model's job identical on every call while protecting the
-`keptLines` / `hasUnresolvedLines` review state in `DishBuildPanel.tsx` —
-the thing that was actually at risk from re-extraction.
+**Removal of, or changes to, a kept line happen only through the panel's
+existing discard and inline-edit controls** — the chef's own affordances,
+not the model's output. This is the same principle as the Master Pantry
+Mandate: the model proposes, the chef disposes, and nothing the chef has
+already confirmed moves without the chef moving it.
 
-Note for the implementer: "normalized ingredient name" should reuse the
-existing normalization convention rather than inventing a second one —
-`InvoicePriceUpdate.tsx` already normalizes by lowercasing, stripping
-punctuation, and collapsing whitespace for its pantry matching. Confirm
-that is the right shared rule before writing a new one.
+**No prose-matching of refinement text against ingredient names.** There
+is no "unless the refinement names that ingredient" escape hatch — that
+would require matching free text against pantry names, a second and
+fuzzier match, and it is explicitly not part of this design.
+
+**Normalized-name matching reuses the `InvoicePriceUpdate.tsx`
+convention** (lowercase, strip punctuation, collapse whitespace) —
+decided, not open. One normalization rule in the codebase, not two.
