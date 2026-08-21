@@ -505,7 +505,7 @@ prompt would have tuned is being removed, so there is nothing left to
 tune. SOUS-EVAL.md's E-001–E-004 remain the evidence base for that
 ruling; they are not discarded with this prompt.
 
-**Origin:** Brian asked how to improve the Sous AI without coding (2026-07-20). Answer: the chef's contribution is judgment, not code — captured in SOUS-EVAL.md (OneDrive miseos folder). Loop: Brian uses Sous in real work and logs misses (asked / got / should-have-said); Claude.ai converts the log into system-prompt corrections and few-shot examples; Code applies them; Brian re-judges against the same questions.
+**Origin:** Brian asked how to improve the Sous AI without coding (2026-07-20). Answer: the chef's contribution is judgment, not code — captured in SOUS-EVAL.md (repo root). Loop: Brian uses Sous in real work and logs misses (asked / got / should-have-said); Claude.ai converts the log into system-prompt corrections and few-shot examples; Code applies them; Brian re-judges against the same questions.
 
 **Gating:** does not run until SOUS-EVAL.md has enough entries to work from (~10 "fix" verdicts). No speculative prompt rewrites before evidence exists.
 
@@ -994,7 +994,9 @@ no.
    contract exactly. **Report the diff of the prompt before committing.**
 5. Mark P-014 RETIRED in PROMPTS.md with reason "superseded by P-026 per
    2026-08-21 ruling". Retire the Chef Matthew parking-lot entry the same
-   way.
+   way. **Already done — P-014 half landed 2026-08-21; Chef Matthew
+   parking-lot entry retired 2026-08-21 (PARKING-LOT.md, OneDrive).**
+   Verify both rather than redoing them.
 6. Typecheck, build, 144 tests, and add one test: the extraction prompt
    contains no persona text. Correct CLAUDE.md's hand-off gate, which
    currently documents only `canHandOff` — the real gate is
