@@ -1047,6 +1047,11 @@ no.
        secondary measure, not the guarantee. **Test:** feed `"$12 per
        plate"` inside a method step and assert the normalized output is
        clean.
+     - *Scope of the strip (decided, not open):* it applies **only to
+       model output**, at extraction and refinement time. Chef-typed and
+       chef-edited text is never altered — Master Pantry Mandate: the
+       model proposes, the chef disposes, and nothing the chef wrote is
+       silently rewritten. A price the chef types into a note stays.
    - **(b) Always a draft, never prose.** Every submission returns a
      structured draft. If the description is too thin to extract, the
      draft comes back with empty fields flagged — not a conversational
@@ -1063,6 +1068,13 @@ no.
      description on grounds of scope or cuisine. (E-004 — "not my lane,"
      which the log records as a firing-offense attitude in this brand's
      kitchens.)
+     - *Enforcement (decided, not open):* satisfied **structurally** —
+       there is no conversational surface left to refuse from — and the
+       extraction prompt contains no scope, cuisine, or refusal
+       language. **Test:** assert the prompt carries none of it, and
+       that an out-of-cuisine fixture ("Tteokbokki, 6 portions,
+       gochujang, rice cakes, fish cake") yields a draft with lines, not
+       an empty or refused result.
 
 **Constraints:**
 
