@@ -22,6 +22,17 @@
  * callback that atomically increments the day's counter and returns
  * the new count. server.ts (local dev) omits it, so local dev runs
  * quota-free.
+ *
+ * Sentry reporting rides the same rail for the same reason: a bare
+ * `@sentry/node` import here would resolve to functions/node_modules
+ * when bundled with the Cloud Function and to the root install when
+ * server.ts pulls this file in — two SDK copies with independent
+ * clients, so an init() on one would be invisible to the
+ * captureException() on the other. Exactly the firebase-admin failure
+ * described above. The caller that owns an initialized SDK injects
+ * `reportError` instead; server.ts omits it, so local dev reports
+ * nothing (mirroring the browser side, where an unset VITE_SENTRY_DSN
+ * skips init).
  */
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 
@@ -49,7 +60,8 @@ export async function handleAiProxyRequest(
   req: AiProxyRequest,
   apiKey: string | undefined,
   verifyIdToken: (idToken: string) => Promise<{ uid: string }>,
-  recordDailyUsage?: (uid: string, dateKey: string) => Promise<number>
+  recordDailyUsage?: (uid: string, dateKey: string) => Promise<number>,
+  reportError?: (err: unknown, uid: string) => void
 ): Promise<AiProxyResult> {
   const { authHeader, body } = req;
 
@@ -150,6 +162,10 @@ export async function handleAiProxyRequest(
     return { status: anthropicResponse.status, body: data };
   } catch (err) {
     console.error('Anthropic proxy request failed:', err);
+    // uid only — never the system prompt, the messages, or any part of
+    // the request body. The uid is enough to tie a failure back to an
+    // account, which is all the existing ai_proxy_request log carries.
+    reportError?.(err, uid);
     return { status: 502, body: { error: { message: 'Failed to reach Anthropic API.' } } };
   }
 }

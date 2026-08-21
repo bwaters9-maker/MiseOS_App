@@ -38,9 +38,19 @@ VITE_FIREBASE_APP_ID
 ANTHROPIC_API_KEY
 ```
 
+Optional:
+
+```
+VITE_SENTRY_DSN
+```
+
 Firebase config also accepts non-prefixed `FIREBASE_*` keys (see `src/firebaseConfig.ts`).
 
 `ANTHROPIC_API_KEY` must never carry a `VITE_` prefix — Vite embeds `VITE_*` vars into the client bundle, which would ship the key to the browser. It is read only by `server.ts` locally, never imported in `src/`. The deployed Cloud Function (`functions/`) does not read this `.env` at all — it needs `ANTHROPIC_API_KEY` set separately as a Functions secret (`firebase functions:secrets:set ANTHROPIC_API_KEY`) before it can be deployed. See the AI feature section below.
+
+`VITE_SENTRY_DSN` is the opposite case: a DSN is **not** a secret — it is a write-only ingest endpoint and is meant to ship in the client bundle, which is exactly why it carries the `VITE_` prefix. It still lives in `.env` rather than being hardcoded, so the project can be repointed without a code edit. Unset is a fully supported state (the local-dev default): `src/main.tsx` skips `Sentry.init()` entirely and every Sentry call downstream is an inert no-op. Because Vite inlines `VITE_*` at build time, the value must be present when `npm run build` runs for a deploy — setting it afterward does nothing.
+
+See the Error reporting section below for what is actually reported.
 
 ## Project structure
 
@@ -51,7 +61,7 @@ functions/                        Deployed Cloud Functions (own package.json/tsc
     aiProxyHandler.ts              Shared /api/ai proxy core — imported by both this and server.ts
     index.ts                       Cloud Function entry points (currently just `ai`)
 src/
-  main.tsx                       React root
+  main.tsx                       React root + Sentry browser init (see Error reporting)
   App.tsx                        View router (viewMap + lazy loading)
   firebaseConfig.ts              Firebase init
   types.ts                       Canonical type definitions
@@ -357,6 +367,16 @@ The proxy accepts an optional `tools` array, whitelisted to exactly Anthropic's 
 - **`messages` ≤ 40 entries** and the **serialized `messages` payload ≤ 100KB** — over either is a 400. Enforced only after `messages` is confirmed to be an array.
 - **Per-uid daily quota: 200 requests/UTC-day** — the 201st verified request in a day is rejected with a 429 (`"Daily AI limit reached — try again tomorrow."`). Counted via the injected `recordDailyUsage` callback (the `aiUsage/{uid}_{YYYY-MM-DD}` counter, above). The quota is checked *after* the 400 validations (a malformed request never burns quota) and *before* the Anthropic forward (an over-limit request costs nothing). **Fail-open**: if the counter read/write throws (local dev has no credentials; a Firestore hiccup in prod), the handler logs a warning and lets the request through — the per-request caps still bound every call, so AI features never go down because the meter is broken. Local dev, which supplies no counter, is therefore effectively quota-free. The message says "try again tomorrow" rather than "resets at midnight" because the bucket is UTC — reset is UTC midnight, not the chef's local midnight.
 - **Client-side companion cap**: `TestKitchenHub.tsx` sends only the last 30 Sous messages per turn (display keeps the full history), starting the window at its first user turn so the payload never begins on an assistant message. Keeps a long chat under the 40-message server cap.
+
+## Error reporting (Sentry, free tier)
+
+Errors only — **no performance tracing and no session replay** on either side. Neither SDK sets `tracesSampleRate`, and `replayIntegration` is never added. Both are deliberate: the free tier's quota is for crashes, and replay would capture kitchen data on screen.
+
+- **Browser** (`@sentry/react`, initialized in `src/main.tsx`): reads `VITE_SENTRY_DSN`; unset skips `init()` entirely, so a local checkout with no DSN runs with every Sentry call an inert no-op. `environment` is `import.meta.env.MODE`.
+- **Caught render errors** (`src/components/ErrorBoundary.tsx`): React swallows a render error at the boundary, so Sentry's global handlers never see it — `componentDidCatch` calls `captureException` explicitly, attaching the `componentStack` as react context. The recovery UI and the existing `console.error` are unchanged; the boundary is not wrapped in `Sentry.ErrorBoundary` and does not need to be.
+- **Server** (`@sentry/node`, `functions/` only): the `/api/ai` catch path — the 502 raised when Anthropic is unreachable — reports **tagged with `uid` and nothing else**. The system prompt, the messages, and every other part of the request body are never attached, matching the existing `ai_proxy_request` log, which also carries only the uid. Anthropic returning an error *status* is not a failure of ours and is forwarded verbatim without reporting.
+- **Why the server side is an injected callback**: `functions/src/aiProxyHandler.ts` takes an optional `reportError(err, uid)` rather than importing `@sentry/node` itself. Same reason `verifyIdToken` and `recordDailyUsage` are injected — the file is resolved from `functions/node_modules` when bundled with the Cloud Function and from the root install when `server.ts` imports it, so a direct import would hand `init()` and `captureException()` two separate SDK copies with independent clients. `functions/src/index.ts` supplies the reporter (lazy init, once per instance, since a secret's value is only readable at runtime); `server.ts` omits it, so **local dev reports no server errors** — mirroring the browser side's unset-DSN default.
+- **Deploy config**: the function reads a `SENTRY_DSN` Functions secret (`firebase functions:secrets:set SENTRY_DSN`), declared in the `ai` function's `secrets` array. A DSN is not a secret, but it rides the same Secret Manager path as `ANTHROPIC_API_KEY` so there is one way to configure this function and no second `.env` file in the repo. If the secret is absent the reporter returns early and the proxy behaves exactly as before.
 
 ## Ingredient Advisor (components/ingredients/IngredientAdvisor.tsx)
 

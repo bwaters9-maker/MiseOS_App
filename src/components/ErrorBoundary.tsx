@@ -1,4 +1,5 @@
 import React, { ErrorInfo, ReactNode } from 'react';
+import * as Sentry from '@sentry/react';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { APP_NAME } from '../lib/appParams';
 
@@ -26,6 +27,12 @@ export default class ErrorBoundary extends React.Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error(`${APP_NAME} Module Crash caught in ErrorBoundary:`, error, errorInfo);
+    // A caught render error is invisible to Sentry's global handlers —
+    // React swallows it here. Report it explicitly. No-op when Sentry
+    // was never initialized (no VITE_SENTRY_DSN).
+    Sentry.captureException(error, {
+      contexts: { react: { componentStack: errorInfo.componentStack } },
+    });
     this.setState({ errorInfo });
   }
 
