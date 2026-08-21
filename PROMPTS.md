@@ -893,6 +893,17 @@ not eliminate it: expect an occasional first-attempt failure that a
 retry clears, and treat a repeat failure as a signal that something new
 was added at module scope.
 
+**Standing mitigation (from P-025's deploy):** prefix functions deploys
+with `FUNCTIONS_DISCOVERY_TIMEOUT=30000`. The predeploy hook now
+guarantees a `tsc` run immediately before every discovery, so the
+analysis subprocess is always competing with a just-finished compile —
+raising the budget from 10s to 30s removes the race rather than retrying
+past it. Use it as the default:
+
+```
+FUNCTIONS_DISCOVERY_TIMEOUT=30000 firebase deploy --only functions
+```
+
 **Background:** `firebase deploy --only functions` uploads `functions/`
 and runs the compiled `lib/` named by `functions/package.json`'s `main`.
 It does **not** run `tsc` — `firebase.json`'s `functions` block has no
@@ -919,7 +930,20 @@ run by hand before each attempt.
 
 ## P-025 — reportError delivery guarantee + dev-only forced-error trigger
 
-**Status:** QUEUED — not yet executed.
+**Status:** DONE 2026-08-21. All eight items complete, deployed to
+production. Suite 144 -> 160 tests (16 new, all authored — `reportError`
+had no committed test before this). Three secrets bound to `ai`:
+`ANTHROPIC_API_KEY`, `SENTRY_DSN`, `ALLOWED_TEST_UIDS`. Liveness
+confirmed: unauthenticated `POST /api/ai` returns 401, with and without
+`__forceError` in the body.
+
+**`ALLOWED_TEST_UIDS` ships holding `none`** and was deliberately not set
+to a real uid — the trigger is inert in production. Arming it is a
+separate, explicit act.
+
+**Deployed with `FUNCTIONS_DISCOVERY_TIMEOUT=30000`** — see P-024's
+standing mitigation. The deploy succeeded first try, against two
+first-attempt failures during P-018/P-024 without it.
 
 **Background:** P-018's `reportError` is fire-and-forget. The callback is
 typed synchronous (`(err, uid) => void`), so `aiProxyHandler.ts` calls it
