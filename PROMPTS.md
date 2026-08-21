@@ -144,3 +144,31 @@ another reason.
   removed, so scope item 2 does not yet pass against a real build. `.env`
   is gitignored and machine-local — that edit is the operator's, not a
   repo change.
+
+---
+
+## P-024 — firebase.json predeploy hook for functions
+
+**Status:** QUEUED — not yet executed.
+
+**Background:** `firebase deploy --only functions` uploads `functions/`
+and runs the compiled `lib/` named by `functions/package.json`'s `main`.
+It does **not** run `tsc` — `firebase.json`'s `functions` block has no
+`predeploy` hook — so whoever deploys must remember to run `npm run
+build` in `functions/` first. A forgotten build ships a stale `lib/`
+silently: the deploy reports success and the old code keeps running.
+Surfaced during the P-018 deploys, where the functions build had to be
+run by hand before each attempt.
+
+**Scope:**
+
+1. Add `"predeploy": ["npm --prefix functions run build"]` to the
+   `functions` block in `firebase.json`.
+2. Verify by making a trivial source-only change in `functions/src`,
+   deleting `functions/lib`, and running a deploy — the hook must
+   rebuild `lib/` before packaging, and the deployed function must
+   reflect the change.
+3. Confirm the hook does not break `firebase deploy --only hosting`
+   (predeploy is per-target, so hosting should not invoke it).
+
+**Constraint:** Do not fix anything else — report additional issues only.
