@@ -31,7 +31,7 @@ const APP_MODULES: AppModule[] = [
   },
   {
     name: 'Recipes',
-    description: 'Recipe Builder (menu recipes and sub-recipes with live cost, food-cost %, suggested pricing, and an FDA nutrition label), Menu (the operational cost/FC% view plus a guest-facing preview with Classic/Clean print templates), Recipe Collections (seasonal groupings of menu recipes, one active at a time), and Development — the dish-development workspace (formerly its own Test Kitchen tab): an AI-generated, read-only editorial trend briefing with pricing commentary and a seasonal sourcing matrix (never touches the pantry or costing), the Sous chat for brainstorming new dishes, and a Recipe Build panel that turns a chat into a real recipe.',
+    description: 'Recipe Builder (menu recipes and sub-recipes with live cost, food-cost %, suggested pricing, and an FDA nutrition label), Menu (the operational cost/FC% view plus a guest-facing preview with Classic/Clean print templates), Recipe Collections (seasonal groupings of menu recipes, one active at a time), and Development — the dish-development workspace (formerly its own Test Kitchen tab): an AI-generated, read-only editorial trend briefing with pricing commentary and a seasonal sourcing matrix (never touches the pantry or costing), the Sous chat for brainstorming new dishes, and a Recipe Build panel that turns a chat into a real recipe. A menu recipe is either in development or active: development dishes carry up to three variants with notes, and stay off the Menu, out of Collections, and out of the Guest Preview until the chef sets them active.',
   },
   {
     name: 'Prep List',

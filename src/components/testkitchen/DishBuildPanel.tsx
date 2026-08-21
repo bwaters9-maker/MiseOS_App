@@ -27,9 +27,10 @@ import { useRestaurantId } from '../AuthContext';
 import { rCollection } from '../../lib/firestorePaths';
 import { callAi, parseAiJson } from '../../lib/ai';
 import { withRegionContext } from '../../lib/regionContext';
-import { toBase, displayUnitsFor, defaultDisplayUnit, type UnitSystem, type DisplayUnit } from '../../lib/units';
+import { displayUnitsFor, defaultDisplayUnit, type UnitSystem, type DisplayUnit } from '../../lib/units';
+import { dishDraftToRecipeDoc } from '../../lib/dishDraftToRecipe';
 import { AiIngredientLookup } from '../ingredients/AiIngredientLookup';
-import type { DishDraft, DishDraftLine, Ingredient, MeasureType, Recipe, RecipeLine, RestaurantProfile, Vendor } from '../../types';
+import type { DishDraft, DishDraftLine, Ingredient, MeasureType, RestaurantProfile, Vendor } from '../../types';
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -79,7 +80,7 @@ const normalizeDishDraft = (parsed: any, ingredients: Ingredient[], unitSystem: 
     // Keep the qty + measureType extraction got right, but never trust the
     // unit blindly: if it doesn't fit the measure type, blank it so the
     // panel's unit select shows empty and the chef must pick — same posture
-    // as the line unit flag, so resolveUnit's fallback never fires for an
+    // as the line unit flag, so the hand-off's unit fallback never fires for an
     // untouched AI yield unit either.
     const unit = (displayUnitsFor(measureType, unitSystem) as string[]).includes(rawUnit) ? rawUnit : '';
     batchYield = { qty: rawYield.qty, measureType, unit };
@@ -139,7 +140,7 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
    * ingredient's measure type (the silent-substitution case Item 1 kills),
    * when it carries no quantity, or when its ingredient has vanished from
    * the pantry mid-session (no measure type to validate against — so it
-   * can only be discarded, never silently handed off through resolveUnit's
+   * can only be discarded, never silently handed off through the unit
    * 'each' fallback). A kept, flagged line blocks hand-off. */
   const lineNeedsAttention = (line: DishDraftLine): boolean => {
     const ing = ingredients.find(i => i.id === line.ingredientId);
@@ -254,55 +255,18 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
 
   // A batch yield whose unit isn't valid for its measure type — the
   // untouched extracted draft normalizeDishDraft blanked to '' being the
-  // common case — must be resolved before hand-off, or resolveUnit would
+  // common case — must be resolved before hand-off, or the unit fallback would
   // silently substitute the default on the empty string. Blocks Send the
   // same way an unresolved line does.
   const yieldNeedsAttention = !!draft && !!draft.batchYield
     && !(displayUnitsFor(draft.batchYield.measureType, unitSystem) as string[]).includes(draft.batchYield.unit);
-
-  /** Resolves an AI-returned display unit against what's actually valid
-   * for a measure type, falling back to the system default when it
-   * doesn't match — same defensive pattern Recipes.tsx's acceptSuggestion
-   * uses for pantry-suggestion units. */
-  const resolveUnit = (aiUnit: string, measureType: MeasureType): DisplayUnit => {
-    const validUnits = displayUnitsFor(measureType, unitSystem) as string[];
-    return (validUnits.includes(aiUnit) ? aiUnit : defaultDisplayUnit(measureType, unitSystem)) as DisplayUnit;
-  };
 
   const handleSendToRecipeBuilder = async () => {
     if (!draft || !draft.batchYield || draft.portions == null || !draft.dishName.trim() || hasUnresolvedLines || yieldNeedsAttention) return;
     setHandingOff(true);
     setHandOffError(null);
     try {
-      const yieldUnit = resolveUnit(draft.batchYield.unit, draft.batchYield.measureType);
-      const lines: RecipeLine[] = draft.lines
-        .filter((_, i) => keptLines.has(i))
-        .map((line): RecipeLine => {
-          const ing = ingredients.find(i => i.id === line.ingredientId);
-          const unit = ing ? resolveUnit(line.unit, ing.measureType) : ('each' as DisplayUnit);
-          return {
-            type: 'ingredient',
-            refId: line.ingredientId!,
-            qty: toBase(line.qty, unit),
-            ...(line.note && { note: line.note }),
-          };
-        });
-
-      const newRecipe: Omit<Recipe, 'id'> = {
-        name: draft.dishName.trim(),
-        recipeType: 'menu',
-        course: '',
-        batchYield: { qty: toBase(draft.batchYield.qty, yieldUnit), measureType: draft.batchYield.measureType },
-        portions: draft.portions,
-        lines,
-        methodSteps: draft.methodSteps,
-        // A freshly extracted dish is not on the menu until the chef puts it
-        // there deliberately from the Recipes library. Explicit false rather
-        // than relying on isRecipeOnMenu's `?? true` legacy default, which
-        // stays untouched so existing recipes keep their current behavior.
-        onMenu: false,
-        updatedAt: new Date().toISOString(),
-      };
+      const newRecipe = dishDraftToRecipeDoc(draft, keptLines, ingredients, unitSystem, new Date().toISOString());
       const ref = await addDoc(rCollection(restaurantId, 'recipes'), newRecipe);
       onOpenRecipe(ref.id);
     } catch (e: any) {

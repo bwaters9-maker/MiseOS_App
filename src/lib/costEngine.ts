@@ -3,7 +3,7 @@
  * Recipe and ingredient cost calculations. Pure functions, no React.
  */
 
-import { Recipe, Ingredient } from '../types';
+import { Recipe, Ingredient, RecipeStatus } from '../types';
 
 /**
  * Total cost of one batch of `recipe`, recursing through sub-recipe lines.
@@ -170,6 +170,11 @@ export const featureFieldsFromRecipe = (
  * before the `onMenu` field existed default to `true` (their prior,
  * unconditional menu status) rather than silently dropping off the menu.
  *
+ * A recipe still in development is never on the menu, whatever its
+ * `onMenu` toggle says — finishing the dish is the status flip, and the
+ * toggle is preserved untouched underneath so it still means what it
+ * meant once the recipe goes active.
+ *
  * When an `activeCollection` is passed (a `RecipeCollection` with
  * `active: true`, or null when none is active), it defines the menu set:
  * the recipe must be a member AND pass its own `onMenu` toggle — the
@@ -182,5 +187,18 @@ export const isRecipeOnMenu = (
   activeCollection?: { recipeIds: string[] } | null,
 ): boolean =>
   recipe.recipeType === 'menu' &&
+  !isRecipeInDevelopment(recipe) &&
   (recipe.onMenu ?? true) &&
   (!activeCollection || activeCollection.recipeIds.includes(recipe.id));
+
+/**
+ * A recipe's lifecycle status, with the legacy default applied. Recipes
+ * saved before `status` existed have no field and read as 'active' —
+ * their prior behavior — so no migration write was ever needed.
+ */
+export const recipeStatus = (recipe: Pick<Recipe, 'status'>): RecipeStatus =>
+  recipe.status ?? 'active';
+
+/** Whether this recipe is still being developed (see `recipeStatus`). */
+export const isRecipeInDevelopment = (recipe: Pick<Recipe, 'status'>): boolean =>
+  recipeStatus(recipe) === 'development';

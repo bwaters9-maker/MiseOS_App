@@ -6,6 +6,7 @@ import { rCollection, rDoc } from './lib/firestorePaths';
 import { useKitchenSelector } from './components/KitchenStateContext';
 import { useRestaurantId } from './components/AuthContext';
 import { useRecipeCollections } from './hooks/useRecipeCollections';
+import { isRecipeInDevelopment } from './lib/costEngine';
 import type { Recipe, RecipeCollection } from './types';
 
 const CARD = 'bg-surface border border-line rounded-card p-[21px]';
@@ -20,9 +21,14 @@ const RecipeCollections: React.FC = () => {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Recipes still in development are not collectable — a season's menu set
+  // can only be built from finished dishes. A development recipe already
+  // sitting in a collection's recipeIds is ignored here the same way a
+  // deleted recipe's stale id is, and comes back on its own once the chef
+  // flips it active.
   const menuRecipes = useMemo(
     () => allRecipes
-      .filter(r => r.recipeType === 'menu')
+      .filter(r => r.recipeType === 'menu' && !isRecipeInDevelopment(r))
       .sort((a, b) => a.name.localeCompare(b.name)),
     [allRecipes],
   );

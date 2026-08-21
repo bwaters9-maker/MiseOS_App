@@ -6,6 +6,8 @@ import {
   fcPercent,
   suggestedPrice,
   isRecipeOnMenu,
+  recipeStatus,
+  isRecipeInDevelopment,
   wouldCreateCycle,
 } from './costEngine';
 import type { Ingredient, Recipe, RecipeLine } from '../types';
@@ -192,6 +194,55 @@ describe('isRecipeOnMenu', () => {
 
   it('treats a null active collection as no collection filter', () => {
     expect(isRecipeOnMenu(menu({ onMenu: true }), null)).toBe(true);
+  });
+
+  it('excludes a development recipe regardless of its onMenu toggle', () => {
+    expect(isRecipeOnMenu(menu({ status: 'development' }))).toBe(false);
+    expect(isRecipeOnMenu(menu({ status: 'development', onMenu: true }))).toBe(false);
+  });
+
+  it('excludes a development recipe even when it is in the active collection', () => {
+    expect(isRecipeOnMenu(menu({ status: 'development', onMenu: true }), { recipeIds: ['r'] })).toBe(false);
+  });
+
+  it('puts a recipe back on the menu when its status flips to active', () => {
+    expect(isRecipeOnMenu(menu({ status: 'active', onMenu: true }))).toBe(true);
+  });
+
+  it('leaves the onMenu toggle meaningful after the status flip', () => {
+    // The toggle is preserved untouched under development, so a dish that
+    // was toggled off stays off once finished — the flip is not a reset.
+    expect(isRecipeOnMenu(menu({ status: 'active', onMenu: false }))).toBe(false);
+  });
+});
+
+describe('recipeStatus / isRecipeInDevelopment', () => {
+  it('defaults a recipe with no status field to active (legacy, no migration)', () => {
+    expect(recipeStatus(mkRecipe({ id: 'r' }))).toBe('active');
+    expect(isRecipeInDevelopment(mkRecipe({ id: 'r' }))).toBe(false);
+  });
+
+  it('reads an explicit status', () => {
+    expect(recipeStatus(mkRecipe({ id: 'r', status: 'development' }))).toBe('development');
+    expect(isRecipeInDevelopment(mkRecipe({ id: 'r', status: 'development' }))).toBe(true);
+    expect(isRecipeInDevelopment(mkRecipe({ id: 'r', status: 'active' }))).toBe(false);
+  });
+});
+
+describe('collection membership excludes development recipes', () => {
+  // Mirrors RecipeCollections.tsx's picker filter: a season's menu set is
+  // built from finished dishes only.
+  const collectable = (recipes: Recipe[]) =>
+    recipes.filter(r => r.recipeType === 'menu' && !isRecipeInDevelopment(r)).map(r => r.id);
+
+  it('offers active and legacy menu recipes, but not development or sub-recipes', () => {
+    const recipes = [
+      mkRecipe({ id: 'legacy' }),
+      mkRecipe({ id: 'active', status: 'active' }),
+      mkRecipe({ id: 'dev', status: 'development' }),
+      mkRecipe({ id: 'sub', recipeType: 'sub' }),
+    ];
+    expect(collectable(recipes)).toEqual(['legacy', 'active']);
   });
 });
 

@@ -67,8 +67,39 @@ export interface Recipe {
   menuPrice?: number;
   menuDescription?: string;
   onMenu?: boolean;
+  status?: RecipeStatus;
+  variants?: RecipeVariant[];
   updatedAt: string;
 }
+
+/**
+ * Where a menu recipe sits in its own lifecycle — a state, not a place.
+ * `'development'` is a dish still being worked out: it stays out of the
+ * Menu, out of Collections, and out of the Guest Preview until the chef
+ * flips it to `'active'`. Absent on every recipe saved before this field
+ * existed; every reader treats a missing value as `'active'`, so nothing
+ * that was on the menu drops off and no migration write was needed.
+ *
+ * Sub-recipes carry no meaningful status — they were never menu-eligible.
+ */
+export type RecipeStatus = 'development' | 'active';
+
+/**
+ * One trial version of a dish in development — the chef's record of what
+ * they changed between passes. Capped at `MAX_RECIPE_VARIANTS` (3), since
+ * a fourth pass in practice means the dish has moved on rather than
+ * branched. Variants are notes only: they never carry their own lines,
+ * cost, or nutrition, and they are not written to any other collection.
+ */
+export interface RecipeVariant {
+  /** Stable key for list rendering/edits; not a Firestore document id. */
+  id: string;
+  name: string;
+  notes: string;
+}
+
+/** Maximum variants a development recipe may carry. */
+export const MAX_RECIPE_VARIANTS = 3;
 
 /**
  * One ingredient line inside a Test Kitchen dish draft (see `DishDraft`).

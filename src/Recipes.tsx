@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { ChefHat, Plus, Trash2, X, Check, Search, Layers, UtensilsCrossed, AlertTriangle, Sparkles, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
+import { ChefHat, Plus, Trash2, X, Check, Search, Layers, UtensilsCrossed, AlertTriangle, Sparkles, Loader2, ChevronDown, ChevronRight, FlaskConical } from 'lucide-react';
 import { addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { rCollection, rDoc } from './lib/firestorePaths';
 import { useKitchenSelector } from './components/KitchenStateContext';
@@ -9,13 +9,17 @@ import { AlertDialog } from './components/AlertDialog';
 import NutritionLabel from './components/recipes/NutritionLabel';
 import {
   recipeCost, costPerPortion, fcPercent, suggestedPrice, wouldCreateCycle, fcColor, isRecipeOnMenu,
+  recipeStatus, isRecipeInDevelopment,
 } from './lib/costEngine';
 import {
   toBase, fromBase, displayUnitsFor, defaultDisplayUnit, smartUnit, costPerDisplayUnit, measureTypeOfUnit,
 } from './lib/units';
 import { callAi, parseAiJson } from './lib/ai';
 import { withRegionContext } from './lib/regionContext';
-import type { Ingredient, Recipe, RecipeLine, MeasureType, RecipeCategory, RestaurantProfile } from './types';
+import { MAX_RECIPE_VARIANTS } from './types';
+import type {
+  Ingredient, Recipe, RecipeLine, MeasureType, RecipeCategory, RestaurantProfile, RecipeStatus, RecipeVariant,
+} from './types';
 import type { UnitSystem, DisplayUnit } from './lib/units';
 
 const INPUT = 'w-full bg-zinc-900 border border-zinc-700 rounded-[5px] px-[8px] py-[5px] text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-500 placeholder-zinc-600';
@@ -113,6 +117,8 @@ interface FormState {
   methodSteps: string[];
   menuPrice: string;
   menuDescription: string;
+  status: RecipeStatus;
+  variants: RecipeVariant[];
 }
 
 const BLANK = (recipeType: 'sub' | 'menu', unitSystem: UnitSystem): FormState => ({
@@ -128,6 +134,11 @@ const BLANK = (recipeType: 'sub' | 'menu', unitSystem: UnitSystem): FormState =>
   methodSteps: [],
   menuPrice: '',
   menuDescription: '',
+  // A recipe the chef builds by hand starts finished — the pre-status
+  // behavior. Development is entered deliberately from the toggle below,
+  // or automatically by a Test Kitchen extraction.
+  status: 'active',
+  variants: [],
 });
 
 const lineMeasureType = (line: LineDraft | RecipeLine, ingredients: Ingredient[], recipes: Recipe[]): MeasureType => {
@@ -192,6 +203,12 @@ const toForm = (recipe: Recipe, unitSystem: UnitSystem, ingredients: Ingredient[
     methodSteps: recipe.methodSteps.length > 0 ? [...recipe.methodSteps] : [],
     menuPrice: recipe.menuPrice != null ? String(recipe.menuPrice) : '',
     menuDescription: recipe.menuDescription ?? '',
+    status: recipeStatus(recipe),
+    variants: (recipe.variants ?? []).slice(0, MAX_RECIPE_VARIANTS).map((v, i) => ({
+      id: v.id || `variant:${i}`,
+      name: v.name ?? '',
+      notes: v.notes ?? '',
+    })),
   };
 };
 
@@ -219,6 +236,18 @@ const toDoc = (form: FormState, ingredients: Ingredient[]): Omit<Recipe, 'id'> =
   ...(form.recipeType === 'menu' && form.menuDescription.trim()
     ? { menuDescription: form.menuDescription.trim() }
     : {}),
+  // Status and variants are menu-recipe concepts only — a sub-recipe was
+  // never menu-eligible, so it carries neither.
+  ...(form.recipeType === 'menu' ? { status: form.status } : {}),
+  ...(form.recipeType === 'menu' && form.status === 'development' && form.variants.length > 0
+    ? {
+        variants: form.variants.slice(0, MAX_RECIPE_VARIANTS).map(v => ({
+          id: v.id,
+          name: v.name.trim(),
+          notes: v.notes.trim(),
+        })),
+      }
+    : {}),
   updatedAt: new Date().toISOString(),
 });
 
@@ -243,6 +272,7 @@ const virtualRecipe = (form: FormState, id: string, ingredients: Ingredient[]): 
   methodSteps: form.methodSteps,
   menuPrice: form.menuPrice !== '' && !isNaN(parseFloat(form.menuPrice)) ? parseFloat(form.menuPrice) : undefined,
   menuDescription: form.recipeType === 'menu' && form.menuDescription.trim() ? form.menuDescription.trim() : undefined,
+  status: form.recipeType === 'menu' ? form.status : undefined,
   updatedAt: '',
 });
 
@@ -471,6 +501,16 @@ const RecipeEditor: React.FC<{
   const updateStep = (idx: number, v: string) => setForm({ ...form, methodSteps: form.methodSteps.map((s, i) => i === idx ? v : s) });
   const removeStep = (idx: number) => setForm({ ...form, methodSteps: form.methodSteps.filter((_, i) => i !== idx) });
 
+  const addVariant = () => {
+    if (form.variants.length >= MAX_RECIPE_VARIANTS) return;
+    const next: RecipeVariant = { id: `variant:${Date.now()}:${form.variants.length}`, name: '', notes: '' };
+    setForm({ ...form, variants: [...form.variants, next] });
+  };
+  const updateVariant = (id: string, patch: Partial<RecipeVariant>) =>
+    setForm({ ...form, variants: form.variants.map(v => (v.id === id ? { ...v, ...patch } : v)) });
+  const removeVariant = (id: string) =>
+    setForm({ ...form, variants: form.variants.filter(v => v.id !== id) });
+
   const suggestionCounter = useRef(0);
   const [pantryLoading, setPantryLoading] = useState(false);
   const [pantryError, setPantryError] = useState<string | null>(null);
@@ -601,6 +641,88 @@ const RecipeEditor: React.FC<{
           Sub-Recipe
         </button>
       </div>
+
+      {form.recipeType === 'menu' && (
+        <div className="space-y-[13px]">
+          <div className="flex flex-wrap items-center gap-[13px]">
+            <div className="flex items-center gap-[8px] bg-zinc-900/60 border border-zinc-800 rounded-[8px] p-[5px] w-fit">
+              <button
+                type="button"
+                onClick={() => set('status', 'development')}
+                className={`px-[13px] py-[5px] text-[10px] font-bold uppercase tracking-wider rounded-[5px] transition-colors duration-[144ms] ${
+                  form.status === 'development' ? 'bg-amber-900/60 text-amber-300 border border-amber-700' : 'text-zinc-500 border border-transparent hover:text-zinc-300'
+                }`}
+              >
+                In Development
+              </button>
+              <button
+                type="button"
+                onClick={() => set('status', 'active')}
+                className={`px-[13px] py-[5px] text-[10px] font-bold uppercase tracking-wider rounded-[5px] transition-colors duration-[144ms] ${
+                  form.status === 'active' ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-700' : 'text-zinc-500 border border-transparent hover:text-zinc-300'
+                }`}
+              >
+                Active
+              </button>
+            </div>
+            <p className="text-[10px] text-zinc-500">
+              {form.status === 'development'
+                ? 'Kept off the Menu, Collections, and Guest Preview until set active.'
+                : 'Eligible for the Menu, Collections, and Guest Preview.'}
+            </p>
+          </div>
+
+          {form.status === 'development' && (
+            <div className="bg-zinc-900/40 border border-zinc-800 rounded-[8px] p-[13px] space-y-[8px]">
+              <div className="flex items-center justify-between">
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                  Variants ({form.variants.length}/{MAX_RECIPE_VARIANTS})
+                </h3>
+                {form.variants.length < MAX_RECIPE_VARIANTS && (
+                  <button type="button" onClick={addVariant} className={`${BTN_GHOST} flex items-center gap-[5px]`}>
+                    <Plus className="w-3 h-3" /> Add Variant
+                  </button>
+                )}
+              </div>
+              {form.variants.length === 0 ? (
+                <p className="text-[10px] text-zinc-600 italic">No variants logged.</p>
+              ) : (
+                <div className="space-y-[8px]">
+                  {form.variants.map((v, idx) => (
+                    <div key={v.id} className="bg-zinc-950 border border-zinc-800 rounded-[5px] p-[8px] space-y-[5px]">
+                      <div className="flex items-center gap-[8px]">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 shrink-0">V{idx + 1}</span>
+                        <input
+                          type="text"
+                          value={v.name}
+                          onChange={e => updateVariant(v.id, { name: e.target.value })}
+                          placeholder="Variant name"
+                          className={INPUT}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeVariant(v.id)}
+                          className="p-[3px] text-zinc-600 hover:text-red-400 transition-colors duration-[144ms] shrink-0"
+                          title="Remove variant"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <textarea
+                        value={v.notes}
+                        onChange={e => updateVariant(v.id, { notes: e.target.value })}
+                        placeholder="What changed, and how it tasted"
+                        rows={2}
+                        className={`${INPUT} resize-y`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className={`grid grid-cols-1 ${form.recipeType === 'menu' ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-[13px]`}>
         <div>
@@ -861,6 +983,7 @@ const ListRow: React.FC<{
   onToggleOnMenu?: () => void;
 }> = ({ r, isActive, isConfirm, onOpen, onRequestDelete, onConfirmDelete, onCancelDelete, onToggleOnMenu }) => {
   const onMenu = isRecipeOnMenu(r);
+  const inDevelopment = isRecipeInDevelopment(r);
   return (
     <div
       className={`group flex items-center justify-between gap-[8px] px-[13px] py-[8px] rounded-[8px] cursor-pointer transition-colors duration-[144ms] ${
@@ -888,7 +1011,15 @@ const ListRow: React.FC<{
         </div>
       ) : (
         <div className="flex items-center gap-[5px] shrink-0">
-          {onToggleOnMenu && (
+          {inDevelopment && (
+            <span
+              className={`${BADGE} text-amber-300 border-amber-800 bg-amber-950/40`}
+              title="In development — off the menu until set active"
+            >
+              Development
+            </span>
+          )}
+          {onToggleOnMenu && !inDevelopment && (
             <button
               onClick={e => { e.stopPropagation(); onToggleOnMenu(); }}
               className={`${BADGE} transition-colors duration-[144ms] ${
@@ -1088,8 +1219,10 @@ const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPerc
   const filtered = allRecipes
     .filter(r => r.name.toLowerCase().includes(search.toLowerCase()))
     .filter(r => !categoryFilter || r.categoryId === categoryFilter);
-  const menuRecipes = filtered.filter(r => r.recipeType === 'menu').sort((a, b) => a.name.localeCompare(b.name));
-  const subRecipes = filtered.filter(r => r.recipeType === 'sub').sort((a, b) => a.name.localeCompare(b.name));
+  const byName = (a: Recipe, b: Recipe) => a.name.localeCompare(b.name);
+  const menuRecipes = filtered.filter(r => r.recipeType === 'menu' && !isRecipeInDevelopment(r)).sort(byName);
+  const developmentRecipes = filtered.filter(r => r.recipeType === 'menu' && isRecipeInDevelopment(r)).sort(byName);
+  const subRecipes = filtered.filter(r => r.recipeType === 'sub').sort(byName);
 
   const menuByCourse = useMemo(() => {
     const groups: Record<string, Recipe[]> = {};
@@ -1170,7 +1303,7 @@ const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPerc
             Recipes
           </h1>
           <p className="text-xs text-zinc-500 mt-[5px]">
-            {allRecipes.length} recipe{allRecipes.length !== 1 ? 's' : ''} — {menuRecipes.length} menu, {subRecipes.length} sub
+            {allRecipes.length} recipe{allRecipes.length !== 1 ? 's' : ''} — {menuRecipes.length} menu, {developmentRecipes.length} in development, {subRecipes.length} sub
           </p>
         </div>
         {onViewMenu && (
@@ -1266,6 +1399,28 @@ const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPerc
                         ))}
                       </div>
                     </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {developmentRecipes.length > 0 && (
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.15em] text-amber-500/80 mb-[8px] flex items-center gap-[5px]">
+                  <FlaskConical className="w-3 h-3" /> In Development
+                </p>
+                <div className="space-y-[2px]">
+                  {developmentRecipes.map(r => (
+                    <ListRow
+                      key={r.id}
+                      r={r}
+                      isActive={selectedId === r.id}
+                      isConfirm={deleteConfirmId === r.id}
+                      onOpen={() => openRecipe(r)}
+                      onRequestDelete={() => setDeleteConfirmId(r.id)}
+                      onConfirmDelete={() => handleDelete(r.id)}
+                      onCancelDelete={() => setDeleteConfirmId(null)}
+                    />
                   ))}
                 </div>
               </div>
