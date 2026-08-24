@@ -88,6 +88,36 @@ const AutoGrowTextarea: React.FC<{
   );
 };
 
+/** The one category filter control. Both places that filter by category —
+ * the recipe library sidebar and the builder's line search — render this, so
+ * the two can never drift in behavior or styling. */
+const CATEGORY_SELECT =
+  'w-full bg-surface border border-line rounded-[8px] px-[8px] py-[5px] text-xs font-body text-navy focus:outline-none focus:border-teal transition-colors duration-[144ms]';
+
+const CategoryFilterSelect: React.FC<{
+  categories: RecipeCategory[];
+  value: string | null;
+  onChange: (categoryId: string | null) => void;
+  /** LineSearchBox uses this to keep its results panel open across the
+   * input blur that picking from a native select causes. */
+  onInteract?: () => void;
+}> = ({ categories, value, onChange, onInteract }) => {
+  if (categories.length === 0) return null;
+  return (
+    <label className="block">
+      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate mb-[5px] font-body">Category</span>
+      <select
+        value={value ?? ''}
+        onChange={e => { onChange(e.target.value || null); onInteract?.(); }}
+        className={CATEGORY_SELECT}
+      >
+        <option value="">All</option>
+        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+      </select>
+    </label>
+  );
+};
+
 const categoryLabel = (r: Recipe, categories: RecipeCategory[]): string => {
   const cat = categories.find(c => c.id === r.categoryId);
   if (cat) return cat.name;
@@ -346,33 +376,14 @@ const LineSearchBox: React.FC<{
           className={`${INPUT} pl-[26px]`}
         />
       </div>
-      {categories.length > 0 && (
-        <div className="flex flex-wrap gap-[5px] mt-[5px]">
-          <button
-            type="button"
-            onMouseDown={e => e.preventDefault()}
-            onClick={() => { setCategoryFilter(null); setFocused(true); }}
-            className={`${BADGE} transition-colors duration-[144ms] ${
-              categoryFilter === null ? 'text-purple-300 border-purple-700 bg-purple-950/40' : 'text-zinc-500 border-zinc-700 hover:text-zinc-300'
-            }`}
-          >
-            All
-          </button>
-          {categories.map(c => (
-            <button
-              key={c.id}
-              type="button"
-              onMouseDown={e => e.preventDefault()}
-              onClick={() => { setCategoryFilter(prev => prev === c.id ? null : c.id); setFocused(true); }}
-              className={`${BADGE} transition-colors duration-[144ms] ${
-                categoryFilter === c.id ? 'text-purple-300 border-purple-700 bg-purple-950/40' : 'text-zinc-500 border-zinc-700 hover:text-zinc-300'
-              }`}
-            >
-              {c.name}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="mt-[5px]">
+        <CategoryFilterSelect
+          categories={categories}
+          value={categoryFilter}
+          onChange={setCategoryFilter}
+          onInteract={() => setFocused(true)}
+        />
+      </div>
       {focused && isBrowsing && (
         <div className="absolute z-10 w-full mt-[5px] bg-zinc-950 border border-zinc-800 rounded-[8px] shadow-lg max-h-64 overflow-y-auto">
           {!hasResults && (
@@ -1337,29 +1348,11 @@ const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPerc
             />
           </div>
 
-          {categories.length > 0 && (
-            <div className="flex flex-wrap gap-[5px]">
-              <button
-                onClick={() => setCategoryFilter(null)}
-                className={`${BADGE} transition-colors duration-[144ms] ${
-                  categoryFilter === null ? 'text-emerald-300 border-emerald-700 bg-emerald-950/40' : 'text-zinc-500 border-zinc-700 hover:text-zinc-300'
-                }`}
-              >
-                All
-              </button>
-              {categories.map(c => (
-                <button
-                  key={c.id}
-                  onClick={() => setCategoryFilter(prev => prev === c.id ? null : c.id)}
-                  className={`${BADGE} transition-colors duration-[144ms] ${
-                    categoryFilter === c.id ? 'text-emerald-300 border-emerald-700 bg-emerald-950/40' : 'text-zinc-500 border-zinc-700 hover:text-zinc-300'
-                  }`}
-                >
-                  {c.name}
-                </button>
-              ))}
-            </div>
-          )}
+          <CategoryFilterSelect
+            categories={categories}
+            value={categoryFilter}
+            onChange={setCategoryFilter}
+          />
 
           <div className="space-y-[5px]">
             <button onClick={() => startCreate('menu')} className={`${BTN_PRIMARY} w-full flex items-center justify-center gap-[5px]`}>

@@ -9,6 +9,7 @@ import { useKitchenSelector } from './components/KitchenStateContext';
 import Ingredients from './IngredientsTable';
 import Vendors from './Vendors';
 import type { RestaurantProfile, CuisineStyle, PricePoint } from './types';
+import { DEFAULT_CATEGORIES } from './hooks/useRecipeCategories';
 
 interface SettingsProps {
   theme: 'day' | 'service';
@@ -23,8 +24,6 @@ interface StationPreset {
   id: string;
   name: string;
 }
-
-const DEFAULT_RECIPE_CATEGORIES = ['Sides', 'Sauces', 'Salads', 'Soups', 'Proteins', 'Desserts'];
 
 interface RecipeCategoryPreset {
   id: string;
@@ -172,7 +171,7 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       if (snapshot.empty && !categorySeeding.current) {
         categorySeeding.current = true;
-        Promise.all(DEFAULT_RECIPE_CATEGORIES.map(name => addDoc(rCollection(restaurantId, 'recipe_categories'), { name })));
+        Promise.all(DEFAULT_CATEGORIES.map(name => addDoc(rCollection(restaurantId, 'recipe_categories'), { name })));
       }
       const categoryData = snapshot.docs.map(doc => ({
         id: doc.id,

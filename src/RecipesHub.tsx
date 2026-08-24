@@ -1,5 +1,6 @@
 import React, { Suspense, useEffect, useState } from 'react';
 import { ChefHat, UtensilsCrossed, Layers, Sparkles } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import Recipes from './Recipes';
 import Menu from './Menu';
 import RecipeCollections from './RecipeCollections';
@@ -28,11 +29,22 @@ interface RecipesHubProps {
 
 type RecipesSubTab = 'recipes' | 'menu' | 'collections' | 'development';
 
-const TAB_BTN = 'px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg border transition-colors flex items-center gap-2';
-const tabBtnClass = (active: boolean) =>
-  `${TAB_BTN} ${active
-    ? 'bg-emerald-700 text-white border-emerald-600'
-    : 'bg-zinc-800/50 text-zinc-400 border-zinc-700 hover:bg-zinc-700/50 hover:text-zinc-200'}`;
+/** Compact segmented control: one connected bar, active segment filled teal,
+ * inactive segments quiet. Deliberately lighter than the page's own headings so
+ * it reads as a switch rather than as content. */
+const SEG_BASE =
+  'px-[11px] py-[5px] text-[11px] font-display font-semibold flex items-center gap-[5px] border-r border-line last:border-r-0 transition-colors duration-[144ms]';
+const segClass = (active: boolean) =>
+  `${SEG_BASE} ${active
+    ? 'bg-teal text-cream'
+    : 'bg-surface text-slate hover:text-navy'}`;
+
+const SUB_TABS: { key: RecipesSubTab; label: string; Icon: LucideIcon }[] = [
+  { key: 'recipes', label: 'Recipe Builder', Icon: ChefHat },
+  { key: 'menu', label: 'Menu', Icon: UtensilsCrossed },
+  { key: 'collections', label: 'Collections', Icon: Layers },
+  { key: 'development', label: 'Development', Icon: Sparkles },
+];
 
 export default function RecipesHub(props: RecipesHubProps) {
   const [activeSubTab, setActiveSubTab] = useState<RecipesSubTab>('recipes');
@@ -56,19 +68,18 @@ export default function RecipesHub(props: RecipesHubProps) {
   return (
     <div>
       <div className="max-w-[1597px] mx-auto px-[21px] pt-[21px] flex justify-end">
-        <div className="flex items-center gap-2">
-          <button onClick={() => setActiveSubTab('recipes')} className={tabBtnClass(activeSubTab === 'recipes')}>
-            <ChefHat className="w-3.5 h-3.5" /> Recipe Builder
-          </button>
-          <button onClick={() => setActiveSubTab('menu')} className={tabBtnClass(activeSubTab === 'menu')}>
-            <UtensilsCrossed className="w-3.5 h-3.5" /> Menu
-          </button>
-          <button onClick={() => setActiveSubTab('collections')} className={tabBtnClass(activeSubTab === 'collections')}>
-            <Layers className="w-3.5 h-3.5" /> Collections
-          </button>
-          <button onClick={() => setActiveSubTab('development')} className={tabBtnClass(activeSubTab === 'development')}>
-            <Sparkles className="w-3.5 h-3.5" /> Development
-          </button>
+        <div className="inline-flex items-stretch rounded-[8px] border border-line overflow-hidden">
+          {SUB_TABS.map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setActiveSubTab(key)}
+              aria-pressed={activeSubTab === key}
+              className={segClass(activeSubTab === key)}
+            >
+              <Icon className="w-3 h-3" /> {label}
+            </button>
+          ))}
         </div>
       </div>
 

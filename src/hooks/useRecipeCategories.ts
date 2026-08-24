@@ -4,7 +4,10 @@ import { rCollection } from '../lib/firestorePaths';
 import { useAuth } from '../components/AuthContext';
 import type { RecipeCategory } from '../types';
 
-const DEFAULT_CATEGORIES = ['Sides', 'Sauces', 'Salads', 'Soups', 'Proteins', 'Desserts'];
+/** Seeded into `recipe_categories` when the collection is empty. Single source
+ * of truth — Settings.tsx's own seeding query imports this rather than keeping
+ * a second copy that could drift. */
+export const DEFAULT_CATEGORIES = ['Sides', 'Sauces', 'Salads', 'Soups', 'Proteins', 'Desserts'];
 
 export function useRecipeCategories() {
   const { restaurantId } = useAuth();
