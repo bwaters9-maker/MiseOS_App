@@ -155,7 +155,7 @@ export const IngredientAdvisor: React.FC<IngredientAdvisorProps> = ({ isOpen, on
                         href={s.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[11px] text-teal hover:underline flex items-center gap-[5px] break-all"
+                        className="text-[11px] text-teal underline flex items-center gap-[5px] break-all"
                       >
                         <ExternalLink className="w-3 h-3 shrink-0" />
                         {s.title}

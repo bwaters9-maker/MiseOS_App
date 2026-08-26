@@ -115,7 +115,7 @@ export default function TrendsReferenceRail(props: TrendsPanelData) {
                           href={card.sourceUrl ?? searchUrlFor(card.headline)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-[3px] text-[9px] font-bold uppercase tracking-wider text-teal hover:text-navy transition-colors duration-[144ms]"
+                          className="flex items-center gap-[3px] text-[9px] font-bold uppercase tracking-wider text-teal underline hover:text-navy transition-colors duration-[144ms]"
                         >
                           <ExternalLink className="w-2.5 h-2.5" /> {card.sourceUrl ? (card.sourceName ?? 'View source') : 'Search for coverage'}
                         </a>

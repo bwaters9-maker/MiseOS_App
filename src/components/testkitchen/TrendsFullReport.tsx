@@ -258,7 +258,7 @@ export default function TrendsFullReport(props: TrendsFullReportProps) {
                   </div>
                   <h3 className="text-sm font-display font-bold text-navy leading-snug">{bridgeCard.headline}</h3>
                   <p className="text-xs text-slate leading-relaxed flex-1">{bridgeCard.description}</p>
-                  <a href={bridgeCard.sourceUrl ?? searchUrlFor(bridgeCard.headline)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-[5px] text-[10px] font-bold uppercase tracking-wider text-teal hover:text-navy transition-colors duration-[144ms]">
+                  <a href={bridgeCard.sourceUrl ?? searchUrlFor(bridgeCard.headline)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-[5px] text-[10px] font-bold uppercase tracking-wider text-teal underline hover:text-navy transition-colors duration-[144ms]">
                     <ExternalLink className="w-3 h-3" /> {bridgeCard.sourceUrl ? (bridgeCard.sourceName ?? 'View source') : 'Search for coverage'}
                   </a>
                 </div>
@@ -268,7 +268,7 @@ export default function TrendsFullReport(props: TrendsFullReportProps) {
                   <span className={`self-start px-[8px] py-[3px] rounded-[5px] text-[10px] font-bold uppercase tracking-wider border ${CATEGORY_STYLE[card.category] ?? CATEGORY_STYLE.Technique}`}>{card.category}</span>
                   <h3 className="text-sm font-display font-bold text-navy leading-snug">{card.headline}</h3>
                   <p className="text-xs text-slate leading-relaxed flex-1">{card.description}</p>
-                  <a href={card.sourceUrl ?? searchUrlFor(card.headline)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-[5px] text-[10px] font-bold uppercase tracking-wider text-teal hover:text-navy transition-colors duration-[144ms]">
+                  <a href={card.sourceUrl ?? searchUrlFor(card.headline)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-[5px] text-[10px] font-bold uppercase tracking-wider text-teal underline hover:text-navy transition-colors duration-[144ms]">
                     <ExternalLink className="w-3 h-3" /> {card.sourceUrl ? (card.sourceName ?? 'View source') : 'Search for coverage'}
                   </a>
                 </div>
