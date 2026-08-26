@@ -33,7 +33,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ activeView, onNavigate }) 
           <div className='flex items-center gap-3 shrink-0'>
               <img src='/brand/phi-tile.svg' alt='' className='h-9 w-9' />
               <span className='font-display font-extrabold tracking-[-0.02em] text-base whitespace-nowrap'>
-                <span className='text-saffron-text'>{APP_NAME_ACCENT}</span><span className='text-navy'>{APP_NAME_BASE}</span>
+                <span className='text-wordmark-saffron'>{APP_NAME_ACCENT}</span><span className='text-navy'>{APP_NAME_BASE}</span>
               </span>
           </div>
           <div className="hidden md:flex flex-wrap items-center gap-2 bg-bg-cool p-1 rounded-card border border-line shadow-inner">

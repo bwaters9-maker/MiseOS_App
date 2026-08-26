@@ -26,11 +26,11 @@ export const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'Jun
 
 export const CATEGORY_STYLE: Record<string, string> = {
   Technique: 'text-teal border-teal/30 bg-teal/10',
-  Ingredient: 'text-saffron-text border-saffron/40 bg-saffron-soft',
+  Ingredient: 'text-navy border-saffron/40 bg-saffron-soft',
   Sourcing: 'text-navy border-navy/20 bg-navy/5',
   Format: 'text-slate border-slate/30 bg-slate/10',
   Hospitality: 'text-teal border-teal/30 bg-teal/10',
-  Flavor: 'text-saffron-text border-saffron/40 bg-saffron-soft',
+  Flavor: 'text-navy border-saffron/40 bg-saffron-soft',
 };
 
 export const searchUrlFor = (headline: string) => `https://www.google.com/search?q=${encodeURIComponent(headline)}`;

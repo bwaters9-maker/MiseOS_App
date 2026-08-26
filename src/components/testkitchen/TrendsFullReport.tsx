@@ -212,7 +212,7 @@ export default function TrendsFullReport(props: TrendsFullReportProps) {
 
           {viewingHistoryId && (
             <div className="bg-saffron-soft border border-saffron/40 rounded-card p-[13px] flex flex-wrap items-center justify-between gap-[13px]">
-              <p className="text-[11px] text-saffron-text font-bold">
+              <p className="text-[11px] text-navy font-bold">
                 Viewing archived report — Week of {formatHistoryLabel(viewingHistoryId)}. Read-only, not the live briefing.
               </p>
               <button
@@ -368,7 +368,7 @@ export default function TrendsFullReport(props: TrendsFullReportProps) {
                         return (
                           <div key={item.name} className="flex items-center justify-between gap-[8px] text-xs">
                             <span className="text-navy">{item.name}</span>
-                            <span className={`px-[8px] py-[1px] rounded-[5px] text-[9px] font-bold uppercase tracking-wider border ${status === 'prime' ? 'text-saffron-text border-saffron/40 bg-saffron-soft' : 'text-slate border-line'}`}>{STATUS_LABEL[status]}</span>
+                            <span className={`px-[8px] py-[1px] rounded-[5px] text-[9px] font-bold uppercase tracking-wider border ${status === 'prime' ? 'text-navy border-saffron/40 bg-saffron-soft' : 'text-slate border-line'}`}>{STATUS_LABEL[status]}</span>
                           </div>
                         );
                       })}

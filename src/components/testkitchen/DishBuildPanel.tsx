@@ -362,7 +362,7 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
                 Same as portions
               </button>
               {yieldNeedsAttention && (
-                <p className="flex items-start gap-[5px] mt-[3px] text-[10px] text-saffron-text leading-snug">
+                <p className="flex items-start gap-[5px] mt-[3px] text-[10px] text-navy leading-snug">
                   <AlertCircle className="w-3 h-3 shrink-0 mt-[1px]" />
                   Set a batch-yield unit.
                 </p>
@@ -426,7 +426,7 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
                         )}
                       </label>
                       {flagged && (
-                        <p className="flex items-start gap-[5px] mt-[3px] text-[10px] text-saffron-text leading-snug">
+                        <p className="flex items-start gap-[5px] mt-[3px] text-[10px] text-navy leading-snug">
                           <AlertCircle className="w-3 h-3 shrink-0 mt-[1px]" />
                           {!ing
                             ? 'No longer in the pantry — discard this line.'

@@ -14,7 +14,7 @@
     "ink-faint":    "#8B97A6",
     "saffron":      "#E8A13D",
     "saffron-soft": "#FBF0DC",
-    "saffron-text": "#96650E",
+    "wordmark-saffron": "#96650E",
     "danger":       "#C0392B",
     "danger-wash":  "#F9E8E5",
     "bg-cool":      "#F7F3EA",
@@ -35,7 +35,7 @@
     "teal":         "#3FA8A0",
     "saffron":      "#F0B254",
     "saffron-soft": "rgba(240,178,84,0.14)",
-    "saffron-text": "#F0B254",
+    "wordmark-saffron": "#F0B254",
     "danger":       "#E06052",
     "danger-wash":  "rgba(224,96,82,0.14)"
   },

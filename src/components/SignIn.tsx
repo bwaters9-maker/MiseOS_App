@@ -41,7 +41,7 @@ export const SignIn: React.FC = () => {
           <img src="/brand/phi-tile.svg" alt="" className="h-9 w-9" />
           <div>
             <span className="font-display font-extrabold tracking-[-0.02em] text-lg whitespace-nowrap">
-              <span className="text-saffron-text">{APP_NAME_ACCENT}</span><span className="text-navy">{APP_NAME_BASE}</span>
+              <span className="text-wordmark-saffron">{APP_NAME_ACCENT}</span><span className="text-navy">{APP_NAME_BASE}</span>
             </span>
             <p className="text-[10px] text-slate font-medium">{APP_TAGLINE}</p>
           </div>
