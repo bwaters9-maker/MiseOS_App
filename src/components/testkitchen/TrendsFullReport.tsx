@@ -14,6 +14,7 @@ import {
   monthStatus, STATUS_LABEL, MONTH_NAMES, CATEGORY_STYLE, searchUrlFor, formatReportDate,
   type TrendsPanelData,
 } from './trendsDisplay';
+import { BTN_GHOST } from '../../lib/formStyles';
 
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTH_SEASON = ['winter', 'winter', 'spring', 'spring', 'spring', 'summer', 'summer', 'summer', 'fall', 'fall', 'fall', 'winter'];
@@ -211,13 +212,13 @@ export default function TrendsFullReport(props: TrendsFullReportProps) {
           </div>
 
           {viewingHistoryId && (
-            <div className="bg-saffron-soft border border-saffron/40 rounded-card p-[13px] flex flex-wrap items-center justify-between gap-[13px]">
+            <div className="bg-saffron-soft border border-line rounded-card p-[13px] flex flex-wrap items-center justify-between gap-[13px]">
               <p className="text-[11px] text-navy font-bold">
                 Viewing archived report — Week of {formatHistoryLabel(viewingHistoryId)}. Read-only, not the live briefing.
               </p>
               <button
                 onClick={() => onSelectHistory(null)}
-                className="text-[10px] font-bold uppercase text-saffron-text hover:text-navy px-[8px] py-[3px] rounded-[5px] border border-saffron/40 shrink-0"
+                className={`${BTN_GHOST} shrink-0`}
               >
                 Back to Current
               </button>
@@ -250,7 +251,7 @@ export default function TrendsFullReport(props: TrendsFullReportProps) {
               {bridgeCard && (
                 <div className="bg-surface border-2 border-saffron rounded-card p-[21px] flex flex-col gap-[13px] lg:col-span-1">
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-[5px] px-[8px] py-[3px] rounded-[5px] text-[10px] font-bold uppercase tracking-wider bg-saffron text-white">
+                    <span className="flex items-center gap-[5px] px-[8px] py-[3px] rounded-[5px] text-[10px] font-bold uppercase tracking-wider bg-saffron text-navy">
                       <Flame className="w-3 h-3" /> Viral Bridge
                     </span>
                     <span className={`px-[8px] py-[3px] rounded-[5px] text-[10px] font-bold uppercase tracking-wider border ${CATEGORY_STYLE[bridgeCard.category] ?? CATEGORY_STYLE.Technique}`}>{bridgeCard.category}</span>
@@ -330,7 +331,7 @@ export default function TrendsFullReport(props: TrendsFullReportProps) {
             <div className="sm-screen-header flex flex-col sm:flex-row sm:items-center justify-between gap-[8px]">
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-widest text-navy flex items-center gap-[8px]">
-                  <CalendarDays className="w-4 h-4 text-saffron" /> Seasonal Matrix
+                  <CalendarDays className="w-4 h-4 text-navy" /> Seasonal Matrix
                 </h3>
                 <p className="text-[10px] text-slate mt-[3px]">
                   {region} region{!hasProfileState && ' — no state set in Restaurant Profile, defaulting to Northeast'}. Static reference, not a live feed.
@@ -368,7 +369,7 @@ export default function TrendsFullReport(props: TrendsFullReportProps) {
                         return (
                           <div key={item.name} className="flex items-center justify-between gap-[8px] text-xs">
                             <span className="text-navy">{item.name}</span>
-                            <span className={`px-[8px] py-[1px] rounded-[5px] text-[9px] font-bold uppercase tracking-wider border ${status === 'prime' ? 'text-navy border-saffron/40 bg-saffron-soft' : 'text-slate border-line'}`}>{STATUS_LABEL[status]}</span>
+                            <span className={`px-[8px] py-[1px] rounded-[5px] text-[9px] font-bold uppercase tracking-wider border ${status === 'prime' ? 'text-navy border-line bg-saffron-soft' : 'text-slate border-line'}`}>{STATUS_LABEL[status]}</span>
                           </div>
                         );
                       })}
@@ -402,8 +403,12 @@ export default function TrendsFullReport(props: TrendsFullReportProps) {
                     </tr>
                     <tr>
                       <th className="px-[8px] py-[5px] text-[10px] font-bold uppercase tracking-wider text-slate text-left">Item</th>
+                      {/* Current month carries three channels, only one of them colour:
+                          navy, bold, and a 2px navy underline. At 9px in a 3px-padded
+                          cell the rule is what actually catches the eye; a glyph does
+                          not fit and colour alone would not survive CVD. */}
                       {MONTH_ABBR.map((m, i) => (
-                        <th key={m} data-szn={MONTH_SEASON[i]} className={`px-[3px] py-[5px] text-[9px] font-bold uppercase tracking-wider text-center ${i + 1 === currentMonth ? 'text-saffron-text' : 'text-slate'}`}>{m}</th>
+                        <th key={m} data-szn={MONTH_SEASON[i]} className={`px-[3px] py-[5px] text-[9px] uppercase tracking-wider text-center ${i + 1 === currentMonth ? 'text-navy font-bold border-b-2 border-navy' : 'text-slate font-normal'}`}>{m}</th>
                       ))}
                     </tr>
                   </thead>

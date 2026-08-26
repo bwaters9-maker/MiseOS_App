@@ -229,7 +229,7 @@ const RecipeCollections: React.FC = () => {
                               : <Circle className="w-4 h-4 text-line shrink-0" />}
                             <span className="truncate">{r.name}</span>
                             {member && offToggle && (
-                              <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-saffron">
+                              <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-navy">
                                 Off Menu toggle
                               </span>
                             )}

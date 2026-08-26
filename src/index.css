@@ -22,7 +22,10 @@
      saffron = 6.60:1). It is 1.87:1 on cream and 2.19:1 on white, so it fails
      1.4.3 as text and 1.4.11 as an icon or component border. P-028. */
   --color-saffron:      #E8A13D;  /* signal — CTA + attention ONLY (was #E0994A) */
-  --color-saffron-soft: #FBF0DC;  /* signal wash — carries navy content, not saffron */
+  --color-saffron-soft: #F2D8A2;  /* signal wash — carries navy content, never a saffron
+                                     border. 1.19:1 on cream, dE 12.4 deutan, so it reads
+                                     as a band; navy on it is 10.40:1. Was #FBF0DC at
+                                     1.03:1 — imperceptible to every viewer. P-028. */
 
   /* Wordmark lockup ONLY (AppHeader, SignIn). 4.32:1 on cream — permitted
      under WCAG 1.4.3 Logotypes exception, and passes 3:1 as large text.

@@ -177,7 +177,7 @@ const NutritionLabel: React.FC<NutritionLabelProps> = ({ recipe, ingredients, re
   return (
     <div className="bg-surface border border-line rounded-card p-[21px] space-y-[13px]">
       {!completeness.isComplete && (
-        <div className="flex items-start gap-[8px] text-saffron">
+        <div className="flex items-start gap-[8px] text-navy">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
           <p className="text-[11px] font-bold">This label is incomplete — not all lines contributed verified data. See notes below.</p>
         </div>
@@ -241,7 +241,7 @@ const NutritionLabel: React.FC<NutritionLabelProps> = ({ recipe, ingredients, re
           <p className="text-[10px] text-navy font-bold">Also contains: {otherCanonicalAllergens.join(', ')}</p>
         )}
         {completeness.containsAiEstimatedData && (
-          <p className="text-[10px] text-saffron font-bold">Contains AI-estimated nutrition data — not verified.</p>
+          <p className="text-[10px] text-navy font-bold">Contains AI-estimated nutrition data — not verified.</p>
         )}
         {completeness.hasVolumeApproximation && (
           <p className="text-[10px] text-slate">Volume-measured ingredients were approximated 1:1 (ml treated as grams).</p>

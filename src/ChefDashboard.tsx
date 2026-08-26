@@ -141,8 +141,8 @@ export default function ChefDashboard({ onNavigate, onOpenRecipe, onOpenDevelopm
 
       {/* TRENDS STRIP — informational signal, single line, never wraps */}
       {showTrendsStrip && (
-        <div className="flex items-center gap-[13px] bg-saffron-soft border border-saffron/40 rounded-card px-[13px] py-[8px] mb-[21px] overflow-hidden">
-          <Sprout className="w-4 h-4 text-saffron-text shrink-0" />
+        <div className="flex items-center gap-[13px] bg-saffron-soft border-l-[3px] border-navy rounded-card px-[13px] py-[8px] mb-[21px] overflow-hidden">
+          <Sprout className="w-4 h-4 text-navy shrink-0" />
           <div className="flex items-center gap-[13px] min-w-0 flex-1 whitespace-nowrap overflow-hidden">
             {seasonalStage.length > 0 && (
               <span className="text-xs text-navy truncate">
@@ -151,7 +151,7 @@ export default function ChefDashboard({ onNavigate, onOpenRecipe, onOpenDevelopm
             )}
             {bridgeCard && (
               <span className="flex items-baseline gap-[5px] min-w-0 truncate">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-saffron-text shrink-0">Viral Bridge</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-navy shrink-0">Viral Bridge</span>
                 <span className="text-xs text-navy truncate">{bridgeCard.headline}</span>
               </span>
             )}
@@ -215,7 +215,7 @@ export default function ChefDashboard({ onNavigate, onOpenRecipe, onOpenDevelopm
         {/* TODAY'S EVENTS */}
         <div className="bg-surface border border-line rounded-card p-[21px]">
           <h2 className="text-xs font-bold uppercase tracking-widest text-navy flex items-center gap-[8px] mb-[13px]">
-            <CalendarDays className="w-4 h-4 text-saffron" /> Today's Events
+            <CalendarDays className="w-4 h-4 text-navy" /> Today's Events
           </h2>
           {todayEvents.length === 0 ? (
             <p className="text-xs text-slate italic">No events today.</p>
@@ -241,7 +241,7 @@ export default function ChefDashboard({ onNavigate, onOpenRecipe, onOpenDevelopm
       <div className="bg-surface border border-line rounded-card p-[21px] mb-[21px]">
         <div className="flex items-center justify-between mb-[13px]">
           <h2 className="text-xs font-bold uppercase tracking-widest text-navy flex items-center gap-[8px]">
-            <Star className="w-4 h-4 text-saffron" /> Tonight's Features
+            <Star className="w-4 h-4 text-navy" /> Tonight's Features
           </h2>
           <button
             onClick={() => onNavigate?.('features')}
@@ -272,7 +272,7 @@ export default function ChefDashboard({ onNavigate, onOpenRecipe, onOpenDevelopm
         <div className="bg-surface border border-line rounded-card p-[21px] mb-[21px]">
           <div className="flex items-center justify-between mb-[13px]">
             <h2 className="text-xs font-bold uppercase tracking-widest text-navy flex items-center gap-[8px]">
-              <FlaskConical className="w-4 h-4 text-saffron" /> In Development
+              <FlaskConical className="w-4 h-4 text-navy" /> In Development
             </h2>
             <button
               onClick={() => onOpenDevelopment?.()}

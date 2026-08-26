@@ -64,7 +64,7 @@ export default function TrendsReferenceRail(props: TrendsPanelData) {
                   <span
                     key={item.name}
                     title={STATUS_LABEL[status]}
-                    className={`px-[8px] py-[2px] rounded-[13px] border text-[10px] ${isPrime ? 'border-saffron/40 bg-saffron-soft text-navy' : 'border-line bg-bg-cool text-navy'}`}
+                    className={`px-[8px] py-[2px] rounded-[13px] border text-[10px] ${isPrime ? 'border-line bg-saffron-soft text-navy' : 'border-line bg-bg-cool text-navy'}`}
                   >
                     {item.name}
                   </span>
@@ -104,7 +104,7 @@ export default function TrendsReferenceRail(props: TrendsPanelData) {
                 return (
                   <div key={key} className={`rounded-[8px] border ${isBridge ? 'border-saffron' : 'border-line'}`}>
                     <button onClick={() => toggleExpanded(key)} className="w-full flex items-center gap-[8px] px-[8px] py-[5px] text-left">
-                      {isBridge && <Flame className="w-3 h-3 text-saffron shrink-0" />}
+                      {isBridge && <Flame className="w-3 h-3 text-navy shrink-0" />}
                       <span className={`shrink-0 px-[5px] py-[1px] rounded-[5px] text-[8px] font-bold uppercase tracking-wider border ${CATEGORY_STYLE[card.category] ?? CATEGORY_STYLE.Technique}`}>{card.category}</span>
                       <span className="text-xs text-navy leading-snug flex-1">{card.headline}</span>
                     </button>

@@ -396,7 +396,7 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
                   return (
                     <div
                       key={i}
-                      className={flagged ? 'rounded-[8px] border border-saffron bg-saffron-soft px-[8px] py-[5px]' : ''}
+                      className={flagged ? 'rounded-[8px] border border-line bg-saffron-soft px-[8px] py-[5px]' : ''}
                     >
                       <label className="flex items-center gap-[8px] text-xs text-navy cursor-pointer">
                         <input type="checkbox" checked={kept} onChange={() => toggleLine(i)} className="accent-teal" />
