@@ -1187,3 +1187,119 @@ fuzzier match, and it is explicitly not part of this design.
 **Normalized-name matching reuses the `InvoicePriceUpdate.tsx`
 convention** (lowercase, strip punctuation, collapse whitespace) —
 decided, not open. One normalization rule in the codebase, not two.
+
+---
+
+## P-028 — Colour-vision-deficiency palette + non-colour encoding pass
+
+**Status:** DONE 2026-08-26. Deployed to production (hosting only, no
+functions/rules changes). Commits `4e0ba29`..`8a923d5` on `main`, pushed.
+
+**ID collision, noted for the record.** The chat that opened this work
+labeled its prompt "P-027" — but P-027 was already assigned (Recipes view
+declutter: category dropdowns + segmented sub-tabs, commit `9f4a697`,
+DONE 2026-08-25). Every commit in this body of work is therefore titled
+`P-028` instead, to keep IDs permanent and searchable rather than
+reusing one. This entry is the first place P-028 is recorded in this file;
+P-027's own entry was never backfilled here and should be if this file is
+meant to be the authoritative mirror going forward.
+
+**Origin:** Brian is colourblind (type undetermined). A 2026-08-22 audit
+(WCAG relative luminance + Machado/Oliveira/Fernandes 2009 simulation)
+found two straight WCAG 1.4.3 failures and one isoluminance failure in the
+Brand v1.1 palette.
+
+**Shipped, in order:**
+
+1. Shared `src/lib/formStyles.ts` — `INPUT`, `FIELD_LABEL`, `BTN_ACTION`
+   (renamed from `BTN_PRIMARY`), `BTN_DESTRUCTIVE` (new), `BTN_GHOST`,
+   `BADGE`. Consolidates five constants that had been hand-copied
+   byte-identical into 7-8 files.
+2. **Item 1** — `--color-teal` `#1E7A74` -> `#0B564F`. Was 4.40:1 on
+   cream (a straight AA fail); now 7.32:1.
+3. **Item 2** — `--color-saffron-text` renamed `--color-wordmark-saffron`,
+   restricted to exactly the two Study-A lockup sites (`AppHeader.tsx`,
+   `SignIn.tsx`). Every other saffron-as-text/icon/border site in `src/`
+   converted to navy content on a saffron fill, per the standing rule now
+   in CLAUDE.md: **saffron is a fill, never a boundary and never a text
+   colour.** `--color-saffron-soft` deepened `#FBF0DC` -> `#F2D8A2` (the
+   old value was 1.03:1 against cream — imperceptible).
+4. **Item 3** — `--color-danger` unchanged; already passed.
+5. **Item 4** — every inline `<a>` (4 total, confirmed exhaustive) carries
+   a permanent underline, not hover-only.
+6. **Item 5** — `BTN_DESTRUCTIVE` distinguishes from `BTN_ACTION` by
+   *form* (outline vs. filled), not hue. Wired through the one shared
+   `AlertDialog` every delete-confirmation in the app renders through,
+   plus one more filled-danger site found outside it
+   (`RecipeCollections.tsx`'s inline confirm-delete).
+7. **Item 6** — `fcColor` (emerald/amber/red hue-only) replaced by
+   `fcIndicator()`: navy through under/borderline, danger only for
+   over-target, escalation carried by weight + a leading glyph
+   (`●`/`▲`), never colour alone. New shared `src/components/FcValue.tsx`.
+   9 new tests (169 total). Two more hand-copied hue-only duplicates
+   found and consolidated (`Features.tsx`, `DailyCribSheet.tsx`).
+8. **Item 7 (amended)** — `scripts/check-color.mjs`, hand-run via
+   `npm run check:color` (`culori` devDependency). Not wired into CI —
+   that's P-029, below. Checks WCAG contrast, the wordmark exception,
+   saffron-as-boundary/text placement, and OKLab CVD-simulated
+   distinguishability for five ink pairs. Verified it actually catches a
+   regression (reverted teal, confirmed the contrast check fails at
+   exactly 4.40, restored, confirmed clean).
+9. **Follow-up** — sites 1 (Dashboard trends strip) and 4 (archived-report
+   notice) restructured from a full-bleed `bg-saffron-soft` fill to a
+   white panel with a 3px navy left rule + 12px saffron-soft inset band.
+   Screenshot comparison (real Chrome DevTools Protocol
+   `Emulation.setEmulatedVisionDeficiency`, not a CSS-filter
+   approximation) showed the deepened wash read as an active highlight —
+   not a warning, but heavier than intended — specifically on large
+   full-bleed panels; small badges/chips at the same token were fine.
+   Geometry was the variable, not the colour. Token unchanged.
+
+**KNOWN, UNRESOLVED — do not treat "DONE" as "the palette is finished":**
+`npm run check:color` currently reports 20 of 30 CVD-distinguishability
+checks failing, concentrated on navy/teal (and, in some deficiencies,
+teal/danger and slate/danger). Item 1's contrast fix pulled teal's
+lightness close to navy's own, so under several deuteranopia/protanopia/
+tritanopia simulations the two are hard to tell apart. This is a genuine,
+quantified, unresolved tension between two constraints (contrast vs.
+mutual distinguishability) that needs new values chosen against both at
+once — design work, not a mechanical fix. Not attempted in this pass.
+
+**Also reported, not fixed:** Recipes.tsx's FC% progress bar fill still
+hue-encodes emerald/amber/red (directly below the now-fixed text
+indicator); `ErrorBoundary.tsx`'s filled-red recovery button (a lone
+action, not a primary/destructive pairing); `DailyCribSheet.tsx` and
+`Features.tsx` classify FC% against a hardcoded 28%/34%, not the real
+configurable `targetFcPercent` every other FC% display reads — a
+pre-existing correctness bug, unrelated to colour, surfaced while
+consolidating their duplicate `fcColor`.
+
+**Unexplained origin branches — logged, not investigated.** `git fetch`
+during this work's push surfaced five branches on `origin` that nothing in
+this session created, with machine-generated-looking names:
+`feature/menu-strategy-integration-tests-11814730879415576376`,
+`fix/update-retired-gemini-model-14434693624815205626`,
+`housekeeping-alignment-12295418740495349143`,
+`main-12048487173765127597`,
+`scaffold-inventory-financial-modules-14737302586424772395`. Something
+other than this session is pushing to this repo. **Not touched, not
+deleted, not merged** — recorded here so the finding isn't lost before
+someone determines what created them.
+
+---
+
+## P-029 — CI pipeline for the colour guard — QUEUED 2026-08-26
+
+**Scope, per P-028 item 7's amendment:** GitHub Actions workflow running
+build, test, and `npm run check:color`; `stylelint-declaration-strict-value`
+banning raw hex on colour properties; a CI grep rejecting Tailwind
+arbitrary colour values (`bg-[#`, `text-[#`, `border-[#`). None of this
+exists yet — P-028 shipped `scripts/check-color.mjs` runnable by hand only,
+deliberately, so two live WCAG failures wouldn't sit behind infrastructure
+that didn't exist yet. Repo currently has no `.github/workflows` and no
+`stylelint`; standing up the pipeline is the first step, not an addition
+to one.
+
+**Should probably also resolve, or at least re-run against:** the 20/30
+CVD-distinguishability findings P-028 left open (see above) — a CI gate
+that goes live already red isn't a gate anyone will respect.
