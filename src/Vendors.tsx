@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { INPUT, FIELD_LABEL, BTN_ACTION, BTN_GHOST, BADGE } from './lib/formStyles';
 import { Truck, Plus, Pencil, Trash2, X, Check, ChevronDown, Phone, Mail, Hash, Clock, Package } from 'lucide-react';
 import { addDoc, updateDoc, deleteDoc, deleteField } from 'firebase/firestore';
 import { rCollection, rDoc } from './lib/firestorePaths';
@@ -32,11 +33,6 @@ const PRICE_SOURCE_LABEL: Record<Ingredient['priceSource'], string> = {
   manual: 'Manual',
 };
 
-const INPUT = 'w-full bg-zinc-900 border border-zinc-700 rounded-[5px] px-[8px] py-[5px] text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-500 placeholder-zinc-600';
-const FIELD_LABEL = 'block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-[5px]';
-const BTN_PRIMARY = 'px-[13px] py-[8px] bg-emerald-900/50 border border-emerald-700 rounded-[8px] text-xs font-bold text-emerald-300 hover:bg-emerald-900 transition-colors duration-[144ms]';
-const BTN_GHOST = 'px-[13px] py-[8px] bg-zinc-900 border border-zinc-700 rounded-[8px] text-xs font-bold text-zinc-400 hover:text-zinc-200 transition-colors duration-[144ms]';
-const BADGE = 'px-[8px] py-[3px] rounded-[5px] text-[10px] font-bold uppercase tracking-wider border';
 
 interface VendorFormState {
   name: string;
@@ -196,7 +192,7 @@ const VendorForm: React.FC<{
         <button
           onClick={onSave}
           disabled={!form.name.trim() || saving}
-          className={`${BTN_PRIMARY} disabled:opacity-40 disabled:cursor-not-allowed`}
+          className={`${BTN_ACTION} disabled:opacity-40 disabled:cursor-not-allowed`}
         >
           {saving ? 'Saving…' : 'Save'}
         </button>
@@ -397,7 +393,7 @@ const Vendors: React.FC = () => {
         {!showAdd && (
           <button
             onClick={() => { setShowAdd(true); setAddForm(BLANK_VENDOR()); setEditId(null); }}
-            className={`${BTN_PRIMARY} flex items-center gap-[8px]`}
+            className={`${BTN_ACTION} flex items-center gap-[8px]`}
           >
             <Plus className="w-3.5 h-3.5" />
             Add Vendor

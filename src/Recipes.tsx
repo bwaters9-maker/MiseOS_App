@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { INPUT, FIELD_LABEL, BTN_ACTION, BTN_GHOST, BADGE } from './lib/formStyles';
 import { ChefHat, Plus, Trash2, X, Check, Search, Layers, UtensilsCrossed, AlertTriangle, Sparkles, Loader2, ChevronDown, ChevronRight, FlaskConical } from 'lucide-react';
 import { addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { rCollection, rDoc } from './lib/firestorePaths';
@@ -22,11 +23,6 @@ import type {
 } from './types';
 import type { UnitSystem, DisplayUnit } from './lib/units';
 
-const INPUT = 'w-full bg-zinc-900 border border-zinc-700 rounded-[5px] px-[8px] py-[5px] text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-500 placeholder-zinc-600';
-const FIELD_LABEL = 'block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-[5px]';
-const BTN_PRIMARY = 'px-[13px] py-[8px] bg-emerald-900/50 border border-emerald-700 rounded-[8px] text-xs font-bold text-emerald-300 hover:bg-emerald-900 transition-colors duration-[144ms]';
-const BTN_GHOST = 'px-[13px] py-[8px] bg-zinc-900 border border-zinc-700 rounded-[8px] text-xs font-bold text-zinc-400 hover:text-zinc-200 transition-colors duration-[144ms]';
-const BADGE = 'px-[8px] py-[3px] rounded-[5px] text-[10px] font-bold uppercase tracking-wider border';
 
 const pantrySystemPrompt = (unitSystem: UnitSystem): string => `You are a professional chef proposing ingredients for a dish from a specific restaurant's Master Pantry inventory. You will receive the recipe's name, category, recipe type, and the pantry as a JSON list of { id, name }.
 
@@ -1109,9 +1105,9 @@ const CostPanel: React.FC<{
       <div className="space-y-[8px]">
         <p className={FIELD_LABEL}>Batch Scale</p>
         <div className="flex items-center gap-[5px]">
-          <button onClick={() => applyScale(0.5)} className={`${scaleFactor === 0.5 ? BTN_PRIMARY : BTN_GHOST}`}>0.5×</button>
-          <button onClick={() => applyScale(1)} className={`${scaleFactor === 1 ? BTN_PRIMARY : BTN_GHOST}`}>1×</button>
-          <button onClick={() => applyScale(2)} className={`${scaleFactor === 2 ? BTN_PRIMARY : BTN_GHOST}`}>2×</button>
+          <button onClick={() => applyScale(0.5)} className={`${scaleFactor === 0.5 ? BTN_ACTION : BTN_GHOST}`}>0.5×</button>
+          <button onClick={() => applyScale(1)} className={`${scaleFactor === 1 ? BTN_ACTION : BTN_GHOST}`}>1×</button>
+          <button onClick={() => applyScale(2)} className={`${scaleFactor === 2 ? BTN_ACTION : BTN_GHOST}`}>2×</button>
           <input
             type="number"
             value={customScale}
@@ -1355,7 +1351,7 @@ const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPerc
           />
 
           <div className="space-y-[5px]">
-            <button onClick={() => startCreate('menu')} className={`${BTN_PRIMARY} w-full flex items-center justify-center gap-[5px]`}>
+            <button onClick={() => startCreate('menu')} className={`${BTN_ACTION} w-full flex items-center justify-center gap-[5px]`}>
               <Plus className="w-3 h-3" /> Add New Recipe
             </button>
             <button
@@ -1459,7 +1455,7 @@ const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPerc
                   <button
                     onClick={handleSave}
                     disabled={!form.name.trim() || saving}
-                    className={`${BTN_PRIMARY} disabled:opacity-40 disabled:cursor-not-allowed`}
+                    className={`${BTN_ACTION} disabled:opacity-40 disabled:cursor-not-allowed`}
                   >
                     {saving ? 'Saving…' : 'Save'}
                   </button>

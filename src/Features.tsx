@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { INPUT, FIELD_LABEL, BTN_ACTION, BTN_GHOST, BADGE } from './lib/formStyles';
 import { Star, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
 import { addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { rCollection, rDoc } from './lib/firestorePaths';
@@ -65,11 +66,6 @@ const computeFc = (price: string, cost: string): number | null => {
   return !isNaN(p) && !isNaN(c) && p > 0 ? Math.round((c / p) * 100) : null;
 };
 
-const INPUT = 'w-full bg-zinc-900 border border-zinc-700 rounded-[5px] px-[8px] py-[5px] text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-500 placeholder-zinc-600';
-const FIELD_LABEL = 'block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-[5px]';
-const BTN_PRIMARY = 'px-[13px] py-[8px] bg-emerald-900/50 border border-emerald-700 rounded-[8px] text-xs font-bold text-emerald-300 hover:bg-emerald-900 transition-colors duration-[144ms]';
-const BTN_GHOST = 'px-[13px] py-[8px] bg-zinc-900 border border-zinc-700 rounded-[8px] text-xs font-bold text-zinc-400 hover:text-zinc-200 transition-colors duration-[144ms]';
-const BADGE = 'px-[8px] py-[3px] rounded-[5px] text-[10px] font-bold uppercase tracking-wider border';
 
 const FeatureForm: React.FC<{
   form: FormState;
@@ -160,7 +156,7 @@ const FeatureForm: React.FC<{
         <button
           onClick={onSave}
           disabled={!form.name.trim() || saving}
-          className={`${BTN_PRIMARY} disabled:opacity-40 disabled:cursor-not-allowed`}
+          className={`${BTN_ACTION} disabled:opacity-40 disabled:cursor-not-allowed`}
         >
           {saving ? 'Saving…' : 'Save'}
         </button>
@@ -255,7 +251,7 @@ const Features: React.FC = () => {
         {!showAdd && (
           <button
             onClick={() => { setShowAdd(true); setAddForm({ ...BLANK }); setAddKind('manual'); setEditId(null); }}
-            className={`${BTN_PRIMARY} flex items-center gap-[8px]`}
+            className={`${BTN_ACTION} flex items-center gap-[8px]`}
           >
             <Plus className="w-3.5 h-3.5" />
             Add Feature
@@ -267,8 +263,8 @@ const Features: React.FC = () => {
         <div className="bg-zinc-950 border border-zinc-800 rounded-[13px] p-[21px] mb-[21px]">
           <p className="text-[10px] font-black uppercase tracking-[0.15em] text-emerald-400 mb-[13px]">New Feature</p>
           <div className="flex gap-[8px] mb-[13px]">
-            <button onClick={() => setAddKind('manual')} className={addKind === 'manual' ? BTN_PRIMARY : BTN_GHOST}>Manual Entry</button>
-            <button onClick={() => setAddKind('recipe')} className={addKind === 'recipe' ? BTN_PRIMARY : BTN_GHOST}>From Recipe</button>
+            <button onClick={() => setAddKind('manual')} className={addKind === 'manual' ? BTN_ACTION : BTN_GHOST}>Manual Entry</button>
+            <button onClick={() => setAddKind('recipe')} className={addKind === 'recipe' ? BTN_ACTION : BTN_GHOST}>From Recipe</button>
           </div>
           {addKind === 'recipe' && (
             <div className="mb-[13px]">

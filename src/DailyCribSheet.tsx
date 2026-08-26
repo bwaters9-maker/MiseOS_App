@@ -3,11 +3,15 @@ import { Printer, Star, Users, CalendarDays, ClipboardList } from 'lucide-react'
 import { useKitchenSelector } from './components/KitchenStateContext';
 import { todayDateKey, formatTime12h } from './utils';
 import type { Feature, Employee, Shift, KitchenEvent, CribNote } from './types';
+import { BADGE as SHARED_BADGE } from './lib/formStyles';
 
 const CARD = 'crib-card bg-zinc-950 border border-zinc-800 rounded-[13px] p-[21px]';
 const LABEL = 'crib-section-header text-[10px] font-black uppercase tracking-[0.15em] flex items-center gap-[8px] mb-[13px]';
 const ROW = 'crib-row flex items-baseline justify-between gap-[13px] py-[8px] border-b border-zinc-900 last:border-b-0 text-xs';
-const BADGE = 'crib-badge px-[8px] py-[3px] rounded-[5px] text-[10px] font-bold uppercase tracking-wider border';
+/* `crib-badge` is a print hook, not styling — the print stylesheet in this file
+   targets it to flatten badges to black-on-white for paper. It must survive any
+   restyle of the shared BADGE. */
+const BADGE = `crib-badge ${SHARED_BADGE}`;
 const EMPTY = 'text-xs text-zinc-500 italic py-[8px]';
 
 const fcColor = (fc: number) =>

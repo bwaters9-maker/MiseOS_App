@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { INPUT, FIELD_LABEL, BTN_ACTION, BTN_GHOST, BADGE } from './lib/formStyles';
 import { CalendarDays, Contact, Plus, Pencil, Trash2, X, Check, ChevronDown, Flag } from 'lucide-react';
 import { addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { rCollection, rDoc } from './lib/firestorePaths';
@@ -62,11 +63,6 @@ const formatDate = (dateStr: string) =>
     weekday: 'long', month: 'long', day: 'numeric',
   });
 
-const INPUT = 'w-full bg-zinc-900 border border-zinc-700 rounded-[5px] px-[8px] py-[5px] text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-500 placeholder-zinc-600';
-const FIELD_LABEL = 'block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-[5px]';
-const BTN_PRIMARY = 'px-[13px] py-[8px] bg-emerald-900/50 border border-emerald-700 rounded-[8px] text-xs font-bold text-emerald-300 hover:bg-emerald-900 transition-colors duration-[144ms]';
-const BTN_GHOST = 'px-[13px] py-[8px] bg-zinc-900 border border-zinc-700 rounded-[8px] text-xs font-bold text-zinc-400 hover:text-zinc-200 transition-colors duration-[144ms]';
-const BADGE = 'px-[8px] py-[3px] rounded-[5px] text-[10px] font-bold uppercase tracking-wider border';
 const TYPE_BADGE = `${BADGE} text-purple-300 border-purple-900 bg-purple-950/30`;
 
 const EventForm: React.FC<{
@@ -168,7 +164,7 @@ const EventForm: React.FC<{
         <button
           onClick={onSave}
           disabled={!form.title.trim() || !form.date || saving}
-          className={`${BTN_PRIMARY} disabled:opacity-40 disabled:cursor-not-allowed`}
+          className={`${BTN_ACTION} disabled:opacity-40 disabled:cursor-not-allowed`}
         >
           {saving ? 'Saving…' : 'Save'}
         </button>
@@ -355,7 +351,7 @@ const ClientForm: React.FC<{
         <button
           onClick={onSave}
           disabled={!form.name.trim() || saving}
-          className={`${BTN_PRIMARY} disabled:opacity-40 disabled:cursor-not-allowed`}
+          className={`${BTN_ACTION} disabled:opacity-40 disabled:cursor-not-allowed`}
         >
           {saving ? 'Saving…' : 'Save'}
         </button>
@@ -655,7 +651,7 @@ const EventCalendar: React.FC<EventCalendarProps> = ({ selectedEventId, setSelec
           {!showAddEvent && (
             <button
               onClick={() => { setShowAddEvent(true); setAddEventForm(BLANK_EVENT()); setEditEventId(null); }}
-              className={`${BTN_PRIMARY} flex items-center gap-[8px]`}
+              className={`${BTN_ACTION} flex items-center gap-[8px]`}
             >
               <Plus className="w-3.5 h-3.5" />
               Add Event
@@ -837,7 +833,7 @@ const EventCalendar: React.FC<EventCalendarProps> = ({ selectedEventId, setSelec
           {!showAddClient && (
             <button
               onClick={() => { setShowAddClient(true); setAddClientForm(BLANK_CLIENT()); setEditClientId(null); }}
-              className={`${BTN_PRIMARY} flex items-center gap-[8px]`}
+              className={`${BTN_ACTION} flex items-center gap-[8px]`}
             >
               <Plus className="w-3.5 h-3.5" />
               Add Client

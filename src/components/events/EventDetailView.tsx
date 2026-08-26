@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { INPUT, FIELD_LABEL, BTN_ACTION, BTN_GHOST, BADGE } from '../../lib/formStyles';
 import { ArrowLeft, Clock, Plus, Pencil, Trash2, Check, X, Search, ChefHat, Contact, History, Flag, Users, Link2, Unlink, ChevronDown, ScrollText } from 'lucide-react';
 import { updateDoc } from 'firebase/firestore';
 import { rDoc } from '../../lib/firestorePaths';
@@ -18,11 +19,6 @@ const formatDate = (dateStr: string) =>
 const getToday = todayDateKey;
 
 const CARD = 'bg-zinc-950 border border-zinc-800 rounded-[13px] p-[21px]';
-const INPUT = 'w-full bg-zinc-900 border border-zinc-700 rounded-[5px] px-[8px] py-[5px] text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-500 placeholder-zinc-600';
-const FIELD_LABEL = 'block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-[5px]';
-const BTN_PRIMARY = 'px-[13px] py-[8px] bg-emerald-900/50 border border-emerald-700 rounded-[8px] text-xs font-bold text-emerald-300 hover:bg-emerald-900 transition-colors duration-[144ms]';
-const BTN_GHOST = 'px-[13px] py-[8px] bg-zinc-900 border border-zinc-700 rounded-[8px] text-xs font-bold text-zinc-400 hover:text-zinc-200 transition-colors duration-[144ms]';
-const BADGE = 'px-[8px] py-[3px] rounded-[5px] text-[10px] font-bold uppercase tracking-wider border';
 const PANEL_LABEL = 'text-[10px] font-black uppercase tracking-[0.15em] flex items-center gap-[8px] mb-[13px]';
 
 // ===================================================================
@@ -114,7 +110,7 @@ const TimelinePanel: React.FC<{ event: KitchenEvent }> = ({ event }) => {
                 </div>
                 <div className="flex gap-[8px] justify-end">
                   <button onClick={() => setEditIdx(null)} className={BTN_GHOST}>Cancel</button>
-                  <button onClick={handleEdit} disabled={!editForm.time || !editForm.label.trim() || saving} className={`${BTN_PRIMARY} disabled:opacity-40 disabled:cursor-not-allowed`}>Save</button>
+                  <button onClick={handleEdit} disabled={!editForm.time || !editForm.label.trim() || saving} className={`${BTN_ACTION} disabled:opacity-40 disabled:cursor-not-allowed`}>Save</button>
                 </div>
               </div>
             );
@@ -151,7 +147,7 @@ const TimelinePanel: React.FC<{ event: KitchenEvent }> = ({ event }) => {
           </div>
           <div className="flex gap-[8px] justify-end">
             <button onClick={() => setShowAdd(false)} className={BTN_GHOST}>Cancel</button>
-            <button onClick={handleAdd} disabled={!addForm.time || !addForm.label.trim() || saving} className={`${BTN_PRIMARY} disabled:opacity-40 disabled:cursor-not-allowed`}>Add</button>
+            <button onClick={handleAdd} disabled={!addForm.time || !addForm.label.trim() || saving} className={`${BTN_ACTION} disabled:opacity-40 disabled:cursor-not-allowed`}>Add</button>
           </div>
         </div>
       )}
@@ -286,7 +282,7 @@ const MenuLineForm: React.FC<{
       )}
       <div className="flex gap-[8px] justify-end pt-[5px]">
         <button onClick={onCancel} className={BTN_GHOST}>Cancel</button>
-        <button onClick={onSave} disabled={!form.course || !form.text.trim() || saving} className={`${BTN_PRIMARY} disabled:opacity-40 disabled:cursor-not-allowed`}>Save</button>
+        <button onClick={onSave} disabled={!form.course || !form.text.trim() || saving} className={`${BTN_ACTION} disabled:opacity-40 disabled:cursor-not-allowed`}>Save</button>
       </div>
     </div>
   );
@@ -620,7 +616,7 @@ const ChangeLogPanel: React.FC<{ event: KitchenEvent }> = ({ event }) => {
           />
           <div className="flex gap-[8px] justify-end">
             <button onClick={() => { setShowAdd(false); setText(''); }} className={BTN_GHOST}>Cancel</button>
-            <button onClick={handleAdd} disabled={!text.trim() || saving} className={`${BTN_PRIMARY} disabled:opacity-40 disabled:cursor-not-allowed`}>Add</button>
+            <button onClick={handleAdd} disabled={!text.trim() || saving} className={`${BTN_ACTION} disabled:opacity-40 disabled:cursor-not-allowed`}>Add</button>
           </div>
         </div>
       )}

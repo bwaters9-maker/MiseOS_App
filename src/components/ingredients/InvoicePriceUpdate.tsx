@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { INPUT, FIELD_LABEL, BTN_ACTION, BTN_GHOST } from '../../lib/formStyles';
 import { Receipt, Upload, Loader2, AlertTriangle, X, Check, FileWarning, Plus } from 'lucide-react';
 import { addDoc, updateDoc } from 'firebase/firestore';
 import { rCollection, rDoc } from '../../lib/firestorePaths';
@@ -178,10 +179,6 @@ const canConfirmAdd = (f: AddForm): boolean =>
 
 type Stage = 'idle' | 'reading' | 'review' | 'failed' | 'empty';
 
-const INPUT = 'w-full bg-zinc-900 border border-zinc-700 rounded-[5px] px-[8px] py-[5px] text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-500 placeholder-zinc-600';
-const FIELD_LABEL = 'block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-[3px]';
-const BTN_PRIMARY = 'px-[13px] py-[8px] bg-emerald-900/50 border border-emerald-700 rounded-[8px] text-xs font-bold text-emerald-300 hover:bg-emerald-900 transition-colors duration-[144ms]';
-const BTN_GHOST = 'px-[13px] py-[8px] bg-zinc-900 border border-zinc-700 rounded-[8px] text-xs font-bold text-zinc-400 hover:text-zinc-200 transition-colors duration-[144ms]';
 
 const readFileAsBase64 = (file: File): Promise<{ base64: string; mediaType: string }> =>
   new Promise((resolve, reject) => {
@@ -479,7 +476,7 @@ export const InvoicePriceUpdate: React.FC<InvoicePriceUpdateProps> = ({ isOpen, 
               <p className="text-xs text-zinc-500">
                 Upload or photograph an invoice. Nothing is stored — the image is sent for extraction only.
               </p>
-              <button onClick={() => fileInputRef.current?.click()} className={`${BTN_PRIMARY} inline-flex items-center gap-[8px]`}>
+              <button onClick={() => fileInputRef.current?.click()} className={`${BTN_ACTION} inline-flex items-center gap-[8px]`}>
                 <Upload className="w-3.5 h-3.5" />
                 Choose Invoice
               </button>
@@ -498,7 +495,7 @@ export const InvoicePriceUpdate: React.FC<InvoicePriceUpdateProps> = ({ isOpen, 
               <AlertTriangle className="w-8 h-8 text-red-500 mx-auto" />
               <p className="text-xs text-red-300">{error || 'Could not read the invoice.'}</p>
               <div className="flex items-center justify-center gap-[8px]">
-                <button onClick={handleRetry} className={BTN_PRIMARY}>Retry</button>
+                <button onClick={handleRetry} className={BTN_ACTION}>Retry</button>
                 <button onClick={() => fileInputRef.current?.click()} className={BTN_GHOST}>Choose Different File</button>
               </div>
             </div>
@@ -508,7 +505,7 @@ export const InvoicePriceUpdate: React.FC<InvoicePriceUpdateProps> = ({ isOpen, 
             <div className="p-[34px] text-center space-y-[13px]">
               <FileWarning className="w-8 h-8 text-zinc-600 mx-auto" />
               <p className="text-xs text-zinc-500">No ingredient prices found — try a clearer photo.</p>
-              <button onClick={() => fileInputRef.current?.click()} className={BTN_PRIMARY}>Choose Different File</button>
+              <button onClick={() => fileInputRef.current?.click()} className={BTN_ACTION}>Choose Different File</button>
             </div>
           )}
 
@@ -702,7 +699,7 @@ export const InvoicePriceUpdate: React.FC<InvoicePriceUpdateProps> = ({ isOpen, 
                               <button
                                 onClick={() => confirmAdd(row)}
                                 disabled={addingKey === row.key || !canConfirmAdd(f)}
-                                className={`${BTN_PRIMARY} disabled:opacity-40 disabled:cursor-not-allowed`}
+                                className={`${BTN_ACTION} disabled:opacity-40 disabled:cursor-not-allowed`}
                               >
                                 {addingKey === row.key ? 'Adding…' : 'Confirm & Add to Pantry'}
                               </button>
@@ -726,7 +723,7 @@ export const InvoicePriceUpdate: React.FC<InvoicePriceUpdateProps> = ({ isOpen, 
                   <button
                     onClick={handleApply}
                     disabled={applying || acceptedCount === 0}
-                    className={`${BTN_PRIMARY} disabled:opacity-40 disabled:cursor-not-allowed`}
+                    className={`${BTN_ACTION} disabled:opacity-40 disabled:cursor-not-allowed`}
                   >
                     {applying ? 'Applying…' : 'Apply'}
                   </button>
