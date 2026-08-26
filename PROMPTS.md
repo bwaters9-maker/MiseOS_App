@@ -1193,7 +1193,7 @@ decided, not open. One normalization rule in the codebase, not two.
 ## P-028 — Colour-vision-deficiency palette + non-colour encoding pass
 
 **Status:** DONE 2026-08-26. Deployed to production (hosting only, no
-functions/rules changes). Commits `4e0ba29`..`8a923d5` on `main`, pushed.
+functions/rules changes). Commits `4e0ba29`..`775f76b` on `main`, pushed.
 
 **ID collision, noted for the record.** The chat that opened this work
 labeled its prompt "P-027" — but P-027 was already assigned (Recipes view
@@ -1255,15 +1255,26 @@ Brand v1.1 palette.
    full-bleed panels; small badges/chips at the same token were fine.
    Geometry was the variable, not the colour. Token unchanged.
 
-**KNOWN, UNRESOLVED — do not treat "DONE" as "the palette is finished":**
-`npm run check:color` currently reports 20 of 30 CVD-distinguishability
-checks failing, concentrated on navy/teal (and, in some deficiencies,
-teal/danger and slate/danger). Item 1's contrast fix pulled teal's
-lightness close to navy's own, so under several deuteranopia/protanopia/
-tritanopia simulations the two are hard to tell apart. This is a genuine,
-quantified, unresolved tension between two constraints (contrast vs.
-mutual distinguishability) that needs new values chosen against both at
-once — design work, not a mechanical fix. Not attempted in this pass.
+**CVD threshold recalibrated 2026-08-26 (P-029 pre-work), resolving the
+apparent 20/30-failing state above.** The original `check:color` threshold
+(0.15 OKLab dE) was set by analogy from CAM02-UCS numbers — a different
+metric, different scale — and rejected pairs like navy/teal that measure
+dE~30 in CAM02 across all observers and read as visibly distinct.
+Recalibrated against two real anchors, both under deuteranopia @ severity
+1.0: slate vs. the OLD teal (`#1E7A74`) = 0.0298, the actual known-real
+failure (1.06:1 WCAG contrast) that started this whole pass — threshold
+must sit above it; navy vs. the CURRENT teal (`#0B564F`) = 0.1000, known-
+good — threshold must sit below it. Midpoint 0.0649, rounded to **0.06**.
+Full 30-row table in commit `edc4fda`'s message.
+
+At 0.06: **29 of 30 pass.** The one holdout — `teal/danger` under
+protanopia @ severity 1.0, measured 0.0538 — is real (below even the LOW
+anchor, not calibration noise) but is explicitly accepted in code
+(`CVD_ACCEPTED_EXCEPTIONS` in `scripts/check-color.mjs`, commit `775f76b`):
+no surface relies on that pair by colour alone today (links underlined,
+destructive buttons outlined+icon+label, FC% glyph+weight — items 4/5/6
+above). `npm run check:color` now exits 0. Any future exit 1 is a genuine,
+un-accepted finding, not a threshold argument.
 
 **Also reported, not fixed:** Recipes.tsx's FC% progress bar fill still
 hue-encodes emerald/amber/red (directly below the now-fixed text
@@ -1285,6 +1296,21 @@ this session created, with machine-generated-looking names:
 other than this session is pushing to this repo. **Not touched, not
 deleted, not merged** — recorded here so the finding isn't lost before
 someone determines what created them.
+
+**A second local clone exists, possibly related.** Session-end bookkeeping
+(2026-08-26) needed the OneDrive `miseos` folder this file's own
+"Where things live" convention describes, and found it at
+`C:\Users\brian\OneDrive\Desktop\miseos\` — but that folder is not just the
+four cited files. It has its own `.git`, `CLAUDE.md`, `PROMPTS.md`,
+`SOUS-EVAL.md`, `src/`, `functions/`: a second, separate local clone of
+this repo, distinct from wherever this session's clone lives. Its
+`PROMPTS.md` was last modified 2026-08-24 — stale, missing this entire
+P-028 pass. Unverified but worth checking: this second clone is a
+plausible source for the unexplained branches immediately above.
+**Not investigated further, not merged, not touched** — its `.git`
+internals returned "the cloud file provider is not running" when checked,
+so nothing there was even readable this session, let alone something to
+act on unilaterally.
 
 ---
 
