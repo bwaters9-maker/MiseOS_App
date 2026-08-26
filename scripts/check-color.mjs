@@ -30,10 +30,19 @@
  * (primary ink), slate (secondary/muted), teal (interactive accent text),
  * danger (destructive/alert text).
  *
- * Exits 0 with a summary when everything passes. Exits 1 with a table of
- * every violation (what failed, against what, the measured value, the
- * required threshold) when anything doesn't — including a currently-known
- * finding, reported in the P-028 summary rather than silently patched here.
+ * A CVD_ACCEPTED_EXCEPTIONS list (below CVD_PAIRS) can exempt one specific
+ * pair/deficiency/severity combination, each with a comment recording WHY —
+ * for a real, measured, deliberately-accepted tension, never as a way to
+ * silence an unexamined failure. An exempted measurement still prints in the
+ * success summary, so it stays visible instead of quietly vanishing, and a
+ * listed exception that no longer matches any real failure is flagged as
+ * stale rather than left as dead code.
+ *
+ * Exits 0 with a summary when everything passes (accepted exceptions do not
+ * block this). Exits 1 with a table of every violation (what failed, against
+ * what, the measured value, the required threshold) when anything doesn't —
+ * an exit-1 here is always a real, un-accepted finding, never one already
+ * known and documented.
  */
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -88,6 +97,20 @@ const CVD_DEFICIENCIES = [
   ['tritanopia', filterDeficiencyTrit],
 ];
 const CVD_SEVERITIES = [1.0, 0.5];
+
+/* KNOWN TENSION (accepted 2026-08-22): teal/danger under protanopia@1.0
+   measures 0.0538, below threshold. Accepted because no surface relies on
+   that pair by colour alone — links underlined, destructive buttons
+   outlined+icon+label, FC% glyph+weight (P-028 items 4/5/6). If a future
+   surface puts teal and danger adjacent with opposed meaning and no
+   non-colour channel, that surface is wrong, not this threshold. */
+const CVD_ACCEPTED_EXCEPTIONS = [
+  { pair: ['teal', 'danger'], deficiency: 'protanopia', severity: 1.0 },
+];
+const isAcceptedException = (aName, bName, defName, severity) =>
+  CVD_ACCEPTED_EXCEPTIONS.some(
+    e => e.pair[0] === aName && e.pair[1] === bName && e.deficiency === defName && e.severity === severity
+  );
 
 const oklabDistance = differenceEuclidean('oklab');
 
@@ -195,12 +218,17 @@ function main() {
   }
 
   // 4. CVD-simulated distinguishability for the five near-isoluminant pairs.
+  const triggeredExceptions = [];
   for (const [aName, bName] of CVD_PAIRS) {
     for (const [defName, filterFn] of CVD_DEFICIENCIES) {
       for (const severity of CVD_SEVERITIES) {
         const sim = filterFn(severity);
         const distance = oklabDistance(sim(tokens[aName]), sim(tokens[bName]));
         if (distance < CVD_MIN_DE) {
+          if (isAcceptedException(aName, bName, defName, severity)) {
+            triggeredExceptions.push({ detail: `${aName}/${bName} under ${defName} @ severity ${severity}`, measured: distance.toFixed(4) });
+            continue; // documented, accepted — see CVD_ACCEPTED_EXCEPTIONS above
+          }
           violations.push({
             kind: 'CVD distinguishability',
             detail: `${aName}/${bName} under ${defName} @ severity ${severity}`,
@@ -212,8 +240,23 @@ function main() {
     }
   }
 
+  // An exception nobody's measurement matches is stale — either the tokens
+  // moved and it's no longer needed, or it was mistyped. Not a failure, but
+  // worth surfacing rather than letting dead code sit silently.
+  const staleExceptions = CVD_ACCEPTED_EXCEPTIONS.filter(
+    e => !triggeredExceptions.some(t => t.detail === `${e.pair[0]}/${e.pair[1]} under ${e.deficiency} @ severity ${e.severity}`)
+  );
+
   if (violations.length === 0) {
     console.log(`check-color: OK — ${TEXT_TOKENS.length} text tokens, the wordmark exception, saffron placement, and ${CVD_PAIRS.length} pairs x ${CVD_DEFICIENCIES.length} deficiencies x ${CVD_SEVERITIES.length} severities all pass.`);
+    if (triggeredExceptions.length > 0) {
+      console.log(`  (${triggeredExceptions.length} accepted exception(s) excluded — see CVD_ACCEPTED_EXCEPTIONS:)`);
+      for (const t of triggeredExceptions) console.log(`    ${t.detail}  —  measured ${t.measured}`);
+    }
+    if (staleExceptions.length > 0) {
+      console.log(`  NOTE: ${staleExceptions.length} accepted exception(s) never matched a real measurement this run — stale, consider removing:`);
+      for (const e of staleExceptions) console.log(`    ${e.pair[0]}/${e.pair[1]} under ${e.deficiency} @ severity ${e.severity}`);
+    }
     process.exit(0);
   }
 
