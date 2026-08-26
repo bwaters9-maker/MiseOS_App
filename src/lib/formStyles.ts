@@ -34,8 +34,11 @@ export const FIELD_LABEL =
  * Teal is the interactive accent; saffron stays reserved for the single
  * per-screen signal element and is never a button colour here.
  */
+/* Hover is an alpha step on teal itself, not navy-deep: after P-028 darkened
+   teal to #0B564F (L=0.073), navy-deep #145A55 (L=0.081) is isoluminant with
+   it at 1.06:1 — the hover state would have been invisible. */
 export const BTN_ACTION =
-  'px-[13px] py-[8px] bg-teal text-cream border border-teal rounded-card text-xs font-bold font-display hover:bg-navy-deep transition-colors duration-[144ms]';
+  'px-[13px] py-[8px] bg-teal text-cream border border-teal rounded-card text-xs font-bold font-display hover:bg-teal/85 transition-colors duration-[144ms]';
 
 /**
  * Destructive. Outline only — transparent fill, 2px danger border — so it is
