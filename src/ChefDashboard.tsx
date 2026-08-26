@@ -140,29 +140,37 @@ export default function ChefDashboard({ onNavigate, onOpenRecipe, onOpenDevelopm
         </div>
       </div>
 
-      {/* TRENDS STRIP — informational signal, single line, never wraps */}
+      {/* TRENDS STRIP — informational signal, single line, never wraps.
+          Saffron is an edge accent (rule + a 12px inset band), not a field —
+          bg-saffron-soft read as a full-bleed panel fill too assertive for a
+          purely informational strip (P-028 follow-up, 2026-08-26). Content
+          sits on bg-surface; the tint marks the edge only. */}
       {showTrendsStrip && (
-        <div className="flex items-center gap-[13px] bg-saffron-soft border-l-[3px] border-navy rounded-card px-[13px] py-[8px] mb-[21px] overflow-hidden">
-          <Sprout className="w-4 h-4 text-navy shrink-0" />
-          <div className="flex items-center gap-[13px] min-w-0 flex-1 whitespace-nowrap overflow-hidden">
-            {seasonalStage.length > 0 && (
-              <span className="text-xs text-navy truncate">
-                {seasonalStage.map(i => `${i.name} (${STATUS_LABEL[i.status].toLowerCase()})`).join(' · ')}
-              </span>
-            )}
-            {bridgeCard && (
-              <span className="flex items-baseline gap-[5px] min-w-0 truncate">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-navy shrink-0">Viral Bridge</span>
-                <span className="text-xs text-navy truncate">{bridgeCard.headline}</span>
-              </span>
-            )}
+        <div className="flex items-stretch bg-surface border border-line rounded-card mb-[21px] overflow-hidden">
+          <div className="w-[3px] bg-navy shrink-0" />
+          <div className="w-[12px] bg-saffron-soft shrink-0" />
+          <div className="flex items-center gap-[13px] px-[13px] py-[8px] flex-1 min-w-0">
+            <Sprout className="w-4 h-4 text-navy shrink-0" />
+            <div className="flex items-center gap-[13px] min-w-0 flex-1 whitespace-nowrap overflow-hidden">
+              {seasonalStage.length > 0 && (
+                <span className="text-xs text-navy truncate">
+                  {seasonalStage.map(i => `${i.name} (${STATUS_LABEL[i.status].toLowerCase()})`).join(' · ')}
+                </span>
+              )}
+              {bridgeCard && (
+                <span className="flex items-baseline gap-[5px] min-w-0 truncate">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-navy shrink-0">Viral Bridge</span>
+                  <span className="text-xs text-navy truncate">{bridgeCard.headline}</span>
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => onOpenDevelopment?.()}
+              className="shrink-0 flex items-center gap-[3px] text-[10px] font-bold uppercase tracking-wider text-teal hover:text-navy transition-colors duration-[144ms]"
+            >
+              Open Trends <ChevronRight className="w-3 h-3" />
+            </button>
           </div>
-          <button
-            onClick={() => onOpenDevelopment?.()}
-            className="shrink-0 flex items-center gap-[3px] text-[10px] font-bold uppercase tracking-wider text-teal hover:text-navy transition-colors duration-[144ms]"
-          >
-            Open Trends <ChevronRight className="w-3 h-3" />
-          </button>
         </div>
       )}
 

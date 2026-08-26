@@ -212,16 +212,24 @@ export default function TrendsFullReport(props: TrendsFullReportProps) {
           </div>
 
           {viewingHistoryId && (
-            <div className="bg-saffron-soft border border-line rounded-card p-[13px] flex flex-wrap items-center justify-between gap-[13px]">
-              <p className="text-[11px] text-navy font-bold">
-                Viewing archived report — Week of {formatHistoryLabel(viewingHistoryId)}. Read-only, not the live briefing.
-              </p>
-              <button
-                onClick={() => onSelectHistory(null)}
-                className={`${BTN_GHOST} shrink-0`}
-              >
-                Back to Current
-              </button>
+            /* Saffron as an edge accent (rule + a 12px inset band), not a
+               full-bleed panel fill — too assertive for a purely
+               informational notice (P-028 follow-up, 2026-08-26). Content
+               sits on bg-surface; the tint marks the edge only. */
+            <div className="flex items-stretch bg-surface border border-line rounded-card overflow-hidden">
+              <div className="w-[3px] bg-navy shrink-0" />
+              <div className="w-[12px] bg-saffron-soft shrink-0" />
+              <div className="flex flex-wrap items-center justify-between gap-[13px] p-[13px] flex-1 min-w-0">
+                <p className="text-[11px] text-navy font-bold">
+                  Viewing archived report — Week of {formatHistoryLabel(viewingHistoryId)}. Read-only, not the live briefing.
+                </p>
+                <button
+                  onClick={() => onSelectHistory(null)}
+                  className={`${BTN_GHOST} shrink-0`}
+                >
+                  Back to Current
+                </button>
+              </div>
             </div>
           )}
 
