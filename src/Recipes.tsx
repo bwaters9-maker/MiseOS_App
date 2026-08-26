@@ -8,8 +8,9 @@ import { useRestaurantId } from './components/AuthContext';
 import { useRecipeCategories } from './hooks/useRecipeCategories';
 import { AlertDialog } from './components/AlertDialog';
 import NutritionLabel from './components/recipes/NutritionLabel';
+import { FcValue } from './components/FcValue';
 import {
-  recipeCost, costPerPortion, fcPercent, suggestedPrice, wouldCreateCycle, fcColor, isRecipeOnMenu,
+  recipeCost, costPerPortion, fcPercent, suggestedPrice, wouldCreateCycle, fcIndicator, isRecipeOnMenu,
   recipeStatus, isRecipeInDevelopment,
 } from './lib/costEngine';
 import {
@@ -1166,9 +1167,17 @@ const CostPanel: React.FC<{
           <div className="p-[13px] bg-zinc-900/50 rounded-[8px] border border-zinc-850">
             <div className="flex justify-between mb-[8px]">
               <span className="text-[10px] font-bold uppercase text-zinc-400">Food Cost %</span>
-              <span className={`text-xs font-black tabular-nums ${fcColor(fc, targetFcPercent)}`}>
-                {menuPriceNum > 0 ? `${fc.toFixed(1)}%` : '—'}
-              </span>
+              {menuPriceNum > 0 ? (
+                <FcValue
+                  className="text-xs"
+                  indicator={fcIndicator(fc, targetFcPercent)}
+                  percentText={`${fc.toFixed(1)}%`}
+                  calmClass="text-zinc-100"
+                  escalatedClass="text-red-400"
+                />
+              ) : (
+                <span className="text-xs font-black tabular-nums text-zinc-600">—</span>
+              )}
             </div>
             <div className="w-full h-[5px] bg-zinc-800 rounded-full overflow-hidden">
               <div

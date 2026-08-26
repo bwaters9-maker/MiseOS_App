@@ -9,6 +9,9 @@ import {
   recipeStatus,
   isRecipeInDevelopment,
   wouldCreateCycle,
+  fcIndicator,
+  fcIndicatorFor,
+  fcIndicatorLegacyFixed,
 } from './costEngine';
 import type { Ingredient, Recipe, RecipeLine } from '../types';
 
@@ -280,5 +283,79 @@ describe('wouldCreateCycle', () => {
     const z = mkRecipe({ id: 'z', lines: [rLine('x', 1)] });
     expect(wouldCreateCycle('x', 'y', [x, y, z])).toBe(true);
     expect(() => recipeCost(x, [], [x, y, z])).toThrow(/Circular reference/);
+  });
+});
+
+// P-028: fcColor's emerald/amber/red hue-only encoding was deliberately
+// skipped at P-017 pending this pass. The replacement marks only the
+// exception — navy through 'under' and 'borderline', weight and a leading
+// glyph carry the escalation, danger is the one colour change.
+describe('fcIndicator', () => {
+  it('classifies at or under target as under, with no glyph and no colour', () => {
+    const i = fcIndicator(28, 30);
+    expect(i.state).toBe('under');
+    expect(i.glyph).toBe('');
+    expect(i.textClass).toBe('text-navy');
+    expect(i.weightClass).toBe('font-normal');
+    expect(i.delta).toBeCloseTo(-2);
+  });
+
+  it('is under exactly at target — the boundary belongs to under, not borderline', () => {
+    const i = fcIndicator(30, 30);
+    expect(i.state).toBe('under');
+    expect(i.glyph).toBe('');
+    expect(i.delta).toBe(0);
+  });
+
+  it('crosses into borderline just above target — navy stays, weight and a glyph carry it', () => {
+    const i = fcIndicator(30.1, 30);
+    expect(i.state).toBe('borderline');
+    expect(i.textClass).toBe('text-navy');
+    expect(i.weightClass).toBe('font-medium');
+    expect(i.glyph).toBe('●');
+    expect(i.delta).toBeCloseTo(0.1);
+  });
+
+  it('is borderline exactly at target + 5 — the boundary belongs to borderline, not over', () => {
+    const i = fcIndicator(35, 30);
+    expect(i.state).toBe('borderline');
+    expect(i.glyph).toBe('●');
+    expect(i.delta).toBe(5);
+  });
+
+  it('crosses into over just above target + 5 — this is the one colour change', () => {
+    const i = fcIndicator(35.1, 30);
+    expect(i.state).toBe('over');
+    expect(i.textClass).toBe('text-danger');
+    expect(i.weightClass).toBe('font-bold');
+    expect(i.glyph).toBe('▲');
+    expect(i.delta).toBeCloseTo(5.1);
+  });
+
+  it('reports the exact delta from target, not just the state', () => {
+    expect(fcIndicator(31.2, 30).delta).toBeCloseTo(1.2);
+    expect(fcIndicator(50, 30).delta).toBeCloseTo(20);
+  });
+});
+
+describe('fcIndicatorFor', () => {
+  it('is the pure render mapping fcIndicator delegates to, for a pre-classified state', () => {
+    expect(fcIndicatorFor('under', -5)).toEqual({ state: 'under', textClass: 'text-navy', weightClass: 'font-normal', glyph: '', delta: -5 });
+    expect(fcIndicatorFor('borderline', 2)).toEqual({ state: 'borderline', textClass: 'text-navy', weightClass: 'font-medium', glyph: '●', delta: 2 });
+    expect(fcIndicatorFor('over', 9)).toEqual({ state: 'over', textClass: 'text-danger', weightClass: 'font-bold', glyph: '▲', delta: 9 });
+  });
+});
+
+describe('fcIndicatorLegacyFixed', () => {
+  it('matches the hand-copied fc<28/fc<34 thresholds it replaced, unchanged', () => {
+    expect(fcIndicatorLegacyFixed(27.9).state).toBe('under');
+    expect(fcIndicatorLegacyFixed(28).state).toBe('borderline'); // strict `<`, not `<=` — 28 itself was already amber in both originals
+    expect(fcIndicatorLegacyFixed(33.9).state).toBe('borderline');
+    expect(fcIndicatorLegacyFixed(34).state).toBe('over');
+  });
+
+  it('measures delta against the lower threshold (28), the same reference point costEngine.fcIndicator uses', () => {
+    expect(fcIndicatorLegacyFixed(30).delta).toBe(2);
+    expect(fcIndicatorLegacyFixed(28).delta).toBe(0);
   });
 });

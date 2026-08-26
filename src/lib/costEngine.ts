@@ -142,9 +142,56 @@ export const recipeUsesEstimatedPricing = (
   });
 };
 
-/** Same emerald/amber/red thresholds used everywhere FC% is displayed. */
-export const fcColor = (fc: number, target: number): string =>
-  fc <= target ? 'text-emerald-400' : fc <= target + 5 ? 'text-amber-400' : 'text-red-400';
+export type FcState = 'under' | 'borderline' | 'over';
+
+export interface FcIndicator {
+  state: FcState;
+  textClass: string;
+  weightClass: string;
+  /** Empty string for 'under' — the leading glyph column stays reserved but blank. */
+  glyph: string;
+  /** fc - target. Only meaningful, and only ever rendered, for 'borderline'/'over'. */
+  delta: number;
+}
+
+/**
+ * Render spec for an already-classified food-cost state. Colour is never the
+ * only signal (P-028): AA on cream caps every text colour at relative
+ * luminance <= 0.1498, so a hue ladder and a lightness ladder can't coexist
+ * in that band — and the obvious hue ladder (teal/saffron/danger) is
+ * non-monotonic anyway (teal L=0.155, saffron L=0.430, danger L=0.143: good
+ * and over-target land at the SAME lightness, borderline is the lightest).
+ * Mark only the exception instead: navy stays navy through 'under' and
+ * 'borderline', weight and a leading glyph carry the escalation, and only
+ * 'over' spends the one colour change the eye needs.
+ */
+export const fcIndicatorFor = (state: FcState, delta: number): FcIndicator => {
+  if (state === 'under') return { state, textClass: 'text-navy', weightClass: 'font-normal', glyph: '', delta };
+  if (state === 'borderline') return { state, textClass: 'text-navy', weightClass: 'font-medium', glyph: '●', delta };
+  return { state, textClass: 'text-danger', weightClass: 'font-bold', glyph: '▲', delta };
+};
+
+/** The standard target/target+5 classification, for every screen that reads
+ * the restaurant's configured targetFcPercent (ChefDashboard, Menu, the
+ * Recipe Builder). Replaces the old emerald/amber/red `fcColor`. */
+export const fcIndicator = (fc: number, target: number): FcIndicator => {
+  const delta = fc - target;
+  const state: FcState = fc <= target ? 'under' : fc <= target + 5 ? 'borderline' : 'over';
+  return fcIndicatorFor(state, delta);
+};
+
+/**
+ * Legacy fixed 28%/34% thresholds. Features.tsx and DailyCribSheet.tsx each
+ * hand-copied an identical `fc<28/fc<34` classifier, unrelated to the
+ * restaurant's configurable targetFcPercent that every other FC% display
+ * reads — the same feature can read "under" on one screen and "over" on
+ * another. Consolidated to one implementation for the P-028 indicator
+ * redesign; the 28/34 values themselves are UNCHANGED and their divergence
+ * from the real target is a pre-existing bug, reported separately, not
+ * fixed here.
+ */
+export const fcIndicatorLegacyFixed = (fc: number): FcIndicator =>
+  fcIndicatorFor(fc < 28 ? 'under' : fc < 34 ? 'borderline' : 'over', fc - 28);
 
 /**
  * One-time snapshot for a feature created by linking to a recipe — not a

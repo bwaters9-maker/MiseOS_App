@@ -4,6 +4,8 @@ import { useKitchenSelector } from './components/KitchenStateContext';
 import { todayDateKey, formatTime12h } from './utils';
 import type { Feature, Employee, Shift, KitchenEvent, CribNote } from './types';
 import { BADGE as SHARED_BADGE } from './lib/formStyles';
+import { fcIndicatorLegacyFixed } from './lib/costEngine';
+import { FcValue } from './components/FcValue';
 
 const CARD = 'crib-card bg-zinc-950 border border-zinc-800 rounded-[13px] p-[21px]';
 const LABEL = 'crib-section-header text-[10px] font-black uppercase tracking-[0.15em] flex items-center gap-[8px] mb-[13px]';
@@ -13,9 +15,6 @@ const ROW = 'crib-row flex items-baseline justify-between gap-[13px] py-[8px] bo
    restyle of the shared BADGE. */
 const BADGE = `crib-badge ${SHARED_BADGE}`;
 const EMPTY = 'text-xs text-zinc-500 italic py-[8px]';
-
-const fcColor = (fc: number) =>
-  fc < 28 ? 'text-emerald-400' : fc < 34 ? 'text-amber-400' : 'text-red-400';
 
 // Pre-rename docs may still carry the old `covers` field — read it as a
 // fallback for display only; every write now uses `attendees`.
@@ -124,7 +123,12 @@ const DailyCribSheet: React.FC = () => {
                           <span className="text-zinc-300 tabular-nums">${f.price.toFixed(2)}</span>
                         )}
                         {fc != null && (
-                          <span className={`font-bold tabular-nums ${fcColor(fc)}`}>FC {fc}%</span>
+                          <FcValue
+                            indicator={fcIndicatorLegacyFixed(fc)}
+                            percentText={`FC ${fc}%`}
+                            calmClass="text-zinc-100"
+                            escalatedClass="text-red-400"
+                          />
                         )}
                       </div>
                     </div>

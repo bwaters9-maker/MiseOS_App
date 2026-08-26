@@ -3,8 +3,9 @@ import { UtensilsCrossed, AlertTriangle, ChevronRight, Eye } from 'lucide-react'
 import { useKitchenSelector } from './components/KitchenStateContext';
 import { useRecipeCategories } from './hooks/useRecipeCategories';
 import { useRecipeCollections } from './hooks/useRecipeCollections';
-import { costPerPortion, fcPercent, fcColor, recipeUsesEstimatedPricing, isRecipeOnMenu } from './lib/costEngine';
+import { costPerPortion, fcPercent, fcIndicator, recipeUsesEstimatedPricing, isRecipeOnMenu } from './lib/costEngine';
 import GuestMenuPreview, { type GuestMenuGroup } from './components/GuestMenuPreview';
+import { FcValue } from './components/FcValue';
 import type { Ingredient, Recipe, MenuTemplate, RestaurantProfile } from './types';
 
 const STAT_CARD = 'bg-zinc-950 border border-zinc-800 rounded-[13px] p-[13px]';
@@ -136,9 +137,17 @@ const Menu: React.FC<MenuProps> = ({ targetFcPercent = 30, onOpenRecipe, menuTem
         </div>
         <div className={STAT_CARD}>
           <p className={STAT_LABEL}>Avg Food Cost %</p>
-          <p className={`text-lg font-black tabular-nums ${avgFc != null ? fcColor(avgFc, targetFcPercent) : 'text-zinc-600'}`}>
-            {avgFc != null ? `${avgFc.toFixed(1)}%` : '—'}
-          </p>
+          {avgFc != null ? (
+            <FcValue
+              className="text-lg"
+              indicator={fcIndicator(avgFc, targetFcPercent)}
+              percentText={`${avgFc.toFixed(1)}%`}
+              calmClass="text-zinc-100"
+              escalatedClass="text-red-400"
+            />
+          ) : (
+            <p className="text-lg font-black tabular-nums text-zinc-600">—</p>
+          )}
         </div>
         <div className={STAT_CARD}>
           <p className={STAT_LABEL}>Missing Menu Price</p>
@@ -203,9 +212,17 @@ const Menu: React.FC<MenuProps> = ({ targetFcPercent = 30, onOpenRecipe, menuTem
                       )}
                     </span>
 
-                    <span className={`w-[55px] text-right text-xs font-black tabular-nums shrink-0 ${row.fc != null ? fcColor(row.fc, targetFcPercent) : 'text-zinc-600'}`}>
-                      {row.fc != null ? `${row.fc.toFixed(1)}%` : '—'}
-                    </span>
+                    {row.fc != null ? (
+                      <FcValue
+                        className="w-[55px] justify-end text-xs shrink-0"
+                        indicator={fcIndicator(row.fc, targetFcPercent)}
+                        percentText={`${row.fc.toFixed(1)}%`}
+                        calmClass="text-zinc-100"
+                        escalatedClass="text-red-400"
+                      />
+                    ) : (
+                      <span className="w-[55px] text-right text-xs font-black tabular-nums shrink-0 text-zinc-600">—</span>
+                    )}
 
                     <ChevronRight className="w-[13px] h-[13px] text-zinc-700 shrink-0" />
                   </button>

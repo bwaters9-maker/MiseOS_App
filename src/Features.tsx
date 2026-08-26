@@ -5,7 +5,8 @@ import { addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { rCollection, rDoc } from './lib/firestorePaths';
 import { useKitchenSelector } from './components/KitchenStateContext';
 import { useRestaurantId } from './components/AuthContext';
-import { featureFieldsFromRecipe } from './lib/costEngine';
+import { featureFieldsFromRecipe, fcIndicatorLegacyFixed } from './lib/costEngine';
+import { FcValue } from './components/FcValue';
 import type { Feature, Recipe, Ingredient } from './types';
 
 export const COURSES = ['Amuse', 'Appetizer', 'Soup', 'Fish', 'Intermezzo', 'Entrée', 'Cheese', 'Dessert', 'Mignardise'];
@@ -57,8 +58,6 @@ export const toDoc = (f: FormState) => ({
   is86d: f.is86d,
   ...(f.recipeId && { recipeId: f.recipeId }),
 });
-
-const fcColor = (fc: number) => fc < 28 ? 'text-emerald-400' : fc < 34 ? 'text-amber-400' : 'text-red-400';
 
 const computeFc = (price: string, cost: string): number | null => {
   const p = parseFloat(price);
@@ -135,7 +134,13 @@ const FeatureForm: React.FC<{
         </div>
         <div className="pb-[5px]">
           {fc != null ? (
-            <span className={`text-sm font-black tabular-nums ${fcColor(fc)}`}>FC {fc}%</span>
+            <FcValue
+              className="text-sm"
+              indicator={fcIndicatorLegacyFixed(fc)}
+              percentText={`FC ${fc}%`}
+              calmClass="text-zinc-100"
+              escalatedClass="text-red-400"
+            />
           ) : (
             <span className="text-xs text-zinc-600 tabular-nums">FC —</span>
           )}
@@ -349,7 +354,12 @@ const Features: React.FC = () => {
                         <span className="text-sm text-zinc-300 tabular-nums font-bold">${f.price.toFixed(2)}</span>
                       )}
                       {fc != null && (
-                        <span className={`text-xs font-bold tabular-nums ${fcColor(fc)}`}>FC {fc}%</span>
+                        <FcValue
+                          indicator={fcIndicatorLegacyFixed(fc)}
+                          percentText={`FC ${fc}%`}
+                          calmClass="text-zinc-100"
+                          escalatedClass="text-red-400"
+                        />
                       )}
 
                       <button

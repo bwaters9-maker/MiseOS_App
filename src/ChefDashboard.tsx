@@ -5,7 +5,8 @@ import { rCollection } from './lib/firestorePaths';
 import { useKitchenSelector } from './components/KitchenStateContext';
 import { useRestaurantId } from './components/AuthContext';
 import { useStationPresets } from './hooks/useStationPresets';
-import { featureFieldsFromRecipe, costPerPortion, fcPercent, fcColor, isRecipeInDevelopment } from './lib/costEngine';
+import { featureFieldsFromRecipe, costPerPortion, fcPercent, fcIndicator, isRecipeInDevelopment } from './lib/costEngine';
+import { FcValue } from './components/FcValue';
 import { regionForState, itemsForRegion } from './lib/seasonalData';
 import { monthStatus, STATUS_LABEL } from './components/testkitchen/trendsDisplay';
 import { COURSES, BLANK as BLANK_FEATURE, toDoc as featureToDoc, type FormState as FeatureFormState } from './Features';
@@ -300,9 +301,11 @@ export default function ChefDashboard({ onNavigate, onOpenRecipe, onOpenDevelopm
                   <span className="text-xs text-slate font-mono">
                     {perPortion != null ? `$${perPortion.toFixed(2)}/portion` : 'No cost'}
                   </span>
-                  <span className={`text-xs font-mono ${fc != null ? fcColor(fc, targetFcPercent) : 'text-slate'}`}>
-                    {fc != null ? `${fc.toFixed(1)}% FC` : 'Unpriced'}
-                  </span>
+                  {fc != null ? (
+                    <FcValue className="text-xs" indicator={fcIndicator(fc, targetFcPercent)} percentText={`${fc.toFixed(1)}% FC`} />
+                  ) : (
+                    <span className="text-xs font-mono text-slate">Unpriced</span>
+                  )}
                 </div>
               </button>
             ))}
