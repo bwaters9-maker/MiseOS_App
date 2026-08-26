@@ -756,7 +756,7 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
         onClose={() => setStationToDelete(null)}
         onConfirm={() => stationToDelete && handleDeleteStation(stationToDelete.id)}
         title="Delete Station Preset"
-        confirmText="Delete"
+        confirmText="Delete station preset"
         variant="destructive"
       >
         <p>
@@ -769,7 +769,7 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
         onClose={() => setCategoryToDelete(null)}
         onConfirm={() => categoryToDelete && handleDeleteCategory(categoryToDelete.id)}
         title="Delete Recipe Category"
-        confirmText="Delete"
+        confirmText="Delete recipe category"
         variant="destructive"
       >
         <p>
@@ -782,7 +782,7 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
         onClose={() => setEventTypeToDelete(null)}
         onConfirm={() => eventTypeToDelete && handleDeleteEventType(eventTypeToDelete.id)}
         title="Delete Event Type"
-        confirmText="Delete"
+        confirmText="Delete event type"
         variant="destructive"
       >
         <p>

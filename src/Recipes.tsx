@@ -971,7 +971,7 @@ const RecipeEditor: React.FC<{
         onClose={() => setConfirmReplaceMethod(false)}
         onConfirm={runDraftMethod}
         title="Replace Method?"
-        confirmText="Replace"
+        confirmText="Replace method"
       >
         This recipe already has method steps. Drafting a new method will replace them.
       </AlertDialog>

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { BTN_DESTRUCTIVE, BTN_GHOST } from './lib/formStyles';
 import { Layers, Plus, Trash2, CheckCircle2, Circle, ChevronDown, ChevronRight } from 'lucide-react';
 import { db } from './firebaseConfig';
 import { addDoc, deleteDoc, updateDoc, writeBatch } from 'firebase/firestore';
@@ -181,14 +182,15 @@ const RecipeCollections: React.FC = () => {
                         type="button"
                         onClick={() => handleDelete(c)}
                         disabled={saving}
-                        className="text-xs font-bold text-white bg-red-400 rounded-[8px] px-[13px] py-[5px]"
+                        className={BTN_DESTRUCTIVE}
                       >
-                        Confirm Delete
+                        <Trash2 className="w-3 h-3" />
+                        Delete collection
                       </button>
                       <button
                         type="button"
                         onClick={() => setConfirmDeleteId(null)}
-                        className="text-xs font-bold text-slate px-[8px] py-[5px]"
+                        className={BTN_GHOST}
                       >
                         Cancel
                       </button>
