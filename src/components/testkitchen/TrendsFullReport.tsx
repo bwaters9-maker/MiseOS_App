@@ -249,7 +249,7 @@ export default function TrendsFullReport(props: TrendsFullReportProps) {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[21px]">
               {bridgeCard && (
-                <div className="bg-surface border-2 border-saffron rounded-card p-[21px] flex flex-col gap-[13px] lg:col-span-1">
+                <div className="bg-surface border-2 border-navy rounded-card p-[21px] flex flex-col gap-[13px] lg:col-span-1">
                   <div className="flex items-center justify-between">
                     <span className="flex items-center gap-[5px] px-[8px] py-[3px] rounded-[5px] text-[10px] font-bold uppercase tracking-wider bg-saffron text-navy">
                       <Flame className="w-3 h-3" /> Viral Bridge

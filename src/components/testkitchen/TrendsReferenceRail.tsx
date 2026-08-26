@@ -102,7 +102,7 @@ export default function TrendsReferenceRail(props: TrendsPanelData) {
                 const isBridge = card === bridgeCard;
                 const expanded = expandedKey === key;
                 return (
-                  <div key={key} className={`rounded-[8px] border ${isBridge ? 'border-saffron' : 'border-line'}`}>
+                  <div key={key} className={`rounded-[8px] border ${isBridge ? 'border-navy' : 'border-line'}`}>
                     <button onClick={() => toggleExpanded(key)} className="w-full flex items-center gap-[8px] px-[8px] py-[5px] text-left">
                       {isBridge && <Flame className="w-3 h-3 text-navy shrink-0" />}
                       <span className={`shrink-0 px-[5px] py-[1px] rounded-[5px] text-[8px] font-bold uppercase tracking-wider border ${CATEGORY_STYLE[card.category] ?? CATEGORY_STYLE.Technique}`}>{card.category}</span>
