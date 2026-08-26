@@ -17,7 +17,8 @@
  *      colours through deuteranopia/protanopia/tritanopia at severity 1.0
  *      AND 0.5 (anomalous trichromacy is the common real-world case, not
  *      full dichromacy) and assert the simulated colours are still at least
- *      OKLab Euclidean distance 0.15 apart.
+ *      OKLab Euclidean distance CVD_MIN_DE apart — empirically calibrated
+ *      (see the constant's own comment), not an arbitrary round number.
  *
  * TEXT_TOKENS is a curated list, not a blind grep of every `text-*` class in
  * the codebase. Some tokens are used as text FOR a colour, not against the
@@ -58,7 +59,22 @@ const WORDMARK_TOKEN = 'wordmark-saffron';
 const WORDMARK_MIN_CONTRAST = 3.0; // WCAG 1.4.3 logotype / large-text exception, not the general 4.5 bar
 const TEXT_TOKENS = ['navy', 'slate', 'teal', 'danger'];
 
-const CVD_MIN_DE = 0.15;
+/**
+ * Empirically calibrated 2026-08-26 (P-029 pre-work), replacing an initial
+ * 0.15 set by analogy from CAM02-UCS dE numbers — a different metric on a
+ * different scale, which made this OKLab check reject navy/teal even though
+ * that pair measures dE~30 in CAM02 across all observers and reads as
+ * visibly distinct. Recalibrated against two real anchors, both under
+ * deuteranopia at severity 1.0 via this same differenceEuclidean('oklab'):
+ *   - LOW  0.0298 — slate vs. the OLD teal (#1E7A74, pre-P-028): the known-
+ *     real failure (1.06:1 WCAG contrast, the isoluminant pair that started
+ *     the whole P-028 pass). Threshold must sit above this.
+ *   - HIGH 0.1000 — navy vs. the CURRENT teal (#0B564F): known-good, reads
+ *     as clearly distinct. Threshold must sit below this.
+ * Midpoint of [0.0298, 0.1000] = 0.0649, rounded to 0.06. Re-derive both
+ * anchors before ever moving this constant again — don't hand-tune it.
+ */
+const CVD_MIN_DE = 0.06;
 const CVD_PAIRS = [
   ['slate', 'teal'],
   ['teal', 'danger'],
