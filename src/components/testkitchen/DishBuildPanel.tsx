@@ -341,7 +341,7 @@ export default function DishBuildPanel({ unitSystem, onOpenRecipe }: DishBuildPa
             placeholder="e.g. A corn side dish with 2 oz corn, 1 lb unsalted butter, and 3 shallots. Makes 4 portions."
             rows={7}
             disabled={extracting}
-            className="w-full bg-bg-cool border border-line p-[13px] rounded-card text-xs focus:outline-none focus:border-teal text-navy placeholder:text-slate/60 font-body disabled:opacity-50 resize-none"
+            className="w-full bg-bg-cool border border-line p-[13px] rounded-card text-xs focus:outline-none focus:border-teal text-navy placeholder:text-slate font-body disabled:opacity-50 resize-none"
           />
           <button
             type="submit"
@@ -367,7 +367,7 @@ export default function DishBuildPanel({ unitSystem, onOpenRecipe }: DishBuildPa
               value={draft.dishName}
               onChange={e => setDishName(e.target.value)}
               placeholder="Name this dish"
-              className="w-full bg-surface border border-line rounded-[5px] px-[8px] py-[5px] text-sm font-display font-bold text-navy placeholder:font-body placeholder:font-normal placeholder:text-slate/60"
+              className="w-full bg-surface border border-line rounded-[5px] px-[8px] py-[5px] text-sm font-display font-bold text-navy placeholder:font-body placeholder:font-normal placeholder:text-slate"
             />
           </div>
 
@@ -549,7 +549,7 @@ export default function DishBuildPanel({ unitSystem, onOpenRecipe }: DishBuildPa
                   onChange={e => setRefinementInput(e.target.value)}
                   placeholder='e.g. "make it 6 portions"'
                   disabled={refining}
-                  className="flex-1 bg-bg-cool border border-line rounded-[5px] px-[8px] py-[5px] text-xs text-navy placeholder:text-slate/60 focus:outline-none focus:border-teal disabled:opacity-50"
+                  className="flex-1 bg-bg-cool border border-line rounded-[5px] px-[8px] py-[5px] text-xs text-navy placeholder:text-slate focus:outline-none focus:border-teal disabled:opacity-50"
                 />
                 <button
                   type="submit"

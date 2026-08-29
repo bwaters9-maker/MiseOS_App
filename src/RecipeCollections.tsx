@@ -112,7 +112,7 @@ const RecipeCollections: React.FC = () => {
           onChange={e => setNewName(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
           placeholder="New collection name (e.g. Summer 2026)"
-          className="flex-1 bg-white border border-line rounded-[8px] px-[13px] py-[8px] text-sm text-navy placeholder:text-slate/60 focus:outline-none focus:border-teal"
+          className="flex-1 bg-white border border-line rounded-[8px] px-[13px] py-[8px] text-sm text-navy placeholder:text-slate focus:outline-none focus:border-teal"
         />
         <button
           type="button"
