@@ -18,6 +18,28 @@
                                      P-028. Do not lighten without re-running check:color. */
   --color-accent-wash:  #E7F2F1;  /* selected row, chip bg */
 
+  /* Content on a bg-teal fill — P-031 item 1. Unlike navy, teal is not a
+     flipping ink token — it carries its own independent Day/Service
+     values (P-028's CVD calibration), so there is no "teal's opposite"
+     to invert against the way on-navy inverts navy. text-cream on
+     bg-teal (BTN_ACTION, 8 sites) collided to 2.46:1 in Service — cream
+     is fixed, and Service's lighter teal (#3FA8A0) sits too close to it.
+     on-teal reuses on-navy's own two values (the app's canonical light/
+     dark ink extremes) rather than inventing new ones: empirically they
+     clear contrast against BOTH of teal's values too — 7.32:1 Day,
+     5.03:1 Service. Named separately from on-navy anyway, since a token
+     is for its use context (content-on-bg-teal), not just its value —
+     the two happening to coincide today doesn't make them the same
+     thing architecturally.
+     Resting-state contrast alone wasn't the whole picture: BTN_ACTION's
+     hover state (an alpha dilution of bg-teal) independently collapsed to
+     3.90-3.99:1 in Service, since diluting the background toward whatever
+     sits behind the button drags it toward on-teal's own dark value,
+     shrinking the gap rather than the resting-state math. Fixed by
+     tightening the dilution amount (see formStyles.ts) — 4.65:1 worst
+     case once corrected, not by changing this token. */
+  --color-on-teal:      #F2EDE2;  /* = cream = on-navy's Day value. 7.32:1 on Day teal. */
+
   /* Signal — valid ONLY as a large fill with navy content on it (navy on
      saffron = 6.60:1). It is 1.87:1 on cream and 2.19:1 on white, so it fails
      1.4.3 as text and 1.4.11 as an icon or component border. P-028. */
@@ -96,6 +118,13 @@
   /* = Day navy. Inversion pair (P-030): navy is now light here, so
      on-navy flips dark to stay its opposite. 12.37:1 on Service navy. */
   --color-on-navy:        #1B2A41;
+
+  /* = Day navy = on-navy's Service value (P-031 item 1). Not an
+     inversion of teal — teal doesn't flip — just the same dark ink
+     extreme reused because it clears Service's teal (#3FA8A0) too.
+     5.03:1 resting on Service teal; 4.65:1 worst case against
+     BTN_ACTION's corrected hover dilution (see formStyles.ts). */
+  --color-on-teal:        #1B2A41;
 }
 
 @layer base {

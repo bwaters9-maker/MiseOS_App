@@ -13,7 +13,7 @@
  * source-scan findings with a real file:line, and both are the kind of
  * thing a screen accumulates before its brand pass, not a live "this
  * button is unreadable" defect. Every OTHER check (bare-token contrast,
- * the wordmark exception, on-navy, saffron misuse, and CVD
+ * the wordmark exception, on-navy, on-teal, saffron misuse, and CVD
  * distinguishability) is NEVER baseline-eligible — those are the hard
  * floor, and baselining any of them would have hidden the exact defect
  * this file exists to catch (P-026 shipped an invisible button; five
@@ -73,6 +73,12 @@
  *      fixed — a flipping background paired with a fixed-value text
  *      token collided to 1.00:1 in Service the moment the flip caught
  *      up with it.
+ *   3b. on-teal (P-031 item 1) is always >= 4.5 against teal itself, in
+ *      EACH surface. Unlike on-navy this isn't an inversion-pair check —
+ *      teal doesn't flip between surfaces — it's a fixed value re-checked
+ *      against a token that could still drift under it later. Permanent
+ *      regression guard for the text-cream/bg-teal collision this item
+ *      fixed (2.46:1 in Service).
  *   4. Saffron is never referenced as text/icon/border anywhere in
  *      src/ — a static grep, not a token check (surface-independent:
  *      component code never branches on the mode, so a misuse is
@@ -176,13 +182,15 @@ const WORDMARK_MIN_CONTRAST = 3.0; // WCAG 1.4.3 logotype / large-text exception
 const TEXT_TOKENS = ['navy', 'slate', 'teal', 'danger'];
 const ON_NAVY_TOKEN = 'on-navy';
 const NAVY_TOKEN = 'navy';
+const ON_TEAL_TOKEN = 'on-teal';
+const TEAL_TOKEN = 'teal';
 
 const SURFACES = ['day', 'service'];
 
 // Violation kinds a baseline entry may cover (P-029). Every other kind
-// (contrast, wordmark, on-navy, saffron misuse, CVD) is an absolute
-// floor — see the file header on why baselining any of those would
-// defeat the point of this guard.
+// (contrast, wordmark, on-navy, on-teal, saffron misuse, CVD) is an
+// absolute floor — see the file header on why baselining any of those
+// would defeat the point of this guard.
 const BASELINE_ELIGIBLE_KINDS = new Set(['raw-tailwind-colour', 'opacity-diluted contrast']);
 
 // A baseline-eligible finding measuring below this is refused baseline
@@ -517,8 +525,8 @@ const BASELINE_HEADER = `# color-baseline.txt — known pre-existing check:color
 # Only two check:color kinds are eligible: raw-tailwind-colour and
 # opacity-diluted contrast (the legacy-dark-zinc-brand-pass backlog and
 # already-dimmed text found before this baseline existed). Every other
-# kind — bare-token contrast, the wordmark exception, on-navy, saffron
-# misuse, CVD distinguishability — can NEVER appear below: baselining any
+# kind — bare-token contrast, the wordmark exception, on-navy, on-teal,
+# saffron misuse, CVD distinguishability — can NEVER appear below: baselining any
 # of those would hide the exact class of defect this guard exists to
 # catch. Regenerate with: node scripts/check-color.mjs --write-baseline
 #
@@ -619,6 +627,25 @@ function main() {
       violations.push({
         kind: 'contrast (on-navy vs navy)',
         detail: `[${surface}] ${ON_NAVY_TOKEN} vs ${NAVY_TOKEN}`,
+        measured: ratio.toFixed(2),
+        required: `>= ${TEXT_MIN_CONTRAST}`,
+      });
+    }
+  }
+
+  // 3b. (P-031 item 1) on-teal must clear 4.5:1 against teal itself, in
+  // EACH surface — the permanent regression guard for the text-cream/
+  // bg-teal collision this item fixed (2.46:1 in Service). Unlike on-navy,
+  // on-teal is not an inversion pair (teal doesn't flip), so this checks a
+  // fixed value against a token that could still drift under it later.
+  for (const surface of SURFACES) {
+    const tokens = tokensBySurface[surface];
+    const tealBg = compositeOver(tokens[TEAL_TOKEN], tokens[TEAL_TOKEN]);
+    const ratio = wcagContrast(compositeOver(tokens[ON_TEAL_TOKEN], tokens[TEAL_TOKEN]), tealBg);
+    if (ratio < TEXT_MIN_CONTRAST) {
+      violations.push({
+        kind: 'contrast (on-teal vs teal)',
+        detail: `[${surface}] ${ON_TEAL_TOKEN} vs ${TEAL_TOKEN}`,
         measured: ratio.toFixed(2),
         required: `>= ${TEXT_MIN_CONTRAST}`,
       });
@@ -747,7 +774,7 @@ function main() {
     }
     const blocking = violations.filter(v => !BASELINE_ELIGIBLE_KINDS.has(v.kind));
     if (blocking.length > 0) {
-      console.error(`check-color --write-baseline: refused — ${blocking.length} finding(s) are of a kind that can never be baselined (contrast, wordmark, on-navy, saffron misuse, or un-tracked CVD). Fix them; --write-baseline only ever covers raw-tailwind-colour and opacity-diluted contrast:\n`);
+      console.error(`check-color --write-baseline: refused — ${blocking.length} finding(s) are of a kind that can never be baselined (contrast, wordmark, on-navy, on-teal, saffron misuse, or un-tracked CVD). Fix them; --write-baseline only ever covers raw-tailwind-colour and opacity-diluted contrast:\n`);
       for (const v of blocking) console.error(`  [${v.kind}]  ${v.detail}  —  measured ${v.measured}`);
       process.exit(1);
     }
@@ -780,7 +807,7 @@ function main() {
   const ok = alwaysBlocking.length === 0 && newFindings.length === 0 && staleBaselineEntries.length === 0;
 
   if (ok) {
-    console.log(`check-color: OK — ${TEXT_TOKENS.length} text tokens, the wordmark exception, on-navy, saffron placement, and ${CVD_PAIRS.length} CVD pairs all pass (or are accepted/tracked exceptions) across both surfaces. ${baseline.size} pre-existing finding(s) match the baseline exactly.`);
+    console.log(`check-color: OK — ${TEXT_TOKENS.length} text tokens, the wordmark exception, on-navy, on-teal, saffron placement, and ${CVD_PAIRS.length} CVD pairs all pass (or are accepted/tracked exceptions) across both surfaces. ${baseline.size} pre-existing finding(s) match the baseline exactly.`);
     if (acceptedExceptions.length > 0) {
       console.log(`  (${acceptedExceptions.length} accepted exception(s) excluded — see CVD_ACCEPTED_EXCEPTIONS:)`);
       for (const t of acceptedExceptions) console.log(`    ${t.detail}  —  measured ${t.measured}`);
