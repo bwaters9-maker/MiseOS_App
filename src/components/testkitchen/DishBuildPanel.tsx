@@ -317,14 +317,14 @@ export default function DishBuildPanel({ unitSystem, onOpenRecipe }: DishBuildPa
       </div>
 
       {extractError && (
-        <div className="flex items-start justify-between gap-[8px] mt-[13px] text-[10px] text-red-400">
+        <div className="flex items-start justify-between gap-[8px] mt-[13px] text-[10px] text-danger">
           <span className="flex items-start gap-[5px]"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-[1px]" />{extractError}</span>
           <button onClick={() => setExtractError(null)} className="text-slate hover:text-navy shrink-0 uppercase font-bold text-[9px]">Dismiss</button>
         </div>
       )}
 
       {handOffError && (
-        <div className="flex items-start justify-between gap-[8px] mt-[13px] text-[10px] text-red-400">
+        <div className="flex items-start justify-between gap-[8px] mt-[13px] text-[10px] text-danger">
           <span className="flex items-start gap-[5px]"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-[1px]" />{handOffError}</span>
           <button onClick={() => setHandOffError(null)} className="text-slate hover:text-navy shrink-0 uppercase font-bold text-[9px]">Dismiss</button>
         </div>
@@ -534,7 +534,7 @@ export default function DishBuildPanel({ unitSystem, onOpenRecipe }: DishBuildPa
               </ul>
             )}
             {refineError && (
-              <div className="flex items-start justify-between gap-[8px] mb-[5px] text-[10px] text-red-400">
+              <div className="flex items-start justify-between gap-[8px] mb-[5px] text-[10px] text-danger">
                 <span className="flex items-start gap-[5px]"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-[1px]" />{refineError}</span>
                 <button onClick={() => setRefineError(null)} className="text-slate hover:text-navy shrink-0 uppercase font-bold text-[9px]">Dismiss</button>
               </div>
