@@ -130,7 +130,11 @@ export default function TrendsReferenceRail(props: TrendsPanelData) {
 
         {/* PRICING */}
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[8px]">Pricing Trends</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[3px]">Pricing Trends</p>
+          <div className="mb-[8px] space-y-[1px]">
+            <p className="text-[10px] text-slate">Short-term — temporary market swing, expected to settle.</p>
+            <p className="text-[10px] text-slate">Structural — lasting shift, plan menus around it.</p>
+          </div>
           {!trendReportLoaded || pricing.length === 0 ? (
             <p className="text-xs text-slate italic">No pricing commentary yet.</p>
           ) : (

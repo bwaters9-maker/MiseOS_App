@@ -291,6 +291,10 @@ export default function TrendsFullReport(props: TrendsFullReportProps) {
               <p className="text-[10px] text-slate/80 italic mt-[3px]">
                 AI commentary only — informational, never linked to your actual ingredient costs. Update real prices from Ingredients, never here.
               </p>
+              <div className="mt-[5px] space-y-[1px]">
+                <p className="text-[10px] text-slate">Short-term — temporary market swing, expected to settle.</p>
+                <p className="text-[10px] text-slate">Structural — lasting shift, plan menus around it.</p>
+              </div>
             </div>
             {!trendReportLoaded || displayedReport === null ? (
               <p className="text-xs text-slate italic py-[8px]">No pricing commentary yet — it refreshes automatically each week.</p>

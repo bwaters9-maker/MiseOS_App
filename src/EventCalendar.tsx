@@ -642,11 +642,11 @@ const EventCalendar: React.FC<EventCalendarProps> = ({ selectedEventId, setSelec
       <div>
         <div className="flex items-start justify-between mb-[34px]">
           <div>
-            <h1 className="text-xl font-black uppercase tracking-wider text-white flex items-center gap-[8px]">
+            <h1 className="text-xl font-black uppercase tracking-wider text-navy flex items-center gap-[8px]">
               <CalendarDays className="w-5 h-5 text-purple-400" />
               Events
             </h1>
-            <p className="text-xs text-zinc-500 mt-[5px]">Private dining, buyouts, and special events — feeds the Crib Sheet</p>
+            <p className="text-xs text-slate mt-[5px]">Private dining, buyouts, and special events — feeds the Crib Sheet</p>
           </div>
           {!showAddEvent && (
             <button
@@ -824,11 +824,11 @@ const EventCalendar: React.FC<EventCalendarProps> = ({ selectedEventId, setSelec
       <div>
         <div className="flex items-start justify-between mb-[21px]">
           <div>
-            <h1 className="text-xl font-black uppercase tracking-wider text-white flex items-center gap-[8px]">
+            <h1 className="text-xl font-black uppercase tracking-wider text-navy flex items-center gap-[8px]">
               <Contact className="w-5 h-5 text-blue-400" />
               Clients
             </h1>
-            <p className="text-xs text-zinc-500 mt-[5px]">Client directory — link a client to an event above</p>
+            <p className="text-xs text-slate mt-[5px]">Client directory — link a client to an event above</p>
           </div>
           {!showAddClient && (
             <button
