@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Sparkles, RefreshCw, Send, AlertCircle } from 'lucide-react';
-import { SOUS_SYSTEM_PROMPT } from './lib/sousPersona';
-import { APP_KNOWLEDGE_CONTEXT } from './lib/sousAppKnowledge';
 import { withRegionContext } from './lib/regionContext';
-import { callAi, parseAiJson, getAiAuthHeader, AI_SIGNED_OUT_MESSAGE } from './lib/ai';
+import { callAi, parseAiJson, getAiAuthHeader } from './lib/ai';
 import { todayDateKey } from './utils';
 import { useKitchenSelector } from './components/KitchenStateContext';
 import { useRestaurantId } from './components/AuthContext';
@@ -15,15 +12,6 @@ import { monthStatus } from './components/testkitchen/trendsDisplay';
 import TrendsReferenceRail from './components/testkitchen/TrendsReferenceRail';
 import DishBuildPanel from './components/testkitchen/DishBuildPanel';
 import type { RestaurantProfile, TrendReport, TrendCard, PricingTrendItem } from './types';
-
-interface Message {
-  role: 'user' | 'model';
-  content: string;
-}
-
-const MarkdownContent = ({ content }: { content: string }) => (
-  <div className="text-xs whitespace-pre-wrap font-body leading-relaxed text-navy">{content}</div>
-);
 
 // ===================================================================
 // TRENDS — AI PROMPT + RESPONSE NORMALIZATION
@@ -180,11 +168,6 @@ export default function TestKitchenHub({ unitSystem, onOpenRecipe }: TestKitchen
   const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
   const trendReport = useKitchenSelector((s: any) => s.trendReport) as TrendReport | null;
   const trendReportLoaded = useKitchenSelector((s: any) => s.trendReportLoaded) as boolean;
-  const [userInput, setUserInput] = useState('');
-  const [sessionError, setSessionError] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [trendsLoading, setTrendsLoading] = useState(false);
   const [trendsError, setTrendsError] = useState<string | null>(null);
@@ -201,63 +184,6 @@ export default function TestKitchenHub({ unitSystem, onOpenRecipe }: TestKitchen
     () => seasonalItems.filter(i => monthStatus(i, currentMonth) === null && isStartingWithinWeeks(i, currentMonth, 8)),
     [seasonalItems, currentMonth],
   );
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages, isGenerating]);
-
-  const handleNewSession = () => {
-    setMessages([]);
-    setSessionError(null);
-    setUserInput('');
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!userInput.trim() || isGenerating) return;
-    setIsGenerating(true);
-    setSessionError(null);
-    const userMessage: Message = { role: 'user', content: userInput };
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
-    setUserInput('');
-    // Cap the transcript sent per turn to the last 30 messages — the
-    // display above keeps the full history, only the request payload is
-    // trimmed. Anthropic requires the first message to be a user turn,
-    // so start the window at its first user message (a raw 30-slice of a
-    // long alternating transcript can begin on an assistant reply).
-    const windowed = updatedMessages.slice(-30);
-    const firstUserIdx = windowed.findIndex(msg => msg.role === 'user');
-    const requestMessages = firstUserIdx > 0 ? windowed.slice(firstUserIdx) : windowed;
-    try {
-      const response = await fetch('/api/ai', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(await getAiAuthHeader()),
-        },
-        body: JSON.stringify({
-          max_tokens: 2048,
-          system: withRegionContext(`${SOUS_SYSTEM_PROMPT}\n\n${APP_KNOWLEDGE_CONTEXT}`, restaurantProfile),
-          messages: requestMessages.map(msg => ({
-            role: msg.role === 'model' ? 'assistant' : 'user',
-            content: msg.content,
-          })),
-        }),
-      });
-      if (!response.ok) {
-        if (response.status === 401) throw new Error(AI_SIGNED_OUT_MESSAGE);
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || `API error: ${response.status}`);
-      }
-      const data = await response.json();
-      setMessages(prev => [...prev, { role: 'model', content: data.content[0]?.text || 'No response received.' }]);
-    } catch (error: any) {
-      setSessionError(error.message || 'An error occurred while communicating with the AI.');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
   const handleRefreshTrends = async () => {
     if (trendsLoading) return;
@@ -332,8 +258,8 @@ export default function TestKitchenHub({ unitSystem, onOpenRecipe }: TestKitchen
   return (
     <div className="max-w-[1597px] mx-auto px-[21px] py-[34px] font-body">
       <div className="border-b border-line pb-[21px]">
-        <h1 className="text-xl font-display font-bold tracking-tight text-navy">Test Kitchen</h1>
-        <p className="text-xs text-slate mt-[5px]">Develop new dishes with real-time AI assistance</p>
+        <h1 className="text-xl font-display font-bold tracking-tight text-navy">Development</h1>
+        <p className="text-xs text-slate mt-[5px]">Trend intelligence, seasonality, and a dish description that becomes a working recipe draft</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-[21px] mt-[21px] h-[610px]">
@@ -361,60 +287,11 @@ export default function TestKitchenHub({ unitSystem, onOpenRecipe }: TestKitchen
           />
         </div>
 
-        {/* CENTER: Sous chat — message list scrolls internally, input pinned at bottom */}
-        <div className="lg:col-span-2 h-full min-h-0 flex flex-col gap-[13px]">
-              <div className="bg-surface border border-line rounded-card p-[21px] flex-1 min-h-0 flex flex-col">
-                <div className="flex justify-between items-center border-b border-line pb-[13px] shrink-0">
-                  <div className="text-xs font-bold uppercase tracking-widest text-navy">Chef Matthew — Sous Chef</div>
-                  <button onClick={handleNewSession} className="text-[10px] font-bold uppercase text-slate hover:text-navy flex items-center gap-[3px]">
-                    <RefreshCw className="w-3 h-3" /> New Session
-                  </button>
-                </div>
-                <div className="flex-1 min-h-0 overflow-y-auto p-[13px] my-[13px]">
-                  {messages.length === 0 && !isGenerating ? (
-                    <div className="flex items-center justify-center h-full text-center">
-                      <p className="text-xs text-slate max-w-md leading-relaxed">Brainstorm and develop brand-new dishes from scratch. Get AI guidance on trending ingredients, flavor pairings, and precise menu costing adjustments.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-[21px]">
-                      {messages.map((msg, index) => (
-                        <div key={index} className={`flex gap-[13px] ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                          {msg.role === 'model' && <div className="w-6 h-6 rounded-full bg-teal/15 flex items-center justify-center text-teal shrink-0"><Sparkles className="w-3.5 h-3.5" /></div>}
-                          <div className={`max-w-xl p-[13px] rounded-card text-navy ${msg.role === 'user' ? 'bg-bg-cool' : 'bg-surface border border-line'}`}>
-                            <MarkdownContent content={msg.content} />
-                          </div>
-                        </div>
-                      ))}
-                      {isGenerating && (
-                        <div className="flex gap-[13px] justify-start">
-                          <div className="w-6 h-6 rounded-full bg-teal/15 flex items-center justify-center text-teal shrink-0"><Sparkles className="w-3.5 h-3.5" /></div>
-                          <div className="p-[13px]"><span className="animate-pulse text-slate">...</span></div>
-                        </div>
-                      )}
-                      <div ref={messagesEndRef} />
-                    </div>
-                  )}
-                </div>
-                <form onSubmit={handleSubmit} className="pt-[13px] shrink-0">
-                  <div className="relative">
-                    <input type="text" value={userInput} onChange={(e) => setUserInput(e.target.value)} placeholder="Describe a dish concept you want to develop..." className="w-full bg-bg-cool border border-line p-[13px] pr-12 rounded-card text-xs focus:outline-none focus:border-teal text-navy placeholder:text-slate/60 font-body disabled:opacity-50" disabled={isGenerating} />
-                    <button type="submit" disabled={isGenerating} className="absolute right-3 top-3 text-slate hover:text-teal transition-colors disabled:opacity-50"><Send className="w-4 h-4" /></button>
-                  </div>
-                </form>
-              </div>
-              {sessionError && (
-                <div className="bg-surface border border-red-400 rounded-card p-[13px] flex justify-between items-center shrink-0">
-                  <div className="flex items-center gap-[8px] text-red-400 text-xs font-bold"><AlertCircle className="w-4 h-4 shrink-0" /><span>{sessionError}</span></div>
-                  <button onClick={() => setSessionError(null)} className="text-[9px] uppercase font-bold text-slate hover:text-navy px-[8px] py-[3px] rounded border border-line">Clear Status</button>
-                </div>
-              )}
-            </div>
-
-            {/* RIGHT: Recipe Build */}
-            <div className="lg:col-span-1 h-full min-h-0">
-              <DishBuildPanel messages={messages} unitSystem={unitSystem} onOpenRecipe={onOpenRecipe} />
-            </div>
-          </div>
+        {/* RIGHT: Recipe Build — dish-description intake through hand-off, one panel */}
+        <div className="lg:col-span-3 h-full min-h-0">
+          <DishBuildPanel unitSystem={unitSystem} onOpenRecipe={onOpenRecipe} />
         </div>
+      </div>
+    </div>
   );
 }

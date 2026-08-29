@@ -1,17 +1,24 @@
 /**
  * src/components/testkitchen/DishBuildPanel.tsx
- * The "Recipe Build" zone of the unified Test Kitchen room. Holds a
- * client-only DishDraft (never written to Firestore itself) pulled from
- * the Sous conversation via a structured extraction pass. Read-only
+ * The "Recipe Build" zone of the Development workspace. Owns the whole
+ * dish-description intake (P-026, replacing the retired Sous chat): a
+ * "Describe the dish" textarea drives the initial extraction; once a
+ * draft exists, a lightweight refinement input applies incremental edits
+ * ("make it 6 portions") without re-describing the whole dish. Holds a
+ * client-only DishDraft (never written to Firestore itself). Read-only
  * rendering with per-line accept/drop checkboxes (Option A) — all other
  * editing happens after hand-off, in the real Recipe Builder.
  *
  * Reads ingredients/restaurantProfile directly via useKitchenSelector
  * (same pattern as IngredientAdvisor) rather than having them threaded
  * down as props — no new Firestore listener, reuses the ones
- * useKitchenState.ts already owns. `messages` (the chat transcript),
- * `unitSystem`, and `onOpenRecipe` come from the parent since they're not
- * part of the shared kitchen state.
+ * useKitchenState.ts already owns. `unitSystem` and `onOpenRecipe` come
+ * from the parent since they're not part of the shared kitchen state.
+ *
+ * The extraction/refinement prompt, response normalization, and the
+ * refinement-reconciliation merge are pure functions in
+ * src/lib/dishExtraction.ts — unit-tested there without mounting this
+ * component, same pattern as dishDraftToRecipe.ts for the hand-off.
  *
  * "Send to Recipe Builder" writes through the same rCollection(...,
  * 'recipes') / addDoc path Recipes.tsx itself uses — no new collection,
@@ -19,8 +26,8 @@
  * onOpenRecipe, the same prop AppShell already threads to every view for
  * jumping into the Recipe Builder on a specific recipe.
  */
-import React, { useState } from 'react';
-import { ChefHat, AlertCircle, Plus, X } from 'lucide-react';
+import React, { useState, type FormEvent } from 'react';
+import { AlertCircle, Plus, X, RotateCcw } from 'lucide-react';
 import { addDoc } from 'firebase/firestore';
 import { useKitchenSelector } from '../KitchenStateContext';
 import { useRestaurantId } from '../AuthContext';
@@ -29,93 +36,44 @@ import { callAi, parseAiJson } from '../../lib/ai';
 import { withRegionContext } from '../../lib/regionContext';
 import { displayUnitsFor, defaultDisplayUnit, type UnitSystem, type DisplayUnit } from '../../lib/units';
 import { dishDraftToRecipeDoc } from '../../lib/dishDraftToRecipe';
+import {
+  DISH_DRAFT_SYSTEM_PROMPT,
+  EMPTY_DISH_DRAFT,
+  MEASURE_TYPES,
+  normalizeDishDraft,
+  normalizeIngredientName,
+  reconcileRefinement,
+} from '../../lib/dishExtraction';
 import { AiIngredientLookup } from '../ingredients/AiIngredientLookup';
 import type { DishDraft, DishDraftLine, Ingredient, MeasureType, RestaurantProfile, Vendor } from '../../types';
 
-interface ChatMessage {
-  role: 'user' | 'model';
-  content: string;
-}
-
 interface DishBuildPanelProps {
-  messages: ChatMessage[];
   unitSystem: UnitSystem;
   onOpenRecipe: (recipeId: string) => void;
 }
 
-const MEASURE_TYPES: MeasureType[] = ['weight', 'volume', 'each'];
+// UX limit on refinement rounds per draft — not tied to any server-side
+// caller cap. Each extraction/refinement call is now a single structured
+// JSON payload in one user turn (no growing multi-turn transcript), so
+// the message-count ceiling that motivated the old chat's 30-message
+// window no longer applies here; this cap exists purely so a draft
+// doesn't accumulate an unbounded refinement trail.
+const REFINEMENT_CAP = 10;
 
-const DISH_DRAFT_SYSTEM_PROMPT = (unitSystem: UnitSystem): string => `You are extracting a working recipe draft from a chef's brainstorming conversation with a sous chef, so it can be reviewed and sent to the kitchen's Recipe Builder for costing. You will receive the full chat transcript and the restaurant's Master Pantry as a JSON list of { id, name }.
-
-Respond with ONLY valid JSON, no markdown, no commentary, in exactly this shape:
-{"dishName":"...","batchYield":{"qty":0,"measureType":"weight","unit":"..."},"portions":0,"lines":[{"ingredientId":"...","qty":0,"unit":"...","note":"..."}],"notInPantry":["..."],"methodSteps":["..."]}
-
-Rules:
-- "dishName" is the working name of the dish under discussion. Use "" if no name or clear concept has emerged yet.
-- "batchYield": "qty" is the total batch size as a plain number, "measureType" is exactly one of "weight", "volume", "each", "unit" is one of the same units listed below for ingredient lines (matching measureType — "each" for measureType "each"). Set "batchYield" to null (the whole field, not just qty) if the conversation gives no real basis for a batch size — never guess one.
-- "portions" is the number of servings as a plain integer, or null if not discussed.
-- "lines" is one entry per ingredient genuinely part of this dish that matches an item in the provided pantry list by name.
-  - "ingredientId" must be copied exactly from the provided pantry list. Never invent an ingredient or an id that is not in the list.
-  - "qty" is the amount needed for one batch, as a plain number.
-  - "unit" must be one of: ${unitSystem === 'imperial' ? '"oz", "lb", "fl oz", "qt", "each"' : '"g", "kg", "ml", "L", "each"'} — weight units for solids, volume units for liquids, "each" for countable items.
-  - "note" is optional, one short phrase, only if genuinely useful (e.g. "diced small").
-- "notInPantry" lists ingredient names the dish needs that have no match in the provided pantry list. Informational only — never invent a matching id for these.
-- "methodSteps" is a short ordered list of the prep/cooking steps actually discussed, in plain sentences. Empty array if no method was discussed.
-- Only pull from what was actually discussed in the conversation. Never invent an ingredient, quantity, or step that wasn't at least implied — if the conversation hasn't gotten there yet, leave the field empty/null rather than guessing.`;
-
-/** Defensive normalization, same posture as normalizeTrendResponse and
- * Recipes.tsx's handleBuildFromPantry — never trusts the model's
- * ingredientId blindly, always re-checks it against the live pantry. */
-const normalizeDishDraft = (parsed: any, ingredients: Ingredient[], unitSystem: UnitSystem): DishDraft => {
-  const validIds = new Set(ingredients.map(i => i.id));
-  const byId = new Map(ingredients.map(i => [i.id, i.name]));
-
-  const dishName = typeof parsed?.dishName === 'string' ? parsed.dishName.trim() : '';
-
-  const rawYield = parsed?.batchYield;
-  let batchYield: DishDraft['batchYield'] = null;
-  if (rawYield && typeof rawYield.qty === 'number' && rawYield.qty > 0 && MEASURE_TYPES.includes(rawYield.measureType)) {
-    const measureType = rawYield.measureType as MeasureType;
-    const rawUnit = typeof rawYield.unit === 'string' ? rawYield.unit.trim() : '';
-    // Keep the qty + measureType extraction got right, but never trust the
-    // unit blindly: if it doesn't fit the measure type, blank it so the
-    // panel's unit select shows empty and the chef must pick — same posture
-    // as the line unit flag, so the hand-off's unit fallback never fires for an
-    // untouched AI yield unit either.
-    const unit = (displayUnitsFor(measureType, unitSystem) as string[]).includes(rawUnit) ? rawUnit : '';
-    batchYield = { qty: rawYield.qty, measureType, unit };
-  }
-
-  const portions = typeof parsed?.portions === 'number' && parsed.portions > 0 ? Math.round(parsed.portions) : null;
-
-  const lines: DishDraftLine[] = (Array.isArray(parsed?.lines) ? parsed.lines : [])
-    .filter((l: any) => l && typeof l.ingredientId === 'string' && validIds.has(l.ingredientId) && typeof l.qty === 'number' && l.qty > 0)
-    .map((l: any) => ({
-      ingredientId: l.ingredientId as string,
-      name: byId.get(l.ingredientId) ?? l.ingredientId,
-      qty: l.qty,
-      unit: typeof l.unit === 'string' ? l.unit : '',
-      ...(typeof l.note === 'string' && l.note.trim() && { note: l.note.trim() }),
-    }));
-
-  const notInPantry: string[] = Array.isArray(parsed?.notInPantry)
-    ? parsed.notInPantry.filter((x: any) => typeof x === 'string' && x.trim()).map((x: string) => x.trim())
-    : [];
-
-  const methodSteps: string[] = Array.isArray(parsed?.methodSteps)
-    ? parsed.methodSteps.filter((x: any) => typeof x === 'string' && x.trim()).map((x: string) => x.trim())
-    : [];
-
-  return { dishName, batchYield, portions, lines, notInPantry, methodSteps };
-};
-
-export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: DishBuildPanelProps) {
+export default function DishBuildPanel({ unitSystem, onOpenRecipe }: DishBuildPanelProps) {
   const restaurantId = useRestaurantId();
   const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
   const ingredients = useKitchenSelector((s: any) => s.ingredients) as Ingredient[];
   const vendors = useKitchenSelector((s: any) => s.vendors) as Vendor[];
 
+  const [description, setDescription] = useState('');
+  const [originalDescription, setOriginalDescription] = useState('');
   const [draft, setDraft] = useState<DishDraft | null>(null);
+  // Set only when the model's response couldn't be read as JSON at all
+  // (E-003: prose instead of structure) — never surfaced as an error
+  // toast. The chef still gets a draft (EMPTY_DISH_DRAFT) to work from;
+  // this flag just explains why it's empty.
+  const [parseFailed, setParseFailed] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
   const [keptLines, setKeptLines] = useState<Set<number>>(new Set());
@@ -123,6 +81,11 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
   const [handOffError, setHandOffError] = useState<string | null>(null);
   // The NOT-IN-PANTRY chip the chef is adding to the pantry, if any.
   const [addingChip, setAddingChip] = useState<{ index: number; name: string } | null>(null);
+
+  const [refinementInput, setRefinementInput] = useState('');
+  const [refinementHistory, setRefinementHistory] = useState<string[]>([]);
+  const [refining, setRefining] = useState(false);
+  const [refineError, setRefineError] = useState<string | null>(null);
 
   const toggleLine = (index: number) => {
     setKeptLines(prev => {
@@ -203,9 +166,8 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
     const chip = addingChip;
     setAddingChip(null);
     if (!chip || !created || !draft) return;
-    const norm = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ');
-    const createdNorm = norm(created.name);
-    const matchIdx = draft.notInPantry.findIndex(n => norm(n) === createdNorm);
+    const createdNorm = normalizeIngredientName(created.name);
+    const matchIdx = draft.notInPantry.findIndex(n => normalizeIngredientName(n) === createdNorm);
     const removeIdx = matchIdx >= 0 ? matchIdx : chip.index;
     const newIndex = draft.lines.length;
     setDraft({
@@ -216,18 +178,16 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
     setKeptLines(prev => new Set(prev).add(newIndex));
   };
 
-  const handleExtract = async () => {
+  const handleExtract = async (e?: FormEvent) => {
+    e?.preventDefault();
+    if (!description.trim() || extracting) return;
     setExtracting(true);
     setExtractError(null);
+    setParseFailed(false);
+    const desc = description.trim();
     try {
-      // Cap the transcript to the same last-30, user-turn-anchored window the
-      // Sous chat sends per turn (TestKitchenHub.handleSubmit) — start at the
-      // first chef turn so a long window never opens on a sous reply.
-      const windowed = messages.slice(-30);
-      const firstUserIdx = windowed.findIndex(m => m.role === 'user');
-      const recentMessages = firstUserIdx > 0 ? windowed.slice(firstUserIdx) : windowed;
       const userContent = JSON.stringify({
-        transcript: recentMessages.map(m => ({ role: m.role === 'model' ? 'sous' : 'chef', content: m.content })),
+        description: desc,
         pantry: ingredients.map(i => ({ id: i.id, name: i.name })),
       });
       const raw = await callAi(withRegionContext(DISH_DRAFT_SYSTEM_PROMPT(unitSystem), restaurantProfile), userContent, 2048);
@@ -235,16 +195,80 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
       try {
         parsed = parseAiJson(raw);
       } catch {
-        throw new Error('The AI response could not be read. Try again.');
+        // Invariant (b): a response that isn't readable as structured JSON
+        // never surfaces as an error toast — it becomes the same empty,
+        // fully-flagged draft a too-thin description would produce, with
+        // a caption explaining why. The chef always gets a draft to work
+        // from, never a conversational non-answer (E-003).
+        setDraft(EMPTY_DISH_DRAFT);
+        setKeptLines(new Set());
+        setParseFailed(true);
+        setOriginalDescription(desc);
+        setDescription('');
+        return;
       }
       const normalized = normalizeDishDraft(parsed, ingredients, unitSystem);
       setDraft(normalized);
       setKeptLines(new Set(normalized.lines.map((_, i) => i)));
+      setOriginalDescription(desc);
+      setDescription('');
+      setRefinementHistory([]);
     } catch (e: any) {
       setExtractError(e?.message || 'Could not extract a dish draft. Try again.');
     } finally {
       setExtracting(false);
     }
+  };
+
+  const handleRefine = async (e?: FormEvent) => {
+    e?.preventDefault();
+    if (!refinementInput.trim() || refining || !draft || refinementHistory.length >= REFINEMENT_CAP) return;
+    setRefining(true);
+    setRefineError(null);
+    const instruction = refinementInput.trim();
+    try {
+      const userContent = JSON.stringify({
+        description: originalDescription,
+        currentDraft: draft,
+        refinement: instruction,
+        pantry: ingredients.map(i => ({ id: i.id, name: i.name })),
+      });
+      const raw = await callAi(withRegionContext(DISH_DRAFT_SYSTEM_PROMPT(unitSystem), restaurantProfile), userContent, 2048);
+      let parsed: any;
+      try {
+        parsed = parseAiJson(raw);
+      } catch {
+        // Same non-error-toast posture as extraction's parse failure, but
+        // a refinement never discards an already-confirmed draft — it
+        // leaves the draft exactly as it was and reports inline.
+        setRefineError("Couldn't apply that — try rephrasing the change.");
+        return;
+      }
+      const normalized = normalizeDishDraft(parsed, ingredients, unitSystem);
+      const { draft: merged, keptLines: mergedKept } = reconcileRefinement(draft, keptLines, normalized);
+      setDraft(merged);
+      setKeptLines(mergedKept);
+      setParseFailed(false);
+      setRefinementHistory(prev => [...prev, instruction]);
+      setRefinementInput('');
+    } catch (e: any) {
+      setRefineError(e?.message || 'Could not apply that refinement. Try again.');
+    } finally {
+      setRefining(false);
+    }
+  };
+
+  const handleStartOver = () => {
+    setDraft(null);
+    setDescription('');
+    setOriginalDescription('');
+    setParseFailed(false);
+    setKeptLines(new Set());
+    setExtractError(null);
+    setHandOffError(null);
+    setRefinementInput('');
+    setRefinementHistory([]);
+    setRefineError(null);
   };
 
   const canHandOff = !!draft && !!draft.dishName.trim() && !!draft.batchYield && draft.portions != null;
@@ -279,7 +303,18 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
   return (
     <>
     <div className="bg-surface border border-line rounded-card p-[21px] h-full min-h-0 overflow-y-auto">
-      <h3 className="text-xs font-bold uppercase tracking-widest text-navy border-b border-line pb-[8px]">Recipe Build</h3>
+      <div className="flex items-center justify-between border-b border-line pb-[8px]">
+        <h3 className="text-xs font-bold uppercase tracking-widest text-navy">Recipe Build</h3>
+        {draft && (
+          <button
+            type="button"
+            onClick={handleStartOver}
+            className="flex items-center gap-[3px] text-[10px] font-bold uppercase text-slate hover:text-navy"
+          >
+            <RotateCcw className="w-3 h-3" /> Start Over
+          </button>
+        )}
+      </div>
 
       {extractError && (
         <div className="flex items-start justify-between gap-[8px] mt-[13px] text-[10px] text-red-400">
@@ -296,19 +331,35 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
       )}
 
       {!draft ? (
-        <div className="flex flex-col items-center text-center gap-[13px] py-[34px]">
-          <ChefHat className="w-6 h-6 text-slate/40" />
-          <p className="text-xs text-slate leading-relaxed max-w-[210px]">No dish yet — extract from the conversation to start one.</p>
+        <form onSubmit={handleExtract} className="mt-[13px] space-y-[8px]">
+          <p className="text-xs text-slate leading-relaxed">
+            Describe the dish — ingredients, yield, portions, method, whatever you have. Extraction builds a working draft from it.
+          </p>
+          <textarea
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder="e.g. A corn side dish with 2 oz corn, 1 lb unsalted butter, and 3 shallots. Makes 4 portions."
+            rows={7}
+            disabled={extracting}
+            className="w-full bg-bg-cool border border-line p-[13px] rounded-card text-xs focus:outline-none focus:border-teal text-navy placeholder:text-slate/60 font-body disabled:opacity-50 resize-none"
+          />
           <button
-            onClick={handleExtract}
-            disabled={extracting || messages.length === 0}
-            className="px-[13px] py-[8px] rounded-[8px] bg-navy text-cream text-[10px] font-bold uppercase tracking-wider disabled:opacity-40 hover:opacity-90 transition-opacity duration-[144ms]"
+            type="submit"
+            disabled={extracting || !description.trim()}
+            className="w-full px-[13px] py-[8px] rounded-[8px] bg-navy text-cream text-[10px] font-bold uppercase tracking-wider disabled:opacity-40 hover:opacity-90 transition-opacity duration-[144ms]"
           >
-            {extracting ? 'Extracting…' : 'Extract from Chat'}
+            {extracting ? 'Extracting…' : 'Extract'}
           </button>
-        </div>
+        </form>
       ) : (
         <div className="mt-[13px] space-y-[13px]">
+          {parseFailed && (
+            <div className="flex items-start gap-[5px] rounded-[8px] border border-line bg-saffron-soft px-[8px] py-[5px] text-[10px] text-navy leading-snug">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
+              Couldn't read that — try describing the dish again.
+            </div>
+          )}
+
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[3px]">Dish</p>
             <input
@@ -473,13 +524,43 @@ export default function DishBuildPanel({ messages, unitSystem, onOpenRecipe }: D
             )}
           </div>
 
-          <button
-            onClick={handleExtract}
-            disabled={extracting || handingOff}
-            className="w-full px-[13px] py-[8px] rounded-[8px] border border-line text-navy text-[10px] font-bold uppercase tracking-wider disabled:opacity-40 hover:bg-bg-cool transition-colors duration-[144ms]"
-          >
-            {extracting ? 'Re-extracting…' : 'Re-extract from Chat'}
-          </button>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[5px]">Refine the Draft</p>
+            {refinementHistory.length > 0 && (
+              <ul className="space-y-[2px] mb-[5px]">
+                {refinementHistory.map((r, i) => (
+                  <li key={i} className="text-[10px] text-slate italic">"{r}"</li>
+                ))}
+              </ul>
+            )}
+            {refineError && (
+              <div className="flex items-start justify-between gap-[8px] mb-[5px] text-[10px] text-red-400">
+                <span className="flex items-start gap-[5px]"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-[1px]" />{refineError}</span>
+                <button onClick={() => setRefineError(null)} className="text-slate hover:text-navy shrink-0 uppercase font-bold text-[9px]">Dismiss</button>
+              </div>
+            )}
+            {refinementHistory.length >= REFINEMENT_CAP ? (
+              <p className="text-xs text-slate italic">Refinement limit reached for this draft — start over to continue.</p>
+            ) : (
+              <form onSubmit={handleRefine} className="flex gap-[5px]">
+                <input
+                  type="text"
+                  value={refinementInput}
+                  onChange={e => setRefinementInput(e.target.value)}
+                  placeholder='e.g. "make it 6 portions"'
+                  disabled={refining}
+                  className="flex-1 bg-bg-cool border border-line rounded-[5px] px-[8px] py-[5px] text-xs text-navy placeholder:text-slate/60 focus:outline-none focus:border-teal disabled:opacity-50"
+                />
+                <button
+                  type="submit"
+                  disabled={refining || !refinementInput.trim()}
+                  className="px-[13px] py-[5px] rounded-[5px] border border-line text-navy text-[10px] font-bold uppercase tracking-wider disabled:opacity-40 hover:bg-bg-cool transition-colors duration-[144ms]"
+                >
+                  {refining ? 'Applying…' : 'Apply'}
+                </button>
+              </form>
+            )}
+          </div>
 
           <button
             onClick={handleSendToRecipeBuilder}
