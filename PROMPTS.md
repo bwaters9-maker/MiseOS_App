@@ -1535,3 +1535,75 @@ is the intended, expected result of item 5, not a regression, and none
 of it was fixed in this prompt per its own closing instruction.
 
 **Not deployed**, per instruction.
+
+**Findings surfaced here that belong to no existing prompt are logged
+under P-031** (queued, not fixed in this pass): `cream` on `bg-teal`
+failing in Service, the new Service-only slate/teal CVD failure, and the
+legacy dark-zinc brand-pass items (EventCalendar's `text-zinc-500` sites
+and its two off-palette icons).
+
+---
+
+## P-031 — Colour findings with no home prompt — QUEUED 2026-08-29
+
+**Origin:** P-030's both-surface measurement and extended-`check-color`
+work surfaced three findings that don't belong to P-030 itself (different
+root causes than the navy/cream collision it fixed), to P-028 (already
+closed), or to P-029 (the CI-pipeline prompt, which references them but
+doesn't fix them). Logged here so they have a home and aren't lost
+between prompts. **Items 1 and 2 are live accessibility defects on
+already-shipped surfaces, not backlog** — they read as real WCAG/CVD
+failures today, in Service, right now. Item 3 is backlog: part of the
+already-documented ~24-screen legacy-dark-zinc migration, not a new
+regression.
+
+**Findings:**
+
+1. **`cream` on `bg-teal` fails in Service (2.46:1).** RecipesHub.tsx:40,
+   the Recipe Builder/Menu/Collections/Development sub-tab active pill.
+   Passes in Day (7.32:1). A different root cause from the navy/cream
+   collision P-030 item 1 fixed: `teal` doesn't flip between surfaces the
+   way `navy` does — it's a genuine accent token with distinct Day/Service
+   values (`#0B564F` / `#3FA8A0`), not an inversion pair — so Service's
+   teal is simply lighter, and closer to cream's fixed value, than Day's
+   is. The `on-navy` fix (a token that flips opposite navy) doesn't apply
+   here; there's nothing to invert against, since teal isn't defined as
+   the opposite of anything. Needs its own ruling: darken Service's teal
+   further (constrained by P-028's CVD calibration comments on teal —
+   re-verify the slate/teal and navy/teal distances before touching it),
+   introduce a dedicated `on-teal` token, or stop using `text-cream` on
+   `bg-teal` and use a token that's already known to work in both
+   surfaces instead.
+
+2. **`slate`/`teal` fails CVD distinguishability in Service — worse than
+   the one exception already on file.** Measured 0.0208 (protanopia,
+   severity 1.0) and 0.0341 (deuteranopia, severity 1.0), both well under
+   the 0.06 threshold; also fails both pairs at severity 0.5. For
+   comparison, the sole existing accepted exception — `teal`/`danger`
+   under protanopia@1.0, Day only — measures 0.0538, closer to threshold
+   than this. No prior pass could have caught this: P-028 built the CVD
+   check and calibrated `CVD_MIN_DE` itself, but ran it only against Day,
+   the sole surface that existed to check at the time in that pass's own
+   frame of reference. Needs a ruling on remedy (adjust Service's slate or
+   teal value, find where the two are actually adjacent with opposed
+   meaning and confirm a non-colour channel already carries it per the
+   P-028 pattern, or accept a documented exception the way `teal`/`danger`
+   already has one) before `check-color.mjs`'s `CVD_ACCEPTED_EXCEPTIONS`
+   list is touched.
+
+3. **The legacy dark-zinc views' brand pass**, first partially catalogued
+   during the P-021 EventCalendar work: `EventCalendar.tsx` alone carries
+   10 `text-zinc-500` sites measuring 4.12:1 against its `bg-zinc-950`
+   cards (attendee counts, phone/email, empty states) — under the 4.5:1
+   floor — plus two off-palette lucide icons beside its section headings:
+   `CalendarDays` in `text-purple-400` (2.39:1 on cream) and `Contact` in
+   `text-blue-400` (2.30:1), both far under the 3:1 non-text floor.
+   `text-teal` (7.71:1 on cream) is the brand-correct replacement for
+   both icons, matching `ChefDashboard.tsx`'s existing heading-icon
+   convention. This is one file's slice of the full ~24-screen backlog
+   `check-color.mjs`'s extended raw-Tailwind check now enumerates in full
+   (P-030 item 5) — scope this prompt to EventCalendar specifically, or
+   widen it to the full backlog, as a decision to make when this is
+   picked up, not assumed here.
+
+**Not fixed in this entry — log only, per instruction.**
