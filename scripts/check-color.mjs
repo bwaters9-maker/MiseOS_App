@@ -1,9 +1,58 @@
 #!/usr/bin/env node
 /**
- * P-028 item 7 (amended), extended by P-030 item 5: a standalone,
- * hand-run colour accessibility guard. Not wired into CI in this pass —
- * that's P-029, whose scope now depends on this file (see its entry in
- * PROMPTS.md). Run with `npm run check:color`.
+ * P-028 item 7 (amended), extended by P-030 item 5, baselined by P-029
+ * (2026-08-29): a standalone colour accessibility guard, now wired for
+ * CI (P-029 item 2). Run with `npm run check:color`; regenerate the
+ * baseline with `node scripts/check-color.mjs --write-baseline`.
+ *
+ * THE BASELINE (color-baseline.txt, repo root): P-029's ruling — the
+ * gate ships against the app's real state, not blocked on clearing a
+ * legacy-dark-zinc backlog that's a design job (its own future brand
+ * pass), not a lint job. Two check kinds are baseline-eligible:
+ * `raw-tailwind-colour` and `opacity-diluted contrast` — both are
+ * source-scan findings with a real file:line, and both are the kind of
+ * thing a screen accumulates before its brand pass, not a live "this
+ * button is unreadable" defect. Every OTHER check (bare-token contrast,
+ * the wordmark exception, on-navy, saffron misuse, and CVD
+ * distinguishability) is NEVER baseline-eligible — those are the hard
+ * floor, and baselining any of them would have hidden the exact defect
+ * this file exists to catch (P-026 shipped an invisible button; five
+ * green `check:color` runs certified half the app, because the guard
+ * that ran was Day-only, opacity-blind, and had no concept of raw
+ * Tailwind classes at all — see P-030).
+ *
+ * CARVE-OUT (P-029 ruling): a baseline-eligible finding measuring below
+ * 2:1 — text that reads as blank, not merely low-contrast — is refused
+ * baseline entry even though its KIND is normally eligible. `assertNoCarveOutViolations`
+ * enforces this at write time: `--write-baseline` refuses to write a
+ * file containing one. This isn't a live re-check on every `npm run
+ * check:color` invocation (that would re-litigate a judgment call the
+ * humans already made); it's a one-time gate on ever getting a sub-2:1
+ * finding INTO the baseline in the first place. If a future finding
+ * needs this same judgment call, `--write-baseline` will refuse and
+ * name it — that's the intended trigger to ask for a ruling, not a
+ * report to read past.
+ *
+ * THE GATE RULE: the baseline can only shrink. A current finding not in
+ * the baseline is NEW and fails the gate outright — no severity
+ * threshold, no grace period. A baseline entry with no matching current
+ * finding is STALE — the underlying issue was fixed but the baseline
+ * wasn't updated in the same commit — and also fails the gate, loudly,
+ * specifically to enforce "removed from the code, removed from the
+ * baseline, same commit." A clean run is exact equality between the
+ * baseline file and the current findings it's allowed to cover, nothing
+ * more, nothing less.
+ *
+ * TRACKED-NOT-ACCEPTED CVD exceptions (P-029 ruling on the Service
+ * slate/teal finding, P-031): a `CVD_ACCEPTED_EXCEPTIONS` entry with a
+ * `trackedIn` field (rather than a plain accepted-forever entry) is a
+ * live, un-accepted defect deliberately excluded from the file baseline
+ * — CVD findings have no file:line to baseline against in the first
+ * place — and instead printed loudly, every run, in both the pass and
+ * fail paths, so it can never be mistaken for an oversight or silently
+ * amnestied the way a quiet baseline entry would. It still doesn't
+ * block the gate (P-031 owns fixing it, not this one), but it is never
+ * quiet about not blocking it.
  *
  * Checks, against design-tokens.json's `colors` block, resolved for
  * BOTH surfaces (Day as declared, Service overlaying `colors-service-
@@ -91,14 +140,15 @@
  * matches any real failure is flagged as stale rather than left as dead
  * code.
  *
- * Exits 0 with a summary when everything passes (accepted exceptions do
- * not block this). Exits 1 with a table of every violation (what failed,
- * against what, the measured value, the required threshold) when
- * anything doesn't — an exit-1 here is always a real, un-accepted
- * finding, never one already known and documented.
+ * Exits 0 when every current finding is either passing, baselined, or a
+ * tracked-not-accepted CVD exception. Exits 1 with a table of every NEW
+ * finding and every STALE baseline entry (what changed, the measured
+ * value, the required threshold) when either exists — an exit-1 here is
+ * always a real change since the baseline was written, never a
+ * pre-existing condition someone already ruled on.
  */
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, resolve } from 'node:path';
 import {
@@ -115,6 +165,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
 const TOKENS_PATH = join(REPO_ROOT, 'design-tokens.json');
 const SRC_DIR = join(REPO_ROOT, 'src');
+const BASELINE_PATH = join(REPO_ROOT, 'color-baseline.txt');
 
 const BG_COOL_TOKEN = 'bg-cool'; // the page background — was wrongly 'cream' pre-P-030
 const SURFACE_TOKEN = 'surface'; // the card background
@@ -127,6 +178,46 @@ const ON_NAVY_TOKEN = 'on-navy';
 const NAVY_TOKEN = 'navy';
 
 const SURFACES = ['day', 'service'];
+
+// Violation kinds a baseline entry may cover (P-029). Every other kind
+// (contrast, wordmark, on-navy, saffron misuse, CVD) is an absolute
+// floor — see the file header on why baselining any of those would
+// defeat the point of this guard.
+const BASELINE_ELIGIBLE_KINDS = new Set(['raw-tailwind-colour', 'opacity-diluted contrast']);
+
+// A baseline-eligible finding measuring below this is refused baseline
+// entry regardless of kind (P-029 ruling) — text that reads as blank,
+// not merely low-contrast. Only meaningful for kinds with a real WCAG
+// ratio (opacity-diluted contrast); raw-tailwind-colour findings have no
+// "measured" ratio at all ("present") and never trigger this.
+const CARVE_OUT_MAX_RATIO = 2.0;
+
+/**
+ * A sub-2:1 finding whose CONTENT is genuinely exempt from the contrast
+ * requirement in the first place — not an exception to the carve-out
+ * rule, but a case where the rule's premise ("text that needs to be
+ * read") doesn't apply, so a human already examined it and ruled
+ * accordingly. Every entry needs the same two things CVD_ACCEPTED_
+ * EXCEPTIONS entries need: a violationKey() match and a comment
+ * recording WHY, checked at the same moment the carve-out itself would
+ * otherwise refuse — never a threshold change, never silent.
+ *
+ * TrendsFullReport.tsx:248 (P-029 ruling, 2026-08-29): a purely
+ * decorative Sparkles icon in an empty-state panel, exempt under WCAG
+ * 1.4.11 (non-text contrast doesn't apply to decoration). Checked before
+ * exempting it: the panel's own message text (`text-xs text-slate`,
+ * already passing at full opacity) sits directly below the icon and
+ * fully carries the meaning in every branch (archived report not found /
+ * generating / no briefing yet) — the icon is not the only thing marking
+ * the panel, so 1.4.11's exemption genuinely applies rather than being
+ * assumed.
+ */
+const CARVE_OUT_EXEMPTIONS = new Set([
+  'opacity-diluted contrast|src/components/testkitchen/TrendsFullReport.tsx:248|text-slate/40 [day] vs bg-cool',
+  'opacity-diluted contrast|src/components/testkitchen/TrendsFullReport.tsx:248|text-slate/40 [day] vs surface',
+  'opacity-diluted contrast|src/components/testkitchen/TrendsFullReport.tsx:248|text-slate/40 [service] vs bg-cool',
+  'opacity-diluted contrast|src/components/testkitchen/TrendsFullReport.tsx:248|text-slate/40 [service] vs surface',
+]);
 
 /**
  * Empirically calibrated 2026-08-26 (P-029 pre-work), replacing an initial
@@ -161,21 +252,54 @@ const CVD_DEFICIENCIES = [
 ];
 const CVD_SEVERITIES = [1.0, 0.5];
 
-/* KNOWN TENSION (accepted 2026-08-22, Day surface only): teal/danger
-   under protanopia@1.0 measures 0.0538 in Day, below threshold. Accepted
-   because no surface relies on that pair by colour alone — links
-   underlined, destructive buttons outlined+icon+label, FC% glyph+weight
-   (P-028 items 4/5/6). If a future surface puts teal and danger adjacent
-   with opposed meaning and no non-colour channel, that surface is
-   wrong, not this threshold. Scoped to `surface: 'day'` deliberately —
-   see the file header on why a Day-calibrated exception must not be
-   assumed to cover Service, which assigns teal/danger different hex
-   values entirely. */
+/**
+ * Two different reasons a CVD finding can be excluded from blocking the
+ * gate — never conflate them:
+ *
+ * ACCEPTED (no `trackedIn`): examined and ruled fine forever. The pair
+ * genuinely is too close under this deficiency/severity, but no surface
+ * relies on it by colour alone, so it isn't a real-world problem. Stays
+ * excluded indefinitely; only revisit if a future surface actually puts
+ * the pair adjacent with opposed meaning and no non-colour channel.
+ *
+ * TRACKED (`trackedIn` set): a real, un-accepted defect, deliberately
+ * NOT fixed in the prompt that found it, owned by the named prompt
+ * instead. Still excluded from the blocking count — this file's job is
+ * "did anything change," not "re-relitigate a triage decision on every
+ * run" — but printed loudly in BOTH the pass and fail paths (see main),
+ * never tucked into the quiet "accepted" footnote a truly-fine pair
+ * gets. A CVD finding has no file:line, so it can't go in the file
+ * baseline the way raw-tailwind-colour/opacity findings do; this is its
+ * only accounting.
+ *
+ * KNOWN TENSION (accepted 2026-08-22, Day surface only): teal/danger
+ * under protanopia@1.0 measures 0.0538 in Day, below threshold. Accepted
+ * because no surface relies on that pair by colour alone — links
+ * underlined, destructive buttons outlined+icon+label, FC% glyph+weight
+ * (P-028 items 4/5/6). Scoped to `surface: 'day'` deliberately — see the
+ * file header on why a Day-calibrated exception must not be assumed to
+ * cover Service, which assigns teal/danger different hex values
+ * entirely.
+ *
+ * TRACKED, NOT ACCEPTED (P-029 ruling, 2026-08-29; owned by P-031):
+ * slate/teal fails CVD distinguishability in Service under BOTH
+ * deuteranopia and protanopia, at BOTH severities — as low as 0.0208,
+ * worse than the one Day exception above. P-030's extension to Service
+ * is what found this; nothing before it had ever run this check against
+ * Service's actual token values. Explicitly excluded from
+ * `color-baseline.txt` rather than silently baselined — see the file
+ * header — because baselining something more severe than a documented,
+ * examined exception would be incoherent.
+ */
 const CVD_ACCEPTED_EXCEPTIONS = [
   { pair: ['teal', 'danger'], deficiency: 'protanopia', severity: 1.0, surface: 'day' },
+  { pair: ['slate', 'teal'], deficiency: 'deuteranopia', severity: 1.0, surface: 'service', trackedIn: 'P-031' },
+  { pair: ['slate', 'teal'], deficiency: 'deuteranopia', severity: 0.5, surface: 'service', trackedIn: 'P-031' },
+  { pair: ['slate', 'teal'], deficiency: 'protanopia', severity: 1.0, surface: 'service', trackedIn: 'P-031' },
+  { pair: ['slate', 'teal'], deficiency: 'protanopia', severity: 0.5, surface: 'service', trackedIn: 'P-031' },
 ];
-const isAcceptedException = (aName, bName, defName, severity, surface) =>
-  CVD_ACCEPTED_EXCEPTIONS.some(
+const findMatchingException = (aName, bName, defName, severity, surface) =>
+  CVD_ACCEPTED_EXCEPTIONS.find(
     e => e.pair[0] === aName && e.pair[1] === bName && e.deficiency === defName
       && e.severity === severity && e.surface === surface
   );
@@ -359,6 +483,86 @@ function findRawTailwindColors() {
   return violations;
 }
 
+/** Windows paths come back backslash-separated; the baseline file is
+ * checked in and diffed on any OS, so normalize to forward slashes. */
+const normalizeSlashes = p => p.replace(/\\/g, '/');
+
+/** Stable identity for a baseline-eligible finding — file, line, and the
+ * specific class/pairing, deliberately WITHOUT the measured ratio or the
+ * source snippet. Matching on the measured value would make a baseline
+ * entry brittle to any token-value tweak that shifts a ratio by a
+ * hundredth without changing the underlying issue; matching on the
+ * snippet would make it brittle to reformatting. Both baseline-eligible
+ * kinds carry `file`/`line`/`classOrPairing` as plain fields (set where
+ * the violation is constructed in main()) specifically so this never
+ * needs to regex the human-readable `detail` string back apart. The
+ * measured value is still recorded in the baseline FILE as the fourth
+ * field — informational for a human reading it, never part of the match. */
+function violationKey(v) {
+  if (!BASELINE_ELIGIBLE_KINDS.has(v.kind)) {
+    throw new Error(`violationKey called on a non-baseline-eligible kind: ${v.kind}`);
+  }
+  return `${v.kind}|${normalizeSlashes(v.file)}:${v.line}|${v.classOrPairing}`;
+}
+
+const BASELINE_HEADER = `# color-baseline.txt — known pre-existing check:color findings (P-029).
+#
+# THE RULE: this file only shrinks. Fixing a violation removes its line
+# here in the SAME commit — a stale entry (baselined but no longer
+# failing) breaks the gate exactly as loudly as a new, un-baselined one.
+# Adding a line here for a NEW finding instead of fixing it requires the
+# same review any other baseline addition would — this is debt with a
+# name and a date, not a bypass.
+#
+# Only two check:color kinds are eligible: raw-tailwind-colour and
+# opacity-diluted contrast (the legacy-dark-zinc-brand-pass backlog and
+# already-dimmed text found before this baseline existed). Every other
+# kind — bare-token contrast, the wordmark exception, on-navy, saffron
+# misuse, CVD distinguishability — can NEVER appear below: baselining any
+# of those would hide the exact class of defect this guard exists to
+# catch. Regenerate with: node scripts/check-color.mjs --write-baseline
+#
+# Format: KIND|FILE:LINE|CLASS-OR-PAIRING|MEASURED
+# MEASURED is informational only — matching uses the first three fields,
+# not this one, so a token-value tweak that shifts a ratio slightly
+# doesn't spuriously register as a new finding.
+`;
+
+function parseBaseline() {
+  let raw;
+  try {
+    raw = readFileSync(BASELINE_PATH, 'utf8');
+  } catch {
+    return new Map(); // no baseline file yet — e.g. before the first --write-baseline
+  }
+  const entries = new Map();
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const parts = trimmed.split('|');
+    if (parts.length !== 4) throw new Error(`Malformed color-baseline.txt line (expected 4 |-separated fields): ${trimmed}`);
+    const [kind, fileLine, classOrPairing, measured] = parts;
+    entries.set(`${kind}|${fileLine}|${classOrPairing}`, { measured, raw: trimmed });
+  }
+  return entries;
+}
+
+function formatBaselineLine(v) {
+  return `${violationKey(v)}|${v.measured}`;
+}
+
+function writeBaseline(violations) {
+  // "One line per known violation" (P-029) — dedupe by key, not by array
+  // length: the same class can legitimately appear twice on one source
+  // line (e.g. both branches of a ternary), which produces two array
+  // entries with an identical key. That's one violation, not two.
+  const lines = [...new Set(
+    violations.filter(v => BASELINE_ELIGIBLE_KINDS.has(v.kind)).map(formatBaselineLine)
+  )].sort();
+  writeFileSync(BASELINE_PATH, BASELINE_HEADER + lines.join('\n') + '\n', 'utf8');
+  return lines.length;
+}
+
 function main() {
   const raw = JSON.parse(readFileSync(TOKENS_PATH, 'utf8'));
   const dayTokens = resolveAliases(raw.colors);
@@ -433,8 +637,11 @@ function main() {
   }
 
   // 5. CVD-simulated distinguishability for the five near-isoluminant
-  // pairs, against EACH surface's own token values.
-  const triggeredExceptions = [];
+  // pairs, against EACH surface's own token values. Never baseline-
+  // eligible — see CVD_ACCEPTED_EXCEPTIONS above for the only two ways
+  // a CVD finding can avoid blocking the gate.
+  const acceptedExceptions = [];
+  const trackedExceptions = [];
   for (const surface of SURFACES) {
     const tokens = tokensBySurface[surface];
     for (const [aName, bName] of CVD_PAIRS) {
@@ -443,13 +650,19 @@ function main() {
           const sim = filterFn(severity);
           const distance = oklabDistance(sim(tokens[aName]), sim(tokens[bName]));
           if (distance < CVD_MIN_DE) {
-            if (isAcceptedException(aName, bName, defName, severity, surface)) {
-              triggeredExceptions.push({ detail: `[${surface}] ${aName}/${bName} under ${defName} @ severity ${severity}`, measured: distance.toFixed(4) });
-              continue; // documented, accepted — see CVD_ACCEPTED_EXCEPTIONS above
+            const match = findMatchingException(aName, bName, defName, severity, surface);
+            const detail = `[${surface}] ${aName}/${bName} under ${defName} @ severity ${severity}`;
+            if (match?.trackedIn) {
+              trackedExceptions.push({ detail, measured: distance.toFixed(4), trackedIn: match.trackedIn });
+              continue; // real, un-accepted — excluded from the count, never quiet about it (see main's printing)
+            }
+            if (match) {
+              acceptedExceptions.push({ detail, measured: distance.toFixed(4) });
+              continue; // examined, accepted forever — see CVD_ACCEPTED_EXCEPTIONS above
             }
             violations.push({
               kind: 'CVD distinguishability',
-              detail: `[${surface}] ${aName}/${bName} under ${defName} @ severity ${severity}`,
+              detail,
               measured: distance.toFixed(4),
               required: `>= ${CVD_MIN_DE}`,
             });
@@ -462,15 +675,16 @@ function main() {
   // An exception nobody's measurement matches is stale — either the tokens
   // moved and it's no longer needed, or it was mistyped. Not a failure, but
   // worth surfacing rather than letting dead code sit silently.
+  const allTriggered = [...acceptedExceptions, ...trackedExceptions];
   const staleExceptions = CVD_ACCEPTED_EXCEPTIONS.filter(
-    e => !triggeredExceptions.some(t => t.detail === `[${e.surface}] ${e.pair[0]}/${e.pair[1]} under ${e.deficiency} @ severity ${e.severity}`)
+    e => !allTriggered.some(t => t.detail === `[${e.surface}] ${e.pair[0]}/${e.pair[1]} under ${e.deficiency} @ severity ${e.severity}`)
   );
 
   // 6. (P-030) Opacity-modified TEXT_TOKENS usage found in src/ — alpha-
   // composited against every surface x background combination, since a
   // static scan can't know the exact background a given sighting renders
   // against. Flags if ANY combination fails, same worst-case posture
-  // check 1 already takes for the undiluted tokens.
+  // check 1 already takes for the undiluted tokens. Baseline-eligible.
   for (const sighting of findOpacityTextUsage()) {
     for (const surface of SURFACES) {
       const tokens = tokensBySurface[surface];
@@ -480,9 +694,13 @@ function main() {
         const ratio = wcagContrast(blended, bgHex);
         if (ratio < TEXT_MIN_CONTRAST) {
           const prefix = sighting.isPlaceholder ? 'placeholder:text' : 'text';
+          const classOrPairing = `${prefix}-${sighting.token}/${sighting.opacity} [${surface}] vs ${bgName}`;
           violations.push({
             kind: 'opacity-diluted contrast',
-            detail: `${sighting.file}:${sighting.line}  \`${prefix}-${sighting.token}/${sighting.opacity}\` [${surface}] vs ${bgName}  —  ${sighting.snippet}`,
+            file: sighting.file,
+            line: sighting.line,
+            classOrPairing,
+            detail: `${sighting.file}:${sighting.line}  \`${classOrPairing}\`  —  ${sighting.snippet}`,
             measured: ratio.toFixed(2),
             required: `>= ${TEXT_MIN_CONTRAST}`,
           });
@@ -494,37 +712,109 @@ function main() {
   // 7. (P-030) Raw Tailwind palette colours on colour-bearing properties —
   // unconditional, no exceptions list. See file header on why this is
   // expected to surface a large pre-existing list, not a bug in the check.
+  // Baseline-eligible.
   for (const misuse of findRawTailwindColors()) {
     violations.push({
       kind: 'raw-tailwind-colour',
+      file: misuse.file,
+      line: misuse.line,
+      classOrPairing: misuse.match,
       detail: `${misuse.file}:${misuse.line}  \`${misuse.match}\`  —  ${misuse.snippet}`,
       measured: 'present',
       required: 'a design token (design-tokens.json), not a raw Tailwind palette class',
     });
   }
 
-  if (violations.length === 0) {
-    console.log(`check-color: OK — ${TEXT_TOKENS.length} text tokens, the wordmark exception, on-navy, saffron placement, ${CVD_PAIRS.length} CVD pairs, opacity-diluted usage, and raw-Tailwind-colour usage all pass, across both surfaces.`);
-    if (triggeredExceptions.length > 0) {
-      console.log(`  (${triggeredExceptions.length} accepted exception(s) excluded — see CVD_ACCEPTED_EXCEPTIONS:)`);
-      for (const t of triggeredExceptions) console.log(`    ${t.detail}  —  measured ${t.measured}`);
+  // --- --write-baseline: regenerate the file and exit, no gate logic ---
+  if (process.argv.includes('--write-baseline')) {
+    const eligible = violations.filter(v => BASELINE_ELIGIBLE_KINDS.has(v.kind));
+    const carveOuts = eligible.filter(v => {
+      const ratio = parseFloat(v.measured);
+      return !isNaN(ratio) && ratio < CARVE_OUT_MAX_RATIO && !CARVE_OUT_EXEMPTIONS.has(violationKey(v));
+    });
+    if (carveOuts.length > 0) {
+      console.error(`check-color --write-baseline: refused — ${carveOuts.length} finding(s) measure below ${CARVE_OUT_MAX_RATIO}:1, the carve-out floor (P-029 ruling). These read as blank, not merely low-contrast, and may not be baselined at any severity threshold without an explicit, examined CARVE_OUT_EXEMPTIONS entry. Fix them, or add a reviewed exemption, then re-run --write-baseline:\n`);
+      for (const v of carveOuts) console.error(`  ${v.detail}  —  measured ${v.measured}`);
+      process.exit(1);
     }
+    const exempted = eligible.filter(v => {
+      const ratio = parseFloat(v.measured);
+      return !isNaN(ratio) && ratio < CARVE_OUT_MAX_RATIO && CARVE_OUT_EXEMPTIONS.has(violationKey(v));
+    });
+    if (exempted.length > 0) {
+      console.log(`check-color --write-baseline: ${exempted.length} sub-${CARVE_OUT_MAX_RATIO}:1 finding(s) baselined anyway via an examined CARVE_OUT_EXEMPTIONS entry (see the constant's own comments for why):`);
+      for (const v of exempted) console.log(`  ${v.detail}  —  measured ${v.measured}`);
+    }
+    const blocking = violations.filter(v => !BASELINE_ELIGIBLE_KINDS.has(v.kind));
+    if (blocking.length > 0) {
+      console.error(`check-color --write-baseline: refused — ${blocking.length} finding(s) are of a kind that can never be baselined (contrast, wordmark, on-navy, saffron misuse, or un-tracked CVD). Fix them; --write-baseline only ever covers raw-tailwind-colour and opacity-diluted contrast:\n`);
+      for (const v of blocking) console.error(`  [${v.kind}]  ${v.detail}  —  measured ${v.measured}`);
+      process.exit(1);
+    }
+    const count = writeBaseline(eligible);
+    console.log(`check-color --write-baseline: wrote ${count} entries to ${BASELINE_PATH.slice(REPO_ROOT.length + 1)}.`);
+    process.exit(0);
+  }
+
+  // --- Normal run: split into always-blocking vs baseline-eligible, and
+  // diff the eligible half against the baseline file. ---
+  const alwaysBlocking = violations.filter(v => !BASELINE_ELIGIBLE_KINDS.has(v.kind));
+  const eligible = violations.filter(v => BASELINE_ELIGIBLE_KINDS.has(v.kind));
+
+  const baseline = parseBaseline();
+  const currentKeys = new Set();
+  const newFindings = [];
+  for (const v of eligible) {
+    const key = violationKey(v);
+    currentKeys.add(key);
+    if (!baseline.has(key)) newFindings.push(v);
+  }
+  const staleBaselineEntries = [...baseline.entries()].filter(([key]) => !currentKeys.has(key));
+
+  const printTracked = (log) => {
+    if (trackedExceptions.length === 0) return;
+    log(`\n  ${trackedExceptions.length} TRACKED, NOT ACCEPTED CVD finding(s) — real defects, deliberately excluded from this gate, owned elsewhere. Not a pass; not silence:`);
+    for (const t of trackedExceptions) log(`    [owned by ${t.trackedIn}] ${t.detail}  —  measured ${t.measured}`);
+  };
+
+  const ok = alwaysBlocking.length === 0 && newFindings.length === 0 && staleBaselineEntries.length === 0;
+
+  if (ok) {
+    console.log(`check-color: OK — ${TEXT_TOKENS.length} text tokens, the wordmark exception, on-navy, saffron placement, and ${CVD_PAIRS.length} CVD pairs all pass (or are accepted/tracked exceptions) across both surfaces. ${baseline.size} pre-existing finding(s) match the baseline exactly.`);
+    if (acceptedExceptions.length > 0) {
+      console.log(`  (${acceptedExceptions.length} accepted exception(s) excluded — see CVD_ACCEPTED_EXCEPTIONS:)`);
+      for (const t of acceptedExceptions) console.log(`    ${t.detail}  —  measured ${t.measured}`);
+    }
+    printTracked(console.log);
     if (staleExceptions.length > 0) {
-      console.log(`  NOTE: ${staleExceptions.length} accepted exception(s) never matched a real measurement this run — stale, consider removing:`);
-      for (const e of staleExceptions) console.log(`    [${e.surface}] ${e.pair[0]}/${e.pair[1]} under ${e.deficiency} @ severity ${e.severity}`);
+      console.log(`  NOTE: ${staleExceptions.length} accepted/tracked exception(s) never matched a real measurement this run — stale, consider removing:`);
+      for (const e of staleExceptions) console.log(`    [${e.surface}] ${e.pair[0]}/${e.pair[1]} under ${e.deficiency} @ severity ${e.severity}${e.trackedIn ? ` (tracked in ${e.trackedIn})` : ''}`);
     }
     process.exit(0);
   }
 
-  console.error(`check-color: ${violations.length} violation(s)\n`);
-  const kindWidth = Math.max(...violations.map(v => v.kind.length));
-  for (const v of violations) {
-    console.error(`  [${v.kind.padEnd(kindWidth)}]  ${v.detail}  —  measured ${v.measured}, required ${v.required}`);
+  console.error(`check-color: ${alwaysBlocking.length} blocking violation(s), ${newFindings.length} NEW (un-baselined) finding(s), ${staleBaselineEntries.length} STALE baseline entr(y/ies)\n`);
+
+  if (alwaysBlocking.length > 0) {
+    console.error(`  --- Blocking (never baseline-eligible) ---`);
+    const kindWidth = Math.max(...alwaysBlocking.map(v => v.kind.length));
+    for (const v of alwaysBlocking) {
+      console.error(`  [${v.kind.padEnd(kindWidth)}]  ${v.detail}  —  measured ${v.measured}, required ${v.required}`);
+    }
   }
-  if (triggeredExceptions.length > 0) {
-    console.error(`\n  (${triggeredExceptions.length} accepted exception(s) excluded from the count above — see CVD_ACCEPTED_EXCEPTIONS:)`);
-    for (const t of triggeredExceptions) console.error(`    ${t.detail}  —  measured ${t.measured}`);
+  if (newFindings.length > 0) {
+    console.error(`\n  --- NEW findings not in color-baseline.txt (fix them, or add deliberately with --write-baseline after review) ---`);
+    for (const v of newFindings) console.error(`  [${v.kind}]  ${v.detail}  —  measured ${v.measured}, required ${v.required}`);
   }
+  if (staleBaselineEntries.length > 0) {
+    console.error(`\n  --- STALE baseline entries (fixed in code but still listed — remove from color-baseline.txt in this same commit) ---`);
+    for (const [, entry] of staleBaselineEntries) console.error(`  ${entry.raw}`);
+  }
+  if (acceptedExceptions.length > 0) {
+    console.error(`\n  (${acceptedExceptions.length} accepted exception(s) excluded from the counts above — see CVD_ACCEPTED_EXCEPTIONS:)`);
+    for (const t of acceptedExceptions) console.error(`    ${t.detail}  —  measured ${t.measured}`);
+  }
+  printTracked(console.error);
   process.exit(1);
 }
 

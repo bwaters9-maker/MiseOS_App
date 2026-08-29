@@ -408,7 +408,7 @@ export default function DishBuildPanel({ unitSystem, onOpenRecipe }: DishBuildPa
                 type="button"
                 onClick={yieldSameAsPortions}
                 disabled={draft.portions == null || draft.portions <= 0}
-                className="mt-[3px] text-[10px] font-bold uppercase tracking-wider text-teal disabled:text-slate/40 disabled:cursor-not-allowed hover:opacity-80 transition-opacity duration-[144ms]"
+                className="mt-[3px] text-[10px] font-bold uppercase tracking-wider text-teal disabled:text-slate disabled:cursor-not-allowed hover:opacity-80 transition-opacity duration-[144ms]"
               >
                 Same as portions
               </button>
