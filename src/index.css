@@ -107,8 +107,12 @@
 /* PRODUCTION PRINT ENGINE SPECIFICATION */
 @media print {
   html, body {
+    /* Print wants pure black/white regardless of Day/Service theme —
+       paper has no dark mode. Deliberate, not a token gap (P-029). */
+    /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
     background-color: #ffffff !important;
     background-image: none !important;
+    /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
     color: #000000 !important;
     font-size: 10pt !important;
     font-family: system-ui, sans-serif !important;
@@ -167,6 +171,7 @@
   h4 {
     background: transparent !important;
     background-color: transparent !important;
+    /* stylelint-disable-next-line scale-unlimited/declaration-strict-value -- pure black for paper legibility, same reasoning as above (P-029) */
     color: #000000 !important;
     text-shadow: none !important;
     box-shadow: none !important;
@@ -185,6 +190,7 @@
   .border-zinc-800,
   .border-zinc-900 {
     border: 1px solid #000000 !important;
+    /* stylelint-disable-next-line scale-unlimited/declaration-strict-value -- crisp black ink-grid borders on paper, same reasoning as above (P-029) */
     border-color: #000000 !important;
     padding: 6px 10px !important;
   }
@@ -192,6 +198,7 @@
   th {
     font-weight: 800 !important;
     text-transform: uppercase !important;
+    /* stylelint-disable-next-line scale-unlimited/declaration-strict-value -- fixed soft-gray print header background, not a token (P-029) */
     background-color: #f4f4f5 !important; /* Soft gray for print header */
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;

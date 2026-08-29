@@ -54,3 +54,25 @@ jobs:
       # colour surface changed since the baseline was written, never a
       # pre-existing condition someone already ruled on.
       - run: npm run check:color
+
+      # stylelint-declaration-strict-value (P-029 item 3): raw colour
+      # literals on standard CSS properties (color, background-color,
+      # border-color, etc.) in src/index.css — the app's one hand-
+      # authored CSS file. Custom-property token DEFINITIONS in the
+      # @theme/[data-surface="service"] blocks are untouched by this
+      # rule by construction (it checks standard properties, not custom
+      # property names) — only real usage sites are flagged. The five
+      # pre-existing hits (the @media print block's deliberate pure
+      # black/white/grey overrides — paper has no dark mode) are
+      # baselined inline via stylelint-disable-next-line comments at
+      # each site, stylelint's own native mechanism, not a second
+      # external baseline file.
+      - run: npm run lint:css
+
+      # Tailwind arbitrary colour values (bg-[#, text-[#, border-[#,
+      # etc.) — a raw hex typed directly into a class string, bypassing
+      # both the token system and stylelint (which only sees
+      # src/index.css, not .tsx class strings). Zero pre-existing hits
+      # as of 2026-08-29, so this is a zero-tolerance gate with no
+      # baseline at all, unlike check:color's raw-tailwind-colour check.
+      - run: npm run check:arbitrary-color

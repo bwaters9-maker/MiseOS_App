@@ -1,0 +1,12 @@
+{
+  "plugins": ["stylelint-declaration-strict-value"],
+  "rules": {
+    "scale-unlimited/declaration-strict-value": [
+      ["color", "background-color", "border-color", "outline-color", "fill", "stroke"],
+      {
+        "ignoreValues": ["transparent", "inherit", "currentColor", "none"],
+        "message": "Use a design token (src/index.css's @theme block / design-tokens.json), not a raw colour literal — see P-029."
+      }
+    ]
+  }
+}

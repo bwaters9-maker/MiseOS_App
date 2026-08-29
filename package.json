@@ -8,8 +8,10 @@
     "build": "vite build",
     "start": "node -e \"try { require('fs').rmSync('dist', { recursive: true, force: true }); require('fs').rmSync('.vite', { recursive: true, force: true }); } catch(e) {}\" && npm run build && cross-env NODE_ENV=production tsx server.ts",
     "lint": "tsc --noEmit",
+    "lint:css": "stylelint \"src/**/*.css\"",
     "test": "vitest run",
-    "check:color": "node scripts/check-color.mjs"
+    "check:color": "node scripts/check-color.mjs",
+    "check:arbitrary-color": "node scripts/check-arbitrary-color.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.70.0",
@@ -36,6 +38,8 @@
     "culori": "^4.0.2",
     "esbuild": "^0.25.0",
     "playwright": "^1.61.1",
+    "stylelint": "^17.14.1",
+    "stylelint-declaration-strict-value": "^1.12.1",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
