@@ -1426,7 +1426,7 @@ act on unilaterally.
 
 ---
 
-## P-029 — CI pipeline for the colour guard — QUEUED 2026-08-26
+## P-029 — CI pipeline for the colour guard — DONE 2026-08-29
 
 **Scope, per P-028 item 7's amendment:** GitHub Actions workflow running
 build, test, and `npm run check:color`; `stylelint-declaration-strict-value`
@@ -1464,6 +1464,77 @@ GitHub Actions workflow, this prompt needs either (a) a baseline/
 allowlist mechanism in the script itself so only NEW violations block
 a PR, or (b) the backlog cleared first — a much larger undertaking
 than originally scoped here, and Brian's call which.
+
+**RULING (Brian, 2026-08-29): (a) — the gate ships baselined, not
+blocked.** The ~1310 findings are the legacy-dark-zinc backlog awaiting
+its own brand pass — a design job, not a lint job — and clearing it
+first would delay the gate indefinitely while the thing it exists to
+stop (a new, un-baselined defect) keeps shipping. Full ruling and the
+three carve-out decisions are in item 1 below.
+
+**Four commits, one per item, each independently verified** (`tsc
+--noEmit`, `npm run build`, `npm test`, `check:color` against the
+baseline):
+
+- `09bc530` — item 1: `color-baseline.txt` (1318 entries) plus the
+  baseline mechanism in `check-color.mjs` (grows-never-shrinks-silently
+  gate: a current finding not in the baseline is NEW and fails, a
+  baseline entry with no matching finding is STALE and also fails).
+  Three carve-out rulings applied first, before writing anything:
+  DishBuildPanel.tsx:411's disabled "Same as portions" label FIXED
+  (`disabled:text-slate/40` → `disabled:text-slate`, now 4.90–6.12:1 in
+  all four contexts — a disabled control the chef can't read can't
+  explain why it's disabled); TrendsFullReport.tsx:248's decorative
+  Sparkles icon BASELINED after confirming its empty-state message
+  fully carries the meaning on its own (WCAG 1.4.11 decorative
+  exemption genuinely applies), via a new, explicit `CARVE_OUT_
+  EXEMPTIONS` mechanism rather than a threshold change; the Service
+  slate/teal CVD finding EXCLUDED from the baseline entirely (worse
+  than the one Day exception already on file — baselining something
+  more severe than a documented exception would be incoherent),
+  tracked instead via a `trackedIn: 'P-031'` field that prints loudly
+  in every run, pass or fail, so it can't be mistaken for an oversight.
+- `a7ae834` — item 2: `.github/workflows/ci.yml`, this repo's first —
+  `npm ci` → lint (`tsc --noEmit`, added beyond the entry's literal
+  wording since `vite build` doesn't itself type-check) → build → test
+  → `check:color`. No secrets needed. Scoped to the root package;
+  `functions/` isn't built/tested here yet.
+- `2dc9a28` — item 3: `stylelint-declaration-strict-value` on
+  `src/index.css` (5 pre-existing findings, all the `@media print`
+  block's deliberate pure black/white/grey overrides, baselined via
+  stylelint's own native `stylelint-disable-next-line` comments — no
+  second baseline file needed for a tool that already has one) plus a
+  new `scripts/check-arbitrary-color.mjs` rejecting Tailwind
+  arbitrary-value hex classes (`bg-[#...]` etc.) — zero pre-existing
+  hits, so this one ships as a zero-tolerance gate with no baseline at
+  all. Both wired into the same CI workflow.
+- Item 4 (this entry): the tracked count, reported below for Brian to
+  paste into `ROADMAP.json` directly — that file lives in OneDrive, not
+  this repo, per this file's own "Where things live" convention, so
+  Claude Code doesn't write it.
+
+**Tracked debt count, for `ROADMAP.json`:**
+```json
+"colorDebt": {
+  "baselinedViolations": 1318,
+  "asOf": "2026-08-29",
+  "source": "color-baseline.txt (P-029)",
+  "breakdown": { "raw-tailwind-colour": 1306, "opacity-diluted contrast": 12 }
+}
+```
+Obvious-when-it-stops-shrinking is the whole point of this number: it
+should only ever go down, one `--write-baseline` regeneration at a time,
+as the legacy-dark-zinc screens get their brand pass. A tracked count
+that goes UP means someone bypassed the gate, not that the debt grew
+faster than it shrank.
+
+**Found, not fixed, during item 3:** `npm install` reported 10
+pre-existing dependency vulnerabilities (1 low, 7 moderate, 2 high) —
+`npm ls`-traced to confirm none came from the new `stylelint`/
+`stylelint-declaration-strict-value` packages: `body-parser` via
+`express`, `brace-expansion`/`protobufjs`/`uuid` via `firebase-admin`'s
+own dependency chain, and `xlsx` (no fix available upstream). All
+pre-existed this prompt's work.
 
 ---
 
