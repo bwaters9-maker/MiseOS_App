@@ -1441,3 +1441,26 @@ to one.
 **Should probably also resolve, or at least re-run against:** the 20/30
 CVD-distinguishability findings P-028 left open (see above) — a CI gate
 that goes live already red isn't a gate anyone will respect.
+
+**Scope now depends on P-030 item 5 (2026-08-29).** `check-color.mjs`
+was extended to validate both surfaces, resolve opacity modifiers by
+alpha-compositing, and flag raw Tailwind palette colour classes
+unconditionally. Wiring the pre-extension version into CI would have
+been a gate that passed every defect P-030 exists to fix — including a
+shipped defect on the app's own nav bar (item 1) and four newly
+discovered Service-only CVD failures (slate/teal, all four
+deficiency/severity combinations) that no prior pass, including P-028
+itself, had ever run against Service's actual token values. The
+extended check currently exits 1 against real work: 1310 raw-Tailwind-
+colour sightings across 28 files (the pre-existing ~24-screen
+legacy-dark-zinc backlog CLAUDE.md already documents, now enumerated
+by file for the first time), 16 opacity-diluted contrast failures (4
+sightings × 2 surfaces × 2 backgrounds), and the 4 new Service CVD
+failures above — all reported in P-030 item 5's entry, none fixed
+there. **This CI pipeline cannot go live gating the current tree as-is
+— it would be red from the first run against ~1330 pre-existing
+violations, none of which are regressions.** Before wiring the
+GitHub Actions workflow, this prompt needs either (a) a baseline/
+allowlist mechanism in the script itself so only NEW violations block
+a PR, or (b) the backlog cleared first — a much larger undertaking
+than originally scoped here, and Brian's call which.
