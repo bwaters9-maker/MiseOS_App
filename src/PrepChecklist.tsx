@@ -11,7 +11,7 @@ export const PrepChecklist: React.FC = () => {
     <div className="w-full max-w-7xl mx-auto p-6 bg-zinc-950 text-zinc-100 font-mono tracking-tight">
       <div className="border-b border-zinc-900 pb-4 mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black text-white tracking-tighter uppercase">Line Prep Checklist</h1>
+          <h1 className="text-2xl font-black text-cream tracking-tighter uppercase">Line Prep Checklist</h1>
           <p className="text-xs text-zinc-500 mt-1">Automated par-to-hand deficiency tracking</p>
         </div>
         <button

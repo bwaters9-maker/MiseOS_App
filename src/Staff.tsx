@@ -571,7 +571,7 @@ const Staff: React.FC<StaffProps> = ({ onOpenEvent }) => {
       <div>
         <div className="flex items-start justify-between mb-[21px]">
           <div>
-            <h1 className="text-xl font-black uppercase tracking-wider text-white flex items-center gap-[8px]">
+            <h1 className="text-xl font-black uppercase tracking-wider text-navy flex items-center gap-[8px]">
               <Users className="w-5 h-5 text-blue-400" />
               Employees
             </h1>
@@ -718,7 +718,7 @@ const Staff: React.FC<StaffProps> = ({ onOpenEvent }) => {
       <div>
         <div className="flex items-start justify-between mb-[21px]">
           <div>
-            <h1 className="text-xl font-black uppercase tracking-wider text-white flex items-center gap-[8px]">
+            <h1 className="text-xl font-black uppercase tracking-wider text-navy flex items-center gap-[8px]">
               <CalendarClock className="w-5 h-5 text-emerald-400" />
               Schedule
             </h1>

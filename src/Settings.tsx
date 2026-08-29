@@ -300,7 +300,7 @@ export const Settings: React.FC<SettingsProps> = ({ theme, setTheme, unitSystem 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 bg-zinc-950 text-zinc-100 font-mono tracking-tight">
       <div className="border-b border-zinc-900 pb-4 mb-6">
-        <h1 className="text-2xl font-black text-white tracking-tighter uppercase flex items-center gap-2">
+        <h1 className="text-2xl font-black text-cream tracking-tighter uppercase flex items-center gap-2">
           <SettingsIcon className="w-6 h-6 text-emerald-400" />
           System Settings
         </h1>

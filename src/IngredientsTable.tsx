@@ -130,7 +130,7 @@ const Ingredients: React.FC<IngredientsProps> = ({ unitSystem = 'imperial' }) =>
 
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-[13px] mb-[34px]">
         <div>
-          <h1 className="text-xl font-black uppercase tracking-wider text-white flex items-center gap-[8px]">
+          <h1 className="text-xl font-black uppercase tracking-wider text-navy flex items-center gap-[8px]">
             <Package className="w-5 h-5 text-amber-400" />
             Master Pantry
           </h1>

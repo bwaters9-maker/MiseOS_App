@@ -247,7 +247,7 @@ const Features: React.FC = () => {
 
       <div className="flex items-start justify-between mb-[34px]">
         <div>
-          <h1 className="text-xl font-black uppercase tracking-wider text-white flex items-center gap-[8px]">
+          <h1 className="text-xl font-black uppercase tracking-wider text-navy flex items-center gap-[8px]">
             <Star className="w-5 h-5 text-emerald-400" />
             Features
           </h1>

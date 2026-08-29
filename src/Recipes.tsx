@@ -1314,7 +1314,7 @@ const Recipes: React.FC<RecipesProps> = ({ unitSystem = 'imperial', targetFcPerc
     <div className="max-w-[1597px] mx-auto px-[21px] py-[34px] font-mono">
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-[13px] mb-[34px]">
         <div>
-          <h1 className="text-xl font-black uppercase tracking-wider text-white flex items-center gap-[8px]">
+          <h1 className="text-xl font-black uppercase tracking-wider text-navy flex items-center gap-[8px]">
             <ChefHat className="w-5 h-5 text-emerald-400" />
             Recipes
           </h1>

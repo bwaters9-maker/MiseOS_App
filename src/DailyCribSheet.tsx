@@ -81,7 +81,7 @@ const DailyCribSheet: React.FC = () => {
 
         <div className="flex items-start justify-between mb-[34px]">
           <div>
-            <h1 className="text-xl font-black uppercase tracking-wider text-white">Daily Crib Sheet</h1>
+            <h1 className="text-xl font-black uppercase tracking-wider text-navy">Daily Crib Sheet</h1>
             <p className="text-xs text-zinc-500 mt-[5px]">{today}</p>
           </div>
           <button

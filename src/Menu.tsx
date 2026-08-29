@@ -107,7 +107,7 @@ const Menu: React.FC<MenuProps> = ({ targetFcPercent = 30, onOpenRecipe, menuTem
     <div className="max-w-[1597px] mx-auto px-[21px] py-[34px] font-mono">
       <div className="mb-[34px] flex items-start justify-between gap-[13px]">
         <div>
-          <h1 className="text-xl font-black uppercase tracking-wider text-white flex items-center gap-[8px]">
+          <h1 className="text-xl font-black uppercase tracking-wider text-navy flex items-center gap-[8px]">
             <UtensilsCrossed className="w-5 h-5 text-emerald-400" />
             Menu
           </h1>

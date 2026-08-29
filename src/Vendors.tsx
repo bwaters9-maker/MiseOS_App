@@ -384,7 +384,7 @@ const Vendors: React.FC = () => {
     <div className="max-w-[987px] mx-auto px-[21px] py-[34px] font-mono">
       <div className="flex items-start justify-between mb-[34px]">
         <div>
-          <h1 className="text-xl font-black uppercase tracking-wider text-white flex items-center gap-[8px]">
+          <h1 className="text-xl font-black uppercase tracking-wider text-navy flex items-center gap-[8px]">
             <Truck className="w-5 h-5 text-teal-400" />
             Vendors
           </h1>
