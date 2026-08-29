@@ -630,7 +630,15 @@ Constraints: do not modify the functions under test unless a test exposes a genu
 
 ---
 
-## P-018 — Error telemetry: Sentry on ErrorBoundary + AI proxy — QUEUED 2026-07-22
+## P-018 — Error telemetry: Sentry on ErrorBoundary + AI proxy — DONE 2026-08-21
+
+**Status:** DONE 2026-08-21. All four steps built one at a time and committed per verified step, merged to main as `7115b44` (branch `p-018-sentry` deleted): `68654df` browser SDK init in `src/main.tsx`, `0b8669d` `ErrorBoundary.componentDidCatch` → `captureException` (recovery UI untouched), `b3c3c00` `/api/ai` catch-path reporting via an injected `reportError(err, uid)` callback (uid tag only — never the system prompt, the messages, or any part of the request body), `1621fd4` CLAUDE.md env-vars + Error reporting sections. No tracing and no replay on either side: neither SDK sets `tracesSampleRate` and `replayIntegration` is never added.
+
+**Two follow-ups landed the same day, both out of live deploys:**
+- `b0604ad` — init gated on `import.meta.env.MODE === 'production'` **and** the DSN, not the DSN alone. Vite inlines `VITE_*` into the dev bundle too, so a DSN in `.env` made every local crash burn free-tier quota. `MODE` not `PROD` — see the P-023 note on why `PROD` reads false in this repo even under `npm run build`.
+- `86122f1` — `@sentry/node` imported dynamically inside `reportError` rather than at module scope. The eager import cost ~1.4s of OpenTelemetry setup and pushed `functions/src/index.ts` past the 10s budget `firebase deploy --only functions` allows for loading the code to discover its exports; the deploy failed outright with "Cannot determine backend specification".
+
+**Hardened by P-025** (`360ce1b`): the server-side report is now awaited before the 502 returns, and the Cloud Function reporter awaits `Sentry.flush(2000)` — capture alone only queues the event, and a Cloud Run instance can be frozen the moment the response goes out.
 
 **Origin:** 2026-07-22 viability audit. Production failures are currently invisible unless a tester reports them; a feedback cycle can't run on unseen bugs.
 
