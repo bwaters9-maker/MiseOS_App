@@ -75,7 +75,7 @@ src/
   Staff.tsx                      Employee directory + shift scheduling — feeds Crib Sheet and Chef's Dashboard (today's shifts only). Shift station select sources from `useStationPresets()` (live, chef-customizable) rather than a hardcoded list — see Chef's Dashboard section. Schedule section carries a List/Calendar toggle (`components/staff/ScheduleCalendar.tsx`) merging shifts with Events — see the Staff Schedule Calendar section below.
   EventCalendar.tsx              Events & Clients — event/client CRUD, grouped by date, upcoming/past split, feeds Crib Sheet; clicking an event opens EventDetailView, which can also be deep-linked into directly via a `selectedEventId` prop (used by the Staff schedule calendar)
   PrepChecklist.tsx              Par-level deficit tracking table
-  TestKitchenHub.tsx             Development workspace (Recipes > Development sub-tab; formerly the standalone Test Kitchen nav tab, filename unchanged) — one continuous workspace, three columns: trends reference rail, Sous chat, Recipe Build panel (calls server-side /api/ai proxy); Sous chat runs on the shared Sous persona (src/lib/sousPersona.ts)
+  TestKitchenHub.tsx             Development workspace (Recipes > Development sub-tab; formerly the standalone Test Kitchen nav tab, filename unchanged) — trends reference rail plus the Recipe Build panel (calls server-side /api/ai proxy): a "Describe the dish" textarea drives extraction into a structured draft, a refinement input applies incremental edits, and the chef hands a reviewed draft off to the Recipe Builder (P-026, replacing the retired Sous chat)
   Settings.tsx                   Theme toggle + station preset CRUD + recipe category CRUD
   IngredientsTable.tsx           Master Pantry — static human-verified ingredient CRUD, unit conversion
   Vendors.tsx                    Vendor directory — supplier contacts, lead time, order days, linked-ingredients view; feeds Ingredient.vendorId
@@ -117,7 +117,7 @@ src/
     dishDraftToRecipe.ts         Pure DishDraft → recipes-doc conversion for the Recipe Build panel's hand-off (development status, off-menu, unit resolution, kept lines) — extracted from DishBuildPanel.tsx so the defaults are unit-testable without Firestore
     units.ts                     Canonical unit conversion (g/ml/each base; imperial/metric display)
     regionContext.ts             buildRegionContext / withRegionContext — compact restaurant-profile block injected into /api/ai system prompts
-    sousPersona.ts                Sous persona system prompt for the Development workspace's Sous chat
+    dishExtraction.ts            Development workspace's extraction/refinement system prompt, response normalization, and the refinement-reconciliation merge (P-026) — extracted from DishBuildPanel.tsx so it's unit-tested without mounting the panel, same pattern as dishDraftToRecipe.ts
     seasonalData.ts              Static seasonal produce/protein reference by US region (the Development workspace's Seasonal Matrix, also feeding the Dashboard trends strip) — no runtime calls, same pattern as yieldReference.ts
     yieldReference.ts            Common product usable-yield percentages, grounds the AI ingredient lookup's yieldPercent proposals
 ```
@@ -134,7 +134,7 @@ Current nav tabs (in order): Dashboard · Staff · Events & Clients · Recipes �
 
 **Recipes** (`view: 'recipes'`, `src/RecipesHub.tsx`) is a merged entry point over three previously-separate top-level views — Recipes, Menu, and Features (nightly specials) — each still its own untouched component with its own internal heading; `RecipesHub` is a thin sub-tab switcher (Recipe Builder / Menu / Features) with no logic of its own beyond keeping the sub-tab in sync with `selectedRecipeId` (so jumping to a specific recipe from Menu or Events & Clients always lands on the Recipe Builder sub-tab).
 
-Features later moved out of `RecipesHub` entirely (Chef's Dashboard split, part two), and Test Kitchen moved *in* (Streamline ruling, 2026-08-09 — see the Product Vision section). `RecipesHub` is now **Recipe Builder / Menu / Collections / Development** — the Development sub-tab renders `src/TestKitchenHub.tsx` unchanged (relocation only, no feature changes), lazily via its own `React.lazy`/`Suspense` so the trends/Sous/build-panel chunk still loads only on demand. `test-kitchen` is gone from `viewMap` and `navItems` entirely — unlike Crib Sheet and Features, it kept no view key, because it is no longer a view.
+Features later moved out of `RecipesHub` entirely (Chef's Dashboard split, part two), and Test Kitchen moved *in* (Streamline ruling, 2026-08-09 — see the Product Vision section). `RecipesHub` is now **Recipe Builder / Menu / Collections / Development** — the Development sub-tab renders `src/TestKitchenHub.tsx` unchanged (relocation only, no feature changes), lazily via its own `React.lazy`/`Suspense` so the trends/build-panel chunk still loads only on demand. `test-kitchen` is gone from `viewMap` and `navItems` entirely — unlike Crib Sheet and Features, it kept no view key, because it is no longer a view.
 
 **Cross-view sub-tab requests**: `App.tsx`'s `AppShell` holds a `recipesSubTab` request (plus `openRecipesDevelopment()`), threaded down and consumed-then-cleared by `RecipesHub` — the same consume-once mechanism `selectedRecipeId` and `selectedEventId` already use, so revisiting Recipes later never re-forces a tab. The Dashboard's trends strip and In Development card use it to land on Development.
 
@@ -196,7 +196,7 @@ The Recipe Builder sub-tab also carries a "View Menu" button (`onViewMenu` prop)
 | `PricingTrendItem` | One line of AI pricing commentary: `{ item, direction: 'up' \| 'down', movement: 'short-term' \| 'structural', note }` — informational only, never linked to a real `Ingredient` |
 | `TrendReport` | Singleton doc at `trend_reports/latest`: `{ generatedAt, cards: TrendCard[], pricingTrends: PricingTrendItem[] }` — replaces an old, unused `recipe_scores`-shaped type left over from an orphaned Base44 script that wrote to the same collection name but was never wired into the app (deleted, see Orphaned files below) |
 | `DishDraftLine` | Client-only line of a `DishDraft`: `{ ingredientId, name, qty, unit, note? }` — `ingredientId` is copied verbatim from the live Master Pantry by the extraction pass on a name match, never invented (`null` when unmatched); `qty`/`unit` are the AI's best-effort read of the conversation, not yet canonical base units |
-| `DishDraft` | Client-only draft pulled from a Development-workspace Sous conversation via a structured AI extraction pass — never written to Firestore as its own document: `{ dishName, batchYield: { qty, measureType, unit } \| null, portions, lines: DishDraftLine[], notInPantry: string[], methodSteps }`. `notInPantry` mirrors the same fallback convention as `Recipes.tsx`'s "Build From Pantry" prompt so an unmatched ingredient mention is always surfaced, never silently dropped. Chef review/confirmation happens in `DishBuildPanel.tsx` before any of it becomes a real `Recipe` doc |
+| `DishDraft` | Client-only draft pulled from a chef's dish description (or a refinement of one) via a structured AI extraction pass — never written to Firestore as its own document: `{ dishName, batchYield: { qty, measureType, unit } \| null, portions, lines: DishDraftLine[], notInPantry: string[], methodSteps }`. `notInPantry` mirrors the same fallback convention as `Recipes.tsx`'s "Build From Pantry" prompt so an unmatched ingredient mention is always surfaced, never silently dropped. Chef review/confirmation happens in `DishBuildPanel.tsx` before any of it becomes a real `Recipe` doc |
 | `Ingredient` | Master Pantry item: name, category, measureType, purchaseUnit, purchaseCost, purchaseQty, yieldPercent, pieceWeightG? (ordered portion spec in grams for portioned weight product, e.g. 6 oz breasts — drives piece-true costing in costEngine [cost ÷ floor(pack/spec) pieces, shortfall treated as unusable pack-out], pieces-per-case, cost-per-piece, and each-yield derivation in the Recipe Builder; absent for bulk/randoms), nutritionPer100g?, allergens?, vendorId?, lastVerified, priceSource, nutritionSource? ('ai' \| 'manual') |
 | `RecipeCategory` | Chef-managed recipe category (id, name), CRUD'd from Settings — referenced by `Recipe.categoryId` |
 | `RecipeCollection` | Seasonal grouping of menu recipes: id, name, recipeIds: string[], active. One active at a time; when active it defines the menu set (see the Recipe Collections section). Stale recipeIds (deleted recipes) are ignored at read time |
@@ -326,16 +326,17 @@ Directory CRUD with the same collapsible-add-form / inline-edit / two-step-delet
 
 **Formerly the standalone Test Kitchen nav tab.** The Streamline ruling (2026-08-09 — development is a state, not a place) relocated it whole into `RecipesHub` as the Development sub-tab; the file, its components, and every behavior below are unchanged by that move. "Test Kitchen" survives only as the filename and in a few internal comments — there is no Test Kitchen tab, view key, or nav entry.
 
-One continuous workspace, not sub-tabs — the earlier "Culinary Trends & Forecasts" / "Menu Development Playground" split was merged into a single three-column screen. Left: a compact trends reference rail, sourcing the same live trends/pricing/seasonal data described below and expanding in place, with a "full report" button opening `TrendsFullReport.tsx` as a drawer for the complete card grid, pricing list, and full-year seasonal calendar. Center: the Sous chat ("Chef Matthew"), unchanged in persona and behavior. Right: the Recipe Build panel (`components/testkitchen/DishBuildPanel.tsx`), covered below.
+One continuous workspace, not sub-tabs — the earlier "Culinary Trends & Forecasts" / "Menu Development Playground" split was merged into a single screen. Left: a compact trends reference rail, sourcing the same live trends/pricing/seasonal data described below and expanding in place, with a "full report" button opening `TrendsFullReport.tsx` as a drawer for the complete card grid, pricing list, and full-year seasonal calendar. Right: the Recipe Build panel (`components/testkitchen/DishBuildPanel.tsx`), covered below — there is no separate chat zone; P-026 (2026-08-21) retired the earlier Sous persona and its chat surface, folding the whole dish-description intake into this one panel.
 
 > **Hard boundary:** trends content is editorial and read-only — it informs the chef and NEVER writes to the pantry, costing, or any other data. It is not a live market-data feed. Refresh now runs automatically on a weekly cadence (see Persistence & weekly cadence below) rather than requiring an explicit chef click — but the boundary against touching any other domain data holds regardless of what triggers a refresh.
 
 ### Recipe Build panel (components/testkitchen/DishBuildPanel.tsx)
 
-Turns the Sous chat transcript into a chef-confirmed `Recipe` doc — the only write path out of the Development workspace, and still gated on explicit chef action at every step.
+Turns a chef's dish description — and any refinements to it — into a chef-confirmed `Recipe` doc — the only write path out of the Development workspace, and still gated on explicit chef action at every step. The extraction/refinement system prompt, response normalization, and the refinement-reconciliation merge are pure functions in `src/lib/dishExtraction.ts` (P-026), unit-tested without mounting the panel — same pattern as `dishDraftToRecipe.ts` for the hand-off.
 
-- **Extraction**: "Extract from Chat" (and "Re-extract") sends the full transcript plus the live Master Pantry as `{ id, name }` pairs to one `/api/ai` call, returning a `DishDraft` — dish name, batch yield (qty/measureType/display unit), portions, ingredient lines matched against the pantry by name, unmatched mentions (`notInPantry`), and method steps. `normalizeDishDraft` validates the shape client-side (numeric qty > 0, `measureType` in the canonical union, non-empty unit) rather than trusting the model — a field that fails validation becomes `null`/empty rather than a guessed value.
-- **Review**: the draft renders as a read-only summary with a per-line keep/discard toggle (`keptLines`); discarded lines are simply excluded from hand-off, never deleted from the draft. Unmatched-to-pantry mentions surface in their own list so nothing found in the conversation is silently dropped.
+- **Extraction**: a "Describe the dish" textarea + Extract button sends the description plus the live Master Pantry as `{ id, name }` pairs to one `/api/ai` call, returning a `DishDraft` — dish name, batch yield (qty/measureType/display unit), portions, ingredient lines matched against the pantry by name, unmatched mentions (`notInPantry`), and method steps. `normalizeDishDraft` validates the shape client-side (numeric qty > 0, `measureType` in the canonical union, non-empty unit) rather than trusting the model — a field that fails validation becomes `null`/empty rather than a guessed value. A response that isn't readable as JSON at all never surfaces as an error toast — it renders the same empty, fully-flagged draft a too-thin description would produce, captioned "Couldn't read that — try describing the dish again" (SOUS-EVAL-derived intake invariant, survives the persona's retirement).
+- **Refinement**: once a draft exists, a lightweight input applies incremental edits ("make it 6 portions") — one `/api/ai` call returning a full revised draft, same shape as extraction, capped at 10 applied refinements per draft (a UX limit, not a technical one — see the AI request limits section). A chef-kept line is immutable to the model regardless of what it returns: `reconcileRefinement` matches the model's revised lines against kept lines by normalized name (the `InvoicePriceUpdate.tsx` convention) and discards any match in favor of the chef's untouched line; omission from the revision is never treated as a removal signal. Everything else in the response — new lines, revisions to lines the chef hasn't kept, dish name/yield/portions/method — is accepted as-is. A refinement's own parse failure leaves the draft untouched and reports inline, rather than discarding confirmed work.
+- **Review**: the draft renders as a read-only summary with a per-line keep/discard toggle (`keptLines`); discarded lines are simply excluded from hand-off, never deleted from the draft. Unmatched-to-pantry mentions surface in their own list so nothing the chef named is silently dropped. A "Start Over" action clears the draft and returns to the description textarea.
 - **Hand-off**: "Send to Recipe Builder" is enabled only once `canHandOff && !hasUnresolvedLines && !yieldNeedsAttention` — dish name, batch yield and portions all present (`canHandOff`), no kept line still flagged, and no flagged yield. All three are enforced in the write-path early return as well as the button's disabled state, so the gate cannot be bypassed by anything that reaches the handler directly. It converts the draft's display units to canonical base units (`toBase`, `src/lib/units.ts`, falling back to the unit system's default display unit if the AI's unit string doesn't resolve — same defensive pattern `Recipes.tsx`'s pantry-suggestion accept uses), builds a `Recipe` (`recipeType: 'menu'`, kept lines only, `course: ''`, `status: 'development'` **and** `onMenu: false` — both, since status governs visibility while the toggle keeps its meaning for after the flip), and writes it with `addDoc` through the same `rCollection(restaurantId, 'recipes')` path `Recipes.tsx` itself uses — no new collection, no bypass of the established data model. On success it navigates straight into the Recipe Builder on the new recipe via `onOpenRecipe` (threaded from `App.tsx`, the same prop `selectedRecipeId` deep-linking already uses elsewhere). A failed write surfaces inline and leaves the draft untouched for retry. The doc construction itself lives in `src/lib/dishDraftToRecipe.ts` (pure, no Firestore) so those defaults are unit-tested without mounting the panel; the panel still owns the write and the navigation.
 
 ### Culinary Trends & Forecasts (reference rail + full-report drawer, Phase B)
@@ -357,7 +358,7 @@ The browser never talks to Anthropic directly, and no AI feature ever ships an A
 
 Every verified request logs `{ event: 'ai_proxy_request', uid, timestamp }` (Cloud Logging in prod, the local terminal in dev) — logging only, never written to Firestore — so a cost spike can be traced back to a specific account.
 
-Client side: every `/api/ai` caller attaches the token via `getAiAuthHeader()` (`src/lib/ai.ts`) — `callAi()` (the shared helper most callers use) includes it automatically; the few raw-`fetch` callers that need `tools` or multi-turn `messages` (Ingredient Advisor, TestKitchenHub's trend-verify pass and Sous chat) import `getAiAuthHeader()` directly. Any future AI feature must go through one of these, not a new raw `fetch('/api/ai')` with hand-rolled headers.
+Client side: every `/api/ai` caller attaches the token via `getAiAuthHeader()` (`src/lib/ai.ts`) — `callAi()` (the shared helper most callers use) includes it automatically; the few raw-`fetch` callers that need `tools` or multi-turn `messages` (Ingredient Advisor, TestKitchenHub's trend-verify pass) import `getAiAuthHeader()` directly. Any future AI feature must go through one of these, not a new raw `fetch('/api/ai')` with hand-rolled headers.
 
 `TestKitchenHub.tsx` posts `{ system, messages, max_tokens }`; the proxy relays Anthropic's JSON response back verbatim, including its `{ error: { message } }` shape on failure. Model is `claude-sonnet-4-6`, default max 1024 tokens. The proxy is otherwise a dumb relay — regional context (below) is composed client-side into `system` before the request goes out, not injected server-side.
 
@@ -377,7 +378,7 @@ The throw sits **after** the per-uid daily counter has incremented, so a forced 
 - **`max_tokens` ≤ 4096** — a request over the cap is rejected with a 400; unset still defaults to 1024. The cap is 4096 (not 2048) because real callers need the headroom: the Ingredient Advisor sends 3000 and the weekly trends draft sends 2500 — both 400'd under the original 2048 cap (caught in live testing). Every current caller sits at or under 4096 (highest is the Advisor at 3000).
 - **`messages` ≤ 40 entries** and the **serialized `messages` payload ≤ 100KB** — over either is a 400. Enforced only after `messages` is confirmed to be an array.
 - **Per-uid daily quota: 200 requests/UTC-day** — the 201st verified request in a day is rejected with a 429 (`"Daily AI limit reached — try again tomorrow."`). Counted via the injected `recordDailyUsage` callback (the `aiUsage/{uid}_{YYYY-MM-DD}` counter, above). The quota is checked *after* the 400 validations (a malformed request never burns quota) and *before* the Anthropic forward (an over-limit request costs nothing). **Fail-open**: if the counter read/write throws (local dev has no credentials; a Firestore hiccup in prod), the handler logs a warning and lets the request through — the per-request caps still bound every call, so AI features never go down because the meter is broken. Local dev, which supplies no counter, is therefore effectively quota-free. The message says "try again tomorrow" rather than "resets at midnight" because the bucket is UTC — reset is UTC midnight, not the chef's local midnight.
-- **Client-side companion cap**: `TestKitchenHub.tsx` sends only the last 30 Sous messages per turn (display keeps the full history), starting the window at its first user turn so the payload never begins on an assistant message. Keeps a long chat under the 40-message server cap.
+- **Client-side companion cap**: the old 30-message chat window is gone along with the chat itself — every extraction or refinement call (`DishBuildPanel.tsx`) is now a single structured JSON payload in one user turn, never a growing transcript, so there's no message count to approach this server cap. `DishBuildPanel.tsx` instead caps refinement rounds at 10 per draft — a UX limit on how long a chef keeps iterating one draft, not a technical ceiling (see the Recipe Build panel section above).
 
 ## Error reporting (Sentry, free tier)
 
@@ -405,7 +406,7 @@ Build order item 13. A read-only, web-search-grounded advisory modal on the Mast
 - Settings gains a "Restaurant Profile" card: name, chef name, brand color (native color picker), cuisine style (fixed select), price point ($–$$$$, fixed select), city (free text — a place name, same exception as personal names), state (fixed 50-state + DC select), regional notes (free text by design — chef commentary on local ingredients/traditions, the same allowed exception as comments elsewhere). Logo upload is deferred — the card shows a disabled "Pending — not yet implemented" row rather than a broken control. One local form + explicit "Save Profile" button, matching the add/edit-form-with-Save pattern used elsewhere (Vendors, Staff, Events & Clients) rather than the Settings page's older per-field auto-save style, since auto-saving free text on every keystroke would be excessive Firestore writes. Saving writes every field explicitly, using `deleteField()` for blanked ones (via `setDoc(..., { merge: true })`) so clearing a field in the form actually clears it in Firestore instead of leaving the old value behind.
 - `targetFcPercent` and `menuTemplate` also live on this doc (migrated from an earlier `App.tsx` state + `localStorage` scheme) since both are restaurant-identity settings, not per-session UI state — but they keep their existing edit surfaces (Settings' "Recipe Costing" card, the Guest Preview toolbar's Classic/Clean picker) unchanged; only the storage underneath moved. `App.tsx`'s `AppShell` reads `restaurantProfile` via `useKitchenSelector` (which required moving `KitchenStateProvider` to wrap `AppShell` rather than be created inside it), computes `targetFcPercent`/`menuTemplate` with a legacy-localStorage read fallback for pre-migration browsers, and runs a one-time migration effect (guarded by a ref, gated on `restaurantProfileLoaded`) that merges any legacy localStorage values into the doc the first time it loads.
 - `src/lib/regionContext.ts` exports `buildRegionContext(profile)` (returns a compact `"Restaurant context:\n..."` block, or `''` if the profile has nothing worth surfacing) and `withRegionContext(basePrompt, profile)` (prepends the block, or returns `basePrompt` unchanged when there's no context — so every AI feature works identically with zero profile data).
-- Injected into every `/api/ai` system prompt where it's genuinely relevant: the Sous persona (`TestKitchenHub.tsx`'s Sous chat), the AI ingredient lookup's price/pack estimate (`AiIngredientLookup.tsx`), the invoice add-unmatched-to-pantry suggestion pass (`InvoicePriceUpdate.tsx`), and both Recipe Builder AI buttons — "Build From Pantry" and "Draft Method" (`Recipes.tsx`). Deliberately **not** injected into `InvoicePriceUpdate.tsx`'s raw invoice line-item extraction prompt — that pass's only job is reading text off a photographed invoice accurately, and region context has no legitimate application there (worse, it risks nudging the model toward region-typical items instead of what's actually printed).
+- Injected into every `/api/ai` system prompt where it's genuinely relevant: the Development workspace's dish-description intake (`DishBuildPanel.tsx`), the AI ingredient lookup's price/pack estimate (`AiIngredientLookup.tsx`), the invoice add-unmatched-to-pantry suggestion pass (`InvoicePriceUpdate.tsx`), and both Recipe Builder AI buttons — "Build From Pantry" and "Draft Method" (`Recipes.tsx`). Deliberately **not** injected into `InvoicePriceUpdate.tsx`'s raw invoice line-item extraction prompt — that pass's only job is reading text off a photographed invoice accurately, and region context has no legitimate application there (worse, it risks nudging the model toward region-typical items instead of what's actually printed).
 
 ## Staff Schedule Calendar (components/staff/ScheduleCalendar.tsx)
 
@@ -481,10 +482,11 @@ places for no gain.
 What this ruling settled:
 
 - **Relocation.** The whole Test Kitchen workspace — trends rail, full
-  report drawer and archive, pricing commentary, seasonal matrix, Sous
-  chat, Recipe Build panel — moved under Recipes as a fourth sub-tab,
-  **Development**. No feature changes, pure relocation; the Test Kitchen
-  nav tab and view key are gone.
+  report drawer and archive, pricing commentary, seasonal matrix, the
+  chat interface later retired by P-026, Recipe Build panel — moved
+  under Recipes as a fourth sub-tab, **Development**. No feature
+  changes, pure relocation; the Test Kitchen nav tab and view key are
+  gone.
 - **Recipe status.** Menu recipes carry `status: 'development' | 'active'`
   (absent reads as active — no migration). A development recipe supports
   up to 3 notes-only variants and stays out of the Menu, Collections, and
@@ -666,8 +668,8 @@ SETTINGS — RESTAURANT PROFILE
 - Kitchen Context: cuisine style, price point, target FC%
 - Regional Intelligence: city/state, local ingredients and
   traditions (free text) — injected into every AI prompt where
-  it's genuinely relevant (Sous, ingredient lookup, invoice
-  add-to-pantry suggestions, Recipe Builder AI buttons; not the
+  it's genuinely relevant (the Development workspace's intake, ingredient
+  lookup, invoice add-to-pantry suggestions, Recipe Builder AI buttons; not the
   raw invoice-extraction OCR pass, which has no use for it)
   A chef in Buffalo has a different conversation than Napa.
   The AI knows this without being told each time.
@@ -678,27 +680,18 @@ AI LAYER
   Trends & Forecasts (Phase B ✓) is editorial and read-only by hard
   boundary — see the Development workspace section above; it never
   touches the pantry, costing, or any other domain data.
-- Sous ("Chef Matthew" — direct, practical, no mascot) — the
-  persona shipped early, inside the Development workspace's chat
-  (`src/lib/sousPersona.ts`, item 15's regional context injected
-  into it). Expanded 2026-07-18 from a single culinary advisor into
-  five domains — culinary, restaurant business, front of house, the
-  app itself, and this restaurant's brand — plus a fixed persona
-  canon (backstory, self-awareness, humor calibration) injected
-  verbatim so answers stay consistent under testing; see PROMPTS.md
-  for the decision. App facts come only from the maintained
-  `src/lib/sousAppKnowledge.ts` (update it whenever a module ships,
-  a nav tab renames, or a feature moves — Sous is never allowed to
-  freehand what the app does); restaurant facts come only from the
-  Restaurant Profile via `withRegionContext`. Hard rule: Sous never
-  invents a fact about the restaurant or the app — anything outside
-  those two injected sources gets an honest "I don't have that on
-  file," never a plausible-sounding guess. A standalone "Chef Chat"
-  surface separate from the Development workspace's chat is still
-  intentionally not built — it would duplicate the same persona
-  behind a second UI
-  with no clear new capability. Build it only if a real gap shows
-  up that the Development workspace can't cover.
+- Dish-description intake (`DishBuildPanel.tsx`, item 15's regional
+  context injected into it via `withRegionContext`) — a chef describes
+  a dish in plain text; extraction returns a structured `DishDraft`
+  for review, never prose (`src/lib/dishExtraction.ts`). A refinement
+  input applies incremental edits to an existing draft afterward. No
+  persona, no name, no open-ended Q&A, no conversational surface at
+  all — P-026 (2026-08-21) retired the earlier five-domain "Sous"
+  character (culinary, restaurant business, front of house, the app
+  itself, this restaurant's brand, plus a fixed persona canon) after
+  every logged failure (SOUS-EVAL E-001–E-004) turned out to be a
+  conversation failure, never an extraction one; see the Ruling
+  2026-08-21 section above and PROMPTS.md for the decision.
 - Ingredient Advisor (web-search enabled, region-aware)
 
 ### Permanently Purged — Never Rebuild
@@ -735,10 +728,10 @@ only allowed state.
 9. ~~Menu View~~ ✓ (operational cost/FC% view + Guest Preview with Classic/Clean templates)
 10. ~~Catering Module~~ — absorbed into Events & Clients (item 5); no standalone Catering Module will be built
 11. ~~Vendor Management~~ ✓
-12. Sous (Chef Chat) — persona shipped early inside the Development
-    workspace (`src/lib/sousPersona.ts`); a standalone chat surface
-    is intentionally not built unless it earns its place over the
-    workspace's own chat
+12. ~~Sous (Chef Chat)~~ — persona retired 2026-08-21 (P-026); superseded
+    by the dish-description intake in the Development workspace's Recipe
+    Build panel (see the AI LAYER entry above and the Ruling 2026-08-21
+    section)
 13. ~~Ingredient Advisor~~ ✓ — web-search-grounded advisory modal on the Master Pantry view (`components/ingredients/IngredientAdvisor.tsx`, `src/lib/advisorPersona.ts`); `/api/ai` proxy gained a whitelisted `tools` passthrough for the `web_search` server tool only
 14. ~~FDA Label (inside Recipe)~~ ✓ — `src/lib/nutritionEngine.ts` (pure aggregation, costEngine-style recursion, completeness report), `src/lib/fdaRounding.ts` (21 CFR 101.9(c) rounding + %DV), `components/recipes/NutritionLabel.tsx` (vertical FDA panel in the Recipe Builder cost panel, menu recipes only; "Contains:" is Big-9 only, gluten/sulfites as advisory, AI-estimated/incomplete/volume-approximation disclosures). "Estimate Nutrition (AI)" backfill button on the ingredient edit form stamps `nutritionSource: 'ai'` unless the chef edits the values
 15. ~~Restaurant Profile / Regional Intelligence~~ ✓ — built ahead of
