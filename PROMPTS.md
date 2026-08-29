@@ -1464,3 +1464,74 @@ GitHub Actions workflow, this prompt needs either (a) a baseline/
 allowlist mechanism in the script itself so only NEW violations block
 a PR, or (b) the backlog cleared first — a much larger undertaking
 than originally scoped here, and Brian's call which.
+
+---
+
+## P-030 — Surface parity: fix what only works in one surface — DONE 2026-08-29
+
+**Origin:** Brian's own both-surface measurement pass on P-026's
+DishBuildPanel.tsx elements (asked for directly, after the P-026 closeout
+had only run `check:color`, which is Day-only by its own docstring)
+surfaced a token-system defect, not a component bug: `navy` flips with
+surface, `cream` doesn't, so a flipping background collides with a fixed
+text colour the moment the surface changes. The same request also asked
+for an app-wide ghost-white-heading inventory, which found the identical
+root cause (a fixed value against a flipping page background) in 8
+further views beyond EventCalendar.
+
+**Five commits, one per item, each independently verified** (`tsc
+--noEmit`, `npm run build`, `npm test`, `check:color`):
+
+- `bd85b97` — item 1: new token `--color-on-navy`, an inversion pair (at
+  each surface, navy's value from the *other* surface) rather than an
+  independent value — fixes `text-cream` on `bg-navy` measuring 1.00:1
+  in Service at all 8 sites across 5 files, including the app's own
+  active nav pill. `cream` itself untouched (still correct on `bg-teal`,
+  a non-flipping token) — found `cream` on `bg-teal` is ALSO broken in
+  Service (2.46:1, RecipesHub.tsx:40) for an unrelated reason; reported,
+  not fixed.
+- `6b34334` — item 2: the 10 ghost-white headings across 8 views ->
+  `text-navy` (same treatment as EventCalendar's `eaf0b8b`). Two
+  exceptions handled differently and correctly, not by the same rule:
+  PrepChecklist.tsx/Settings.tsx sit inside a fixed `bg-zinc-950` island
+  this prompt doesn't convert — `text-navy` there would have been a
+  Day-specific regression (1.38:1, navy is dark in Day and the island
+  never lightens), so they got `text-cream` instead, the deliberately
+  correct fixed value for a background that itself never changes.
+- `e6a0114` — item 3: `text-red-400` (raw Tailwind, invisible to
+  `check:color`'s curated token list) -> `text-danger` at all three
+  DishBuildPanel.tsx error banners — 2.77:1 Day was the failure;
+  5.44/4.59:1 now.
+- `30c08af` — item 4: `placeholder:text-slate/60` fixed at all 4 sites
+  using it (not just DishBuildPanel.tsx) by dropping the opacity
+  modifier entirely — checked every opacity level from 100% down and
+  found NO safe dimmed value exists against these backgrounds (100% is
+  the only value clearing 4.5:1, and only by a 4.90:1 margin on the
+  tightest case). Full list of every other opacity-modified colour usage
+  in the codebase reported in the commit, none of it touched.
+- `9959bdd` — item 5: `check-color.mjs` extended to both surfaces,
+  opacity-modifier alpha-compositing, and unconditional raw-Tailwind
+  flagging. Found and fixed a real pre-existing imprecision while
+  building the per-surface background resolution: the script's own
+  `CREAM_TOKEN` constant pointed at the `cream` token (#F2EDE2, the
+  on-dark-content token) instead of `bg-cool` (#F7F3EA, the actual page
+  background) — never caused a false pass, but was checking against the
+  wrong reference the whole time. Extending to Service surfaced a
+  genuinely new, previously invisible finding nobody had asked about:
+  slate/teal fails CVD distinguishability under both deuteranopia and
+  protanopia, both severities, in Service (as low as 0.0208) — worse
+  than the one Day exception P-028 already tracked, and never checked
+  because nothing had ever run this check against Service. PROMPTS.md's
+  P-029 entry updated per instruction: the CI pipeline cannot go live
+  gating the current tree, which now fails the extended guard at ~1330
+  pre-existing violations (1310 of them the raw-Tailwind legacy-dark-zinc
+  backlog CLAUDE.md already named as a group, now enumerated by file for
+  the first time).
+
+**Final state:** `tsc --noEmit` clean, `npm run build` clean, `npm test`
+184/184 throughout all five commits. `check:color` itself now correctly
+exits 1 against the pre-existing backlog its extension surfaced — this
+is the intended, expected result of item 5, not a regression, and none
+of it was fixed in this prompt per its own closing instruction.
+
+**Not deployed**, per instruction.
