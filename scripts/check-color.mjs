@@ -13,8 +13,8 @@
  * source-scan findings with a real file:line, and both are the kind of
  * thing a screen accumulates before its brand pass, not a live "this
  * button is unreadable" defect. Every OTHER check (bare-token contrast,
- * the wordmark exception, on-navy, on-teal, saffron misuse, and CVD
- * distinguishability) is NEVER baseline-eligible — those are the hard
+ * the wordmark exception, on-navy, on-teal, teal-hover, saffron misuse,
+ * and CVD distinguishability) is NEVER baseline-eligible — those are the hard
  * floor, and baselining any of them would have hidden the exact defect
  * this file exists to catch (P-026 shipped an invisible button; five
  * green `check:color` runs certified half the app, because the guard
@@ -79,6 +79,12 @@
  *      against a token that could still drift under it later. Permanent
  *      regression guard for the text-cream/bg-teal collision this item
  *      fixed (2.46:1 in Service).
+ *   3c. teal-hover (P-031 item 2) is always >= 4.5 against on-teal, in
+ *      EACH surface — BTN_ACTION's hover fill against its own (unchanged
+ *      on hover) text colour. Permanent regression guard for the
+ *      affordance fix this item made (replacing an alpha-dilution hover
+ *      that passed contrast but read as no change at all in Service,
+ *      CIEDE2000 1.83 vs resting).
  *   4. Saffron is never referenced as text/icon/border anywhere in
  *      src/ — a static grep, not a token check (surface-independent:
  *      component code never branches on the mode, so a misuse is
@@ -184,12 +190,13 @@ const ON_NAVY_TOKEN = 'on-navy';
 const NAVY_TOKEN = 'navy';
 const ON_TEAL_TOKEN = 'on-teal';
 const TEAL_TOKEN = 'teal';
+const TEAL_HOVER_TOKEN = 'teal-hover';
 
 const SURFACES = ['day', 'service'];
 
 // Violation kinds a baseline entry may cover (P-029). Every other kind
-// (contrast, wordmark, on-navy, on-teal, saffron misuse, CVD) is an
-// absolute floor — see the file header on why baselining any of those
+// (contrast, wordmark, on-navy, on-teal, teal-hover, saffron misuse, CVD)
+// is an absolute floor — see the file header on why baselining any of those
 // would defeat the point of this guard.
 const BASELINE_ELIGIBLE_KINDS = new Set(['raw-tailwind-colour', 'opacity-diluted contrast']);
 
@@ -526,9 +533,10 @@ const BASELINE_HEADER = `# color-baseline.txt — known pre-existing check:color
 # opacity-diluted contrast (the legacy-dark-zinc-brand-pass backlog and
 # already-dimmed text found before this baseline existed). Every other
 # kind — bare-token contrast, the wordmark exception, on-navy, on-teal,
-# saffron misuse, CVD distinguishability — can NEVER appear below: baselining any
-# of those would hide the exact class of defect this guard exists to
-# catch. Regenerate with: node scripts/check-color.mjs --write-baseline
+# teal-hover, saffron misuse, CVD distinguishability — can NEVER appear
+# below: baselining any of those would hide the exact class of defect
+# this guard exists to catch. Regenerate with:
+# node scripts/check-color.mjs --write-baseline
 #
 # Format: KIND|FILE:LINE|CLASS-OR-PAIRING|MEASURED
 # MEASURED is informational only — matching uses the first three fields,
@@ -646,6 +654,25 @@ function main() {
       violations.push({
         kind: 'contrast (on-teal vs teal)',
         detail: `[${surface}] ${ON_TEAL_TOKEN} vs ${TEAL_TOKEN}`,
+        measured: ratio.toFixed(2),
+        required: `>= ${TEXT_MIN_CONTRAST}`,
+      });
+    }
+  }
+
+  // 3c. (P-031 item 2) teal-hover must clear 4.5:1 against on-teal, in
+  // EACH surface — BTN_ACTION's hover fill paired with its actual text
+  // colour (on-teal doesn't change on hover, only the fill does), the
+  // permanent regression guard for the affordance fix this item made.
+  // Mirrors check 3b's on-teal-vs-teal (the resting-state pairing).
+  for (const surface of SURFACES) {
+    const tokens = tokensBySurface[surface];
+    const tealHoverBg = compositeOver(tokens[TEAL_HOVER_TOKEN], tokens[TEAL_HOVER_TOKEN]);
+    const ratio = wcagContrast(compositeOver(tokens[ON_TEAL_TOKEN], tokens[TEAL_HOVER_TOKEN]), tealHoverBg);
+    if (ratio < TEXT_MIN_CONTRAST) {
+      violations.push({
+        kind: 'contrast (teal-hover vs on-teal)',
+        detail: `[${surface}] ${ON_TEAL_TOKEN} vs ${TEAL_HOVER_TOKEN}`,
         measured: ratio.toFixed(2),
         required: `>= ${TEXT_MIN_CONTRAST}`,
       });
@@ -774,7 +801,7 @@ function main() {
     }
     const blocking = violations.filter(v => !BASELINE_ELIGIBLE_KINDS.has(v.kind));
     if (blocking.length > 0) {
-      console.error(`check-color --write-baseline: refused — ${blocking.length} finding(s) are of a kind that can never be baselined (contrast, wordmark, on-navy, on-teal, saffron misuse, or un-tracked CVD). Fix them; --write-baseline only ever covers raw-tailwind-colour and opacity-diluted contrast:\n`);
+      console.error(`check-color --write-baseline: refused — ${blocking.length} finding(s) are of a kind that can never be baselined (contrast, wordmark, on-navy, on-teal, teal-hover, saffron misuse, or un-tracked CVD). Fix them; --write-baseline only ever covers raw-tailwind-colour and opacity-diluted contrast:\n`);
       for (const v of blocking) console.error(`  [${v.kind}]  ${v.detail}  —  measured ${v.measured}`);
       process.exit(1);
     }
@@ -807,7 +834,7 @@ function main() {
   const ok = alwaysBlocking.length === 0 && newFindings.length === 0 && staleBaselineEntries.length === 0;
 
   if (ok) {
-    console.log(`check-color: OK — ${TEXT_TOKENS.length} text tokens, the wordmark exception, on-navy, on-teal, saffron placement, and ${CVD_PAIRS.length} CVD pairs all pass (or are accepted/tracked exceptions) across both surfaces. ${baseline.size} pre-existing finding(s) match the baseline exactly.`);
+    console.log(`check-color: OK — ${TEXT_TOKENS.length} text tokens, the wordmark exception, on-navy, on-teal, teal-hover, saffron placement, and ${CVD_PAIRS.length} CVD pairs all pass (or are accepted/tracked exceptions) across both surfaces. ${baseline.size} pre-existing finding(s) match the baseline exactly.`);
     if (acceptedExceptions.length > 0) {
       console.log(`  (${acceptedExceptions.length} accepted exception(s) excluded — see CVD_ACCEPTED_EXCEPTIONS:)`);
       for (const t of acceptedExceptions) console.log(`    ${t.detail}  —  measured ${t.measured}`);

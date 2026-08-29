@@ -35,10 +35,38 @@
      hover state (an alpha dilution of bg-teal) independently collapsed to
      3.90-3.99:1 in Service, since diluting the background toward whatever
      sits behind the button drags it toward on-teal's own dark value,
-     shrinking the gap rather than the resting-state math. Fixed by
-     tightening the dilution amount (see formStyles.ts) — 4.65:1 worst
-     case once corrected, not by changing this token. */
+     shrinking the gap rather than the resting-state math. A first pass
+     tightened the dilution amount (/95) to clear contrast, but that left
+     the hover nearly imperceptible in Service (CIEDE2000 1.83 vs resting
+     — indistinguishable at normal viewing scale) — contrast and
+     affordance are different requirements, and /95 only solved the
+     first. See --color-teal-hover below for the actual hover fix. */
   --color-on-teal:      #F2EDE2;  /* = cream = on-navy's Day value. 7.32:1 on Day teal. */
+
+  /* Hover fill for BTN_ACTION — P-031 item 2. A solid colour swap, not an
+     alpha dilution: teal and on-teal sit on OPPOSITE sides of each
+     other's lightness in the two surfaces (teal dark-on-light in Day,
+     light-on-dark in Service; on-teal the reverse in each), so any
+     single scalar transformation applied uniformly through one shared
+     Tailwind utility (alpha dilution, a brightness() filter, anything
+     multiplicative) hits the same wall the /95 dilution did: tight
+     enough to clear contrast in one surface is too weak to read in the
+     other, with no room left to fix both from one formula. A dedicated
+     token sidesteps this — each surface's value picked on its own terms,
+     same construction teal/danger/saffron already use, not an inversion
+     pair.
+     PRINCIPLE: the hover moves AWAY from its own surface's baseline —
+     darker in Day (already dark-on-light, hover deepens further),
+     lighter in Service (already light-on-dark, hover brightens further).
+     The two directions look inconsistent side by side. That is not a
+     bug — do not "fix" one to match the other; each is chosen against
+     its OWN surface's teal and on-teal, not against the other surface's
+     direction.
+     Day value is new (#073F3A): dE2000 7.38 vs resting teal, matching
+     the pre-fix /85 dilution's visibility; 10.10:1 vs on-teal. navy-deep
+     (Day #145A55) was re-checked and confirmed still unusable here — see
+     its own comment below, isoluminant with teal at 1.06:1. */
+  --color-teal-hover:   #073F3A;  /* 7.38 dE2000 vs teal, 10.10:1 vs on-teal (Day). */
 
   /* Signal — valid ONLY as a large fill with navy content on it (navy on
      saffron = 6.60:1). It is 1.87:1 on cream and 2.19:1 on white, so it fails
@@ -122,9 +150,26 @@
   /* = Day navy = on-navy's Service value (P-031 item 1). Not an
      inversion of teal — teal doesn't flip — just the same dark ink
      extreme reused because it clears Service's teal (#3FA8A0) too.
-     5.03:1 resting on Service teal; 4.65:1 worst case against
-     BTN_ACTION's corrected hover dilution (see formStyles.ts). */
+     5.03:1 resting on Service teal. See --color-teal-hover below for
+     the hover fill, which replaced the alpha-dilution hover approach
+     (P-031 item 2). */
   --color-on-teal:        #1B2A41;
+
+  /* Hover fill for BTN_ACTION — P-031 item 2. This happens to equal
+     navy-deep's own Service value (#5FC0B8, "hover/pressed on accent"),
+     which was never checked against teal specifically before — only
+     rejected as a hover swap for Day's isoluminance problem. It clears
+     Service cleanly: 7.15 dE2000 vs resting teal, 6.68:1 vs on-teal.
+     Deliberately a SEPARATE token from navy-deep rather than repointing
+     BTN_ACTION at navy-deep directly: navy-deep has other consumers
+     outside this item's scope (e.g. ChefDashboard.tsx's bg-navy Add
+     Feature button hover), and a token is for its use context, not just
+     its value — the same principle on-teal already established by
+     reusing on-navy's values under its own name. See index.css's Day
+     block for the PRINCIPLE note (hover moves away from its own
+     surface's baseline — this is lighter here, darker in Day, and that
+     asymmetry is deliberate). */
+  --color-teal-hover:     #5FC0B8;  /* 7.15 dE2000 vs teal, 6.68:1 vs on-teal (Service). */
 }
 
 @layer base {
