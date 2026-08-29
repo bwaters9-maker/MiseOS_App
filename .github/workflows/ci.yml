@@ -1,0 +1,56 @@
+name: CI
+
+# P-029 item 2. First CI pipeline this repo has ever had — there was no
+# .github/workflows before this, so standing this up IS the addition,
+# not a change to an existing one.
+#
+# Scoped to the root package only (the SPA + server.ts) — functions/ is
+# a separate package (its own package.json/tsconfig, Node 20, deployed
+# independently via `firebase deploy --only functions`) and isn't built
+# or tested here. Adding it is a natural next step, not done in this
+# pass — see PROMPTS.md's P-029 entry.
+#
+# No secrets required: `npm run build` bundles the SPA without ever
+# connecting to a real Firebase project (firebaseConfig.ts's
+# initializeApp doesn't validate its config eagerly), and the test suite
+# is pure-function unit tests with no live Firestore/Auth calls.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      # Type-check first, cheapest real failure to surface. Not named in
+      # P-029's own one-line scope ("build, test, and check:color"), but
+      # `npm run build` (vite build) does not itself type-check — Vite
+      # strips types via esbuild without checking them — and every
+      # verification pass this whole engagement has run has treated
+      # `tsc --noEmit` as its own required step, never folded into
+      # "build." Dropping it here would be a real gap in exactly the
+      # area this pipeline exists to close.
+      - run: npm run lint
+
+      - run: npm run build
+
+      - run: npm test
+
+      # Exits 1 on any NEW finding not in color-baseline.txt, or any
+      # STALE entry left in it after a fix — see the script's own header
+      # for the full baseline rule (P-029). A red run here means the
+      # colour surface changed since the baseline was written, never a
+      # pre-existing condition someone already ruled on.
+      - run: npm run check:color
