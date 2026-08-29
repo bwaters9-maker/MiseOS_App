@@ -1048,9 +1048,76 @@ environment.
 
 ---
 
-## P-026 — Replace Sous chat with extraction intake
+## P-026 — Replace Sous chat with extraction intake — DONE 2026-08-28
 
-**Status:** QUEUED — not yet executed.
+**Status:** DONE 2026-08-28. Executed as amended in a follow-up message
+(the amendments corrected the stale test count, applied P-028's
+colour-vision-deficiency rules to every new element, and added Ruling 3
+below — item 4 turned out to be a full input-contract rewrite, not a
+persona strip). Six commits, one per step, each independently verified
+(`tsc --noEmit`, `npm run build`, `npm test`, `npm run check:color`):
+
+- `3168a81` — items 1+2+4: `src/lib/dishExtraction.ts` (new pure module:
+  prompt, `normalizeDishDraft`, `normalizeIngredientName`,
+  `reconcileRefinement`, `stripPriceMentions`, `EMPTY_DISH_DRAFT`) +
+  `DishBuildPanel.tsx` rewritten to own the whole intake (textarea →
+  Extract → draft → refine → Send) + `TestKitchenHub.tsx`'s chat state
+  and 4-column layout removed entirely (now rail(1)/build(3)) +
+  `dishExtraction.test.ts`, 15 tests.
+- `2ff9669` — item 3: `sousPersona.ts`/`sousAppKnowledge.ts` deleted
+  (grep-confirmed zero remaining importers first), three doc-comment
+  fixes (`types.ts`, `dishDraftToRecipe.ts`, `RecipesHub.tsx`).
+- `0def200` — Ruling 1: the 2026-07-18 persona-canon entry gets one
+  appended line, body untouched — same treatment as P-014 and the
+  Chef Matthew parking-lot entry.
+- `060a195` — Ruling 2: CLAUDE.md's 18 obsolete hits rewritten in its
+  own commit; the 2 inside the Ruling 2026-08-21 section kept exactly
+  as written, per the amendment.
+
+**Item 5, verified not redone:** P-014 already `RETIRED 2026-08-21`
+with the exact required reason string; the Chef Matthew parking-lot
+entry already carries its `→ RETIRED 2026-08-21` outcome. Both
+confirmed before any other work started.
+
+**Item 6's CLAUDE.md hand-off-gate correction — verified already
+correct, no change needed.** The entry claimed CLAUDE.md documented
+only `canHandOff`; by execution time the Hand-off bullet already read
+`canHandOff && !hasUnresolvedLines && !yieldNeedsAttention` in full —
+presumably fixed in an earlier pass this entry predates. Re-verified
+after every subsequent CLAUDE.md edit in this pass; still correct.
+
+**Final suite: 184/184** (169 baseline + 15 new — the amendment's
+corrected count, confirmed at execution time, not the entry's stale
+144).
+
+**Reference inventory correction:** the entry's own table (below) read
+94 hits / 9 files as of 2026-08-21. The actual grep at execution time
+(2026-08-28, after fixing an initial `-w` undercount that missed
+identifier substrings like `SOUS_SYSTEM_PROMPT`) found 111 hits across
+13 files. The entry's own instruction — "re-grep at execution time, do
+not trust this list" — held; recorded here so the gap doesn't look like
+a missed step.
+
+**Judgment calls made during execution (entry silent on all three):**
+- A refinement's own parse failure does not reset an already-confirmed
+  draft to `EMPTY_DISH_DRAFT` — it leaves the draft untouched and
+  reports inline. Invariant (b)'s exact language ("empty, fully-flagged
+  draft") fits the first extraction, where there's nothing to preserve;
+  discarding confirmed chef work on a refinement failure would be a
+  worse outcome than the invariant is guarding against.
+- `DishBuildPanel.tsx`'s own `handleIngredientAdded` normalization
+  (previously a locally-inlined, slightly different regex than
+  `InvoicePriceUpdate.tsx`'s) was switched to the same shared
+  `normalizeIngredientName` the new refinement-reconciliation match
+  needed anyway — one normalization rule in this file now, matching
+  the ruling's stated principle, without touching
+  `InvoicePriceUpdate.tsx` itself (out of scope).
+- A "Start Over" action was added (clears the draft back to the
+  textarea) as the direct functional replacement for the old chat's
+  "New Session" — without it there was no way to abandon a draft and
+  describe a different dish short of a full page reload, which reads
+  as a usability regression the entry didn't intend, not a scope
+  expansion.
 
 **Background:** Implements the 2026-08-21 ruling in CLAUDE.md ("Sous
 persona retired; extraction intake stays"). The chat character goes; the
@@ -1197,6 +1264,41 @@ fuzzier match, and it is explicitly not part of this design.
 **Normalized-name matching reuses the `InvoicePriceUpdate.tsx`
 convention** (lowercase, strip punctuation, collapse whitespace) —
 decided, not open. One normalization rule in the codebase, not two.
+
+**Ruling (Brian, 2026-08-28) — item 4, the extraction prompt is a new
+input contract, not a persona strip. Decided, not open.**
+
+The entry as originally written framed item 4 as stripping persona
+framing while keeping "the same prompt." That undersold it: the old
+prompt opened "extracting a working recipe draft from a chef's
+brainstorming conversation with a sous chef... You will receive the full
+chat transcript," and the call site sent `{transcript:
+[{role:'sous'|'chef', content}], pantry}` windowed to the last 30
+messages anchored to a chef turn. With the chat gone there is no
+transcript, no roles, and nothing to anchor — the body rules inherited
+the same assumption throughout ("the dish under discussion," "if the
+conversation gives no real basis," "only pull from what was actually
+discussed"). Those are input instructions, not persona framing, and they
+had to change regardless of the persona.
+
+**Two input shapes, one prompt:**
+```
+extraction:  { description, pantry }
+refinement:  { description, currentDraft, refinement, pantry }
+```
+Carried over verbatim: the output JSON shape, the unit list, and every
+anti-invention rule (`ingredientId` copied exactly from the pantry list,
+never invent an id, null `batchYield` rather than a guess, `notInPantry`
+informational only, leave fields empty rather than guessing). Only the
+sentences describing the input changed. The last-30 transcript window in
+`handleExtract` was dead code once there's no transcript — removed;
+item 2's 10-turn refinement cap replaces it as the only per-draft limit
+left.
+
+One rule added, not carried over from anywhere: never state a price,
+cost, or FC% (E-002's invented $45 analysis). Prompt-level instruction
+only — the actual guarantee is `stripPriceMentions`, client-side, applied
+to model output only.
 
 ---
 
