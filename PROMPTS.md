@@ -713,13 +713,22 @@ CONSTRAINTS:
 - One item at a time: propose, wait for my verification, commit per verified working item.
 ```
 
-**Chef test script (run after all four items land; needs API credits):**
-1. New Sous session. Say: `I want a simple corn side dish. Use 2 oz corn, 1 lb unsalted butter, and 3 shallots. Call it Corn Test Dish. It makes 4 portions.` → Extract from Chat.
-2. Expect: corn line FLAGGED (saffron, editable qty/unit — pantry corn is each-measured); butter and shallot lines clean; Send to Recipe Builder DISABLED.
-3. Set the corn line to `2 each` → flag clears. If yield is empty, tap "Same as portions" → Send ENABLES.
-4. Expect at least one NOT IN PANTRY chip (invent an ingredient in chat if none — e.g. add "a splash of yuzu kosho"). Click the chip → AI lookup opens pre-filled → review the proposal → save → the mention becomes a real draft line matched to the new pantry item.
+**Chef test script (run after all four items land; needs API credits).
+Rewritten 2026-08-29 — the original described the Sous chat UI (step 1's
+"New Sous session / Extract from Chat," step 4's "invent an ingredient
+in chat"), which P-026 deleted; every assertion below is the same one
+the original made, run against the current dish-description intake
+(P-026) with its refinement input and Start Over (P-026) and the
+navy/cream button-contrast fix (P-030) folded in:**
+1. Recipes > Development. In the "Describe the dish" box: `I want a simple corn side dish. Use 2 oz corn, 1 lb unsalted butter, and 3 shallots. Call it Corn Test Dish. It makes 4 portions. Add a splash of yuzu kosho.` → Extract.
+2. Expect: corn line FLAGGED (saffron, editable qty/unit — pantry corn is each-measured, so 2 oz cannot resolve); butter and shallot lines clean; Send to Recipe Builder DISABLED.
+3. Confirm the disabled "Same as portions" label is READABLE before tapping (P-029 raised it from 1.71:1). Set the corn line to `2 each` → flag clears. If yield is empty, tap "Same as portions" → Send ENABLES.
+4. Expect a NOT IN PANTRY chip for yuzu kosho. Click it → AI lookup opens pre-filled → review the proposal → save → the mention becomes a real draft line matched to the new pantry item.
 5. Send to Recipe Builder → recipe opens in the Builder: onMenu should read OFF (check the Recipes library badge), lines and yield exactly as reviewed.
-6. Cleanup per protocol: delete Corn Test Dish and the test-created pantry ingredient (e.g. yuzu kosho) afterward.
+6. NEW (P-026): in the refinement box, `make it 6 portions`. Expect portions to update and every already-resolved line to stay exactly as left — a kept line reverting to flagged is a FAILURE of the immutable-kept-lines ruling, not a quirk.
+7. NEW (P-026): Start Over clears the draft cleanly.
+8. Run steps 1–5 once in each Surface (DAY and SERVICE, Settings' Surface toggle). Confirm the Extract and Send buttons are readable in Service — that is the 1.00:1 collision P-030 fixed.
+9. Cleanup per protocol: delete Corn Test Dish and the test-created pantry ingredient (yuzu kosho) afterward.
 
 ---
 
