@@ -118,12 +118,12 @@ export interface DishDraftLine {
 }
 
 /**
- * Client-only draft of a dish pulled from a Test Kitchen Sous conversation
- * via a structured AI extraction pass — never written to Firestore as its
- * own document. The chef reviews and confirms before any of it becomes a
- * real `Recipe` doc; `notInPantry` mirrors the same fallback convention as
- * `Recipes.tsx`'s "Build From Pantry" prompt so an unmatched ingredient
- * mention is always surfaced, never silently dropped.
+ * Client-only draft of a dish pulled from a chef's dish description (or a
+ * refinement of one) via a structured AI extraction pass — never written
+ * to Firestore as its own document. The chef reviews and confirms before
+ * any of it becomes a real `Recipe` doc; `notInPantry` mirrors the same
+ * fallback convention as `Recipes.tsx`'s "Build From Pantry" prompt so an
+ * unmatched ingredient mention is always surfaced, never silently dropped.
  */
 export interface DishDraft {
   dishName: string;

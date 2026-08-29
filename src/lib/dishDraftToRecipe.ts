@@ -1,9 +1,9 @@
 /**
  * src/lib/dishDraftToRecipe.ts
- * Pure conversion from a Test Kitchen `DishDraft` (client-only, pulled
- * from a Sous conversation) to the `recipes` document the Recipe Build
- * panel writes. Extracted from DishBuildPanel.tsx so the hand-off's
- * defaults — development status, off-menu, unit resolution, kept-lines
+ * Pure conversion from a Development-workspace `DishDraft` (client-only,
+ * pulled from a chef's dish description) to the `recipes` document the
+ * Recipe Build panel writes. Extracted from DishBuildPanel.tsx so the
+ * hand-off's defaults — development status, off-menu, unit resolution, kept-lines
  * only — are testable without mounting the component or touching
  * Firestore. The panel owns the write and the navigation; this owns the
  * shape.

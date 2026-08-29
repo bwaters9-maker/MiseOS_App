@@ -8,8 +8,9 @@ import RecipeCollections from './RecipeCollections';
 import type { UnitSystem } from './lib/units';
 import type { MenuTemplate } from './types';
 // Development (formerly the Test Kitchen nav tab) stays lazy — it pulls in the
-// trends rail, full-report drawer, Sous chat, and the Recipe Build panel, none
-// of which the Recipe Builder / Menu / Collections sub-tabs need.
+// trends rail, full-report drawer, and the Recipe Build panel (dish-description
+// intake through hand-off), none of which the Recipe Builder / Menu /
+// Collections sub-tabs need.
 const DevelopmentWorkspace = React.lazy(() => import('./TestKitchenHub'));
 
 
