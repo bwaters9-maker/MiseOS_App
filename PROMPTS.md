@@ -108,6 +108,8 @@ source Sous is allowed to describe the app from, so if it drifts from the
 real app, Sous will describe features that don't exist or miss ones that
 do.
 
+→ Persona retired 2026-08-21 per CLAUDE.md's ruling; see P-026.
+
 ---
 
 ## P-001 — Staff roster module (Wave 1) — DONE 2026-07-17
