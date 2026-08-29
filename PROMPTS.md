@@ -1687,3 +1687,27 @@ regression.
    picked up, not assumed here.
 
 **Not fixed in this entry — log only, per instruction.**
+
+---
+
+## P-032 — Refinement state and field-targeting defects — QUEUED 2026-08-29
+
+**Origin:** live chef testing of P-026's dish-description intake, 2026-08-29 — local dev, real Firestore, real model calls, not a simulated or unit-test scenario.
+
+**All four defects below were found by deviating from the written chef test script (P-019's entry) — ad-libbing refinement phrasings beyond what the script covers. The script as written still passes.**
+
+**WHAT HELD — record this first: the P-019 gate.** Across every refinement below, corn and shallots stayed unit-flagged and Send to Recipe Builder stayed disabled. `hasUnresolvedLines` did its job; nothing reached Firestore. **No fix arising from this entry may weaken it.**
+
+**DEFECT 1 — refinement computes from stale state.** Reproduced in a clean isolation run. Extraction from "...It makes 4 portions" → portions 4.
+- "make it 6 portions" → portions 6 — CORRECT
+- "double the batch" → portions 8 — WRONG (6 × 2 = 12; 8 is 4 × 2, the value from the ORIGINAL DESCRIPTION, not the draft)
+
+In an earlier run the following refinement then doubled correctly from current state (8 → 16), so the behaviour is inconsistent, not uniformly stale. Suspect what the refinement call receives as `currentDraft`.
+
+**DEFECT 2 — refinement writes to the wrong field.** "double the batch" changed PORTIONS, not BATCH YIELD. The instruction names the yield; the model moved the other field.
+
+**DEFECT 3 — batch yield populated unprompted.** In an earlier run, batch yield came back "2 each" — never given by the chef, in a field the original extraction correctly left null — and it then satisfied `yieldNeedsAttention`, enabling Send on a model-invented yield. NOT reproduced in the isolation run (three refinements, yield stayed empty), so the trigger is one of two untested phrasings: "make it six portions" (spelled out) or "Double the portions". Same defect class as the unit-substitution silent fallback P-019 killed.
+
+**DEFECT 4 — design gap, not a bug.** "make it 6 portions" changes portions and leaves every ingredient quantity untouched — correct per the 2026-08-21 immutable-kept-lines ruling, but the chef sees a rescaled dish with identical quantities and nothing explains why.
+
+**Not investigated, not fixed — log only, per instruction.**
