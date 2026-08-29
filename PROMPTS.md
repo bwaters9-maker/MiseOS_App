@@ -1624,7 +1624,7 @@ and its two off-palette icons).
 
 ---
 
-## P-031 — Colour findings with no home prompt — QUEUED 2026-08-29
+## P-031 — Colour findings with no home prompt — PARTIALLY DONE (item 1 DONE 2026-08-29, commit dfa8119; items 2–3 QUEUED)
 
 **Origin:** P-030's both-surface measurement and extended-`check-color`
 work surfaced three findings that don't belong to P-030 itself (different
@@ -1687,6 +1687,117 @@ regression.
    picked up, not assumed here.
 
 **Not fixed in this entry — log only, per instruction.**
+
+### Item 1 — DONE 2026-08-29, commit dfa8119
+
+Executed with a wider scope than the site originally named above: not
+`RecipesHub.tsx:40`, but the identical `text-cream`/`bg-teal` collision
+independently found in `BTN_ACTION` (`src/lib/formStyles.ts`), the
+shared primary-button style used at 8 call sites across the app
+(Recipes, Staff, Vendors, Features, EventCalendar, events/
+EventDetailView, ingredients/InvoicePriceUpdate, AlertDialog) — same
+root cause (`cream` fixed, teal's own Service value sitting too close to
+it), much larger blast radius than the one site this item was originally
+logged against. Fixed via a new `on-teal` token (reuses `on-navy`'s two
+values: 7.32:1 Day, 5.03:1 Service resting) and a permanent
+`on-teal vs teal` regression guard in `check-color.mjs`, mirroring the
+existing `on-navy vs navy` guard. Full detail in the commit.
+
+**`RecipesHub.tsx:40` — the site item 1 was originally logged against —
+was NOT touched and remains open.** It carries its own inline
+`bg-teal text-cream` (the Recipe Builder/Menu/Collections/Development
+sub-tab active pill), same collision, different code path (not routed
+through `BTN_ACTION`), outside the executed fix's scope. Still a live
+Service-surface defect, needing its own fix.
+
+**Baselined count unchanged at 1318.** The `text-cream`/`bg-teal`
+pattern was invisible to every `check-color.mjs` check kind that existed
+before item 1 — `color-baseline.txt` never referenced it (grepped to
+confirm before committing), so there was nothing to remove. It's caught
+going forward only by the new `on-teal vs teal` guard added in the same
+commit.
+
+**Stale-docstring root cause of the original "seven files" count above:**
+`formStyles.ts`'s own docstring claimed `BTN_ACTION` was hand-copied into
+seven files, missing `AlertDialog.tsx` (added to the app after the
+docstring was last updated, never reconciled). That stale count is what
+put the wrong number into currency before item 1's own grep corrected it
+to eight. Docstring corrected in the same commit (dfa8119) that fixed the
+token — not a separate change, and not needed again here.
+
+### Hover-affordance follow-up — 2026-08-29 (proposal only, not applied)
+
+Item 1's fix tightened `BTN_ACTION`'s hover dilution from
+`hover:bg-teal/85` to `hover:bg-teal/95` to clear 4.5:1 contrast in
+Service. Contrast is fixed; whether the hover still reads as a state
+change is a separate question, checked here by actually looking at it —
+a pixel-accurate standalone reproduction of the real CSS (the live app
+sits behind real operator auth this session doesn't have and won't type
+a password into) — rather than inferring an answer from the contrast
+numbers alone.
+
+**Verdict: it does not reliably read as a state change, especially in
+Service.** Measured via CIEDE2000 (perceptibility scale: <1
+imperceptible, 1–2 perceptible on close inspection, 2–10 clearly
+perceptible) against actual browser-rendered pixel values (Chromium's
+`color-mix(in oklab, ...)` output, sampled via canvas — not a linear-RGB
+approximation):
+
+- Day, current (`/95`): dE2000 2.99 — faintly visible, borderline.
+- Service, current (`/95`): dE2000 **1.83** — indistinguishable from
+  resting at normal viewing scale in a direct side-by-side screenshot.
+- Day, old (`/85`, pre-item-1): dE2000 8.84 — obviously visible.
+- Service, old (`/85`, pre-item-1): dE2000 6.37 — obviously visible (but
+  this is the value that failed contrast, hence item 1's fix).
+
+Root cause of the asymmetry: `teal` and `on-teal` sit on OPPOSITE sides
+of each other's lightness in the two surfaces (`teal` is dark-on-light
+in Day, light-on-dark in Service; `on-teal` is the reverse in each).
+Diluting the background toward whatever's behind it moves the same
+direction in both surfaces, so it interacts with contrast in opposite
+ways — the exact tension that forced `/95` in the first place. Any
+single scalar transformation applied uniformly through one shared
+Tailwind utility (alpha dilution, a `brightness()` filter, anything
+multiplicative) hits this same conflict: strengthening the shift enough
+to read clearly in Service pushes Day's contrast down and vice versa,
+because `/95` was already the tightest value that still clears contrast
+— there's no room left to also make it more visible.
+
+**Proposal: a dedicated `--color-teal-hover` token — a solid colour
+swap, not an alpha dilution — with independently chosen Day/Service
+values (the same construction `teal`/`danger`/`saffron` already use, not
+an inversion pair).** This sidesteps the tension above entirely: each
+surface's hover value is picked on its own terms, not derived from
+teal's own value by a shared formula.
+
+- **Day: `#073F3A`** (new value) — dE2000 7.38 vs resting teal (matches
+  the old `/85`'s visibility), 10.10:1 contrast vs `on-teal` (comfortable
+  margin above 4.5). The existing `navy-deep` token (Day: `#145A55`) was
+  re-checked and confirmed still unusable here: 1.75 dE2000 against
+  resting teal — isoluminant, matching the reason `formStyles.ts`'s own
+  comment already gives for rejecting it (`navy-deep` and `teal` measure
+  1.06:1 contrast against each other in Day, near-invisible as a swap).
+- **Service: `#5FC0B8`** — dE2000 7.15 vs resting teal, 6.68:1 contrast
+  vs `on-teal`. This is `navy-deep`'s EXISTING Service value (`#5FC0B8`,
+  documented in `index.css` as "hover/pressed on accent") — never
+  previously checked against `teal` specifically, only rejected for
+  Day's isoluminance problem. It works well in Service. Not proposing to
+  repoint `BTN_ACTION` at `navy-deep` directly: `navy-deep` has other
+  consumers (e.g. `ChefDashboard.tsx`'s `bg-navy` Add Feature button
+  hover, per CLAUDE.md's migration-status gap note) outside this item's
+  scope, and reusing its VALUE in a new, separately-named token follows
+  the same "a token is for its use context, not just its value"
+  principle `on-teal` itself already established against `on-navy`.
+- The border should move with the fill (`hover:border-teal-hover`
+  alongside `hover:bg-teal-hover`) — the current `/95` treatment only
+  dilutes the background, leaving `border-teal` at full opacity, a minor
+  seam the dedicated-token construction should not repeat.
+
+Confirmed visually in a standalone reproduction (exact CSS values, real
+`:hover` state, verified live via `getComputedStyle`/`matches(':hover')`
+before screenshotting, not assumed): the candidate is clearly,
+unmistakably distinct from resting in both surfaces, unlike the current
+`/95` in Service. **Not applied — proposal only, per instruction.**
 
 ---
 
