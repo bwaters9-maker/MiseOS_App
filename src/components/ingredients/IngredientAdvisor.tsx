@@ -120,7 +120,7 @@ export const IngredientAdvisor: React.FC<IngredientAdvisorProps> = ({ isOpen, on
             <button
               onClick={ask}
               disabled={loading || !query.trim()}
-              className="px-[13px] py-[8px] rounded-[8px] bg-navy text-cream text-[10px] font-bold uppercase tracking-wider disabled:opacity-40 hover:opacity-90 transition-opacity duration-[144ms] whitespace-nowrap"
+              className="px-[13px] py-[8px] rounded-[8px] bg-navy text-on-navy text-[10px] font-bold uppercase tracking-wider disabled:opacity-40 hover:opacity-90 transition-opacity duration-[144ms] whitespace-nowrap"
             >
               {loading ? 'Searching…' : 'Get Brief'}
             </button>

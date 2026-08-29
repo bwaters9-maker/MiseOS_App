@@ -43,7 +43,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ activeView, onNavigate }) 
                 onClick={() => onNavigate(item.view)}
                 className={`px-3 py-1.5 text-xs font-extrabold uppercase tracking-wider rounded-lg transition-all border flex items-center gap-2 whitespace-nowrap ${
                   activeView === item.view
-                    ? 'bg-navy text-cream border-navy shadow-md'
+                    ? 'bg-navy text-on-navy border-navy shadow-md'
                     : 'bg-transparent text-slate hover:text-navy border-transparent'
                 }`}
               >

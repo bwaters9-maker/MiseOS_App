@@ -346,7 +346,7 @@ export default function DishBuildPanel({ unitSystem, onOpenRecipe }: DishBuildPa
           <button
             type="submit"
             disabled={extracting || !description.trim()}
-            className="w-full px-[13px] py-[8px] rounded-[8px] bg-navy text-cream text-[10px] font-bold uppercase tracking-wider disabled:opacity-40 hover:opacity-90 transition-opacity duration-[144ms]"
+            className="w-full px-[13px] py-[8px] rounded-[8px] bg-navy text-on-navy text-[10px] font-bold uppercase tracking-wider disabled:opacity-40 hover:opacity-90 transition-opacity duration-[144ms]"
           >
             {extracting ? 'Extracting…' : 'Extract'}
           </button>
@@ -565,7 +565,7 @@ export default function DishBuildPanel({ unitSystem, onOpenRecipe }: DishBuildPa
           <button
             onClick={handleSendToRecipeBuilder}
             disabled={!canHandOff || handingOff || hasUnresolvedLines || yieldNeedsAttention}
-            className="w-full px-[13px] py-[8px] rounded-[8px] bg-navy text-cream text-[10px] font-bold uppercase tracking-wider disabled:opacity-40 hover:opacity-90 transition-opacity duration-[144ms]"
+            className="w-full px-[13px] py-[8px] rounded-[8px] bg-navy text-on-navy text-[10px] font-bold uppercase tracking-wider disabled:opacity-40 hover:opacity-90 transition-opacity duration-[144ms]"
           >
             {handingOff ? 'Sending…' : 'Send to Recipe Builder'}
           </button>

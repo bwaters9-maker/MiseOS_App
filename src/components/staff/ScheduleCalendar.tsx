@@ -337,7 +337,7 @@ export const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
               type="button"
               onClick={() => { setMode(m); setExpandedDayKey(null); }}
               className={`px-[13px] py-[5px] text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors duration-[144ms] ${
-                mode === m ? 'bg-navy text-cream' : 'text-slate hover:text-navy'
+                mode === m ? 'bg-navy text-on-navy' : 'text-slate hover:text-navy'
               }`}
             >
               {m === 'week' ? 'Week' : 'Month'}

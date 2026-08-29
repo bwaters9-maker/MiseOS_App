@@ -41,6 +41,16 @@
 
   --color-cream:        #F2EDE2;  /* light text-on-dark-element (buttons, tiles) */
 
+  /* Content on a bg-navy fill — P-030. navy is the flipping ink token
+     (dark in Day, light in Service); cream is fixed, so bg-navy +
+     text-cream collided to 1.00:1 in Service the moment navy flipped to
+     the same value cream already was. on-navy is an INVERSION pair, not
+     an independent value: at each surface it equals navy's value from
+     the OTHER surface, so it is always navy's opposite lightness by
+     construction. Use for any bg-navy content; never use text-cream on
+     bg-navy again. */
+  --color-on-navy:      #F2EDE2;  /* = Day cream. 12.37:1 on Day navy. */
+
   /* ---- Type ---- */
   --font-display: 'Archivo', sans-serif;         /* headings, nav, buttons (was Quicksand) */
   --font-body:    'Source Sans 3', sans-serif;   /* everything else (was Nunito Sans) */
@@ -82,6 +92,10 @@
 
   --color-danger:         #E06052;
   --color-danger-wash:    rgba(224,96,82,0.14);
+
+  /* = Day navy. Inversion pair (P-030): navy is now light here, so
+     on-navy flips dark to stay its opposite. 12.37:1 on Service navy. */
+  --color-on-navy:        #1B2A41;
 }
 
 @layer base {

@@ -345,13 +345,13 @@ export default function ChefDashboard({ onNavigate, onOpenRecipe, onOpenDevelopm
             <div className="flex gap-[8px]">
               <button
                 onClick={() => setAddKind('manual')}
-                className={`px-[13px] py-[8px] rounded-card border text-xs font-bold transition-colors duration-[144ms] ${addKind === 'manual' ? 'bg-navy text-cream border-navy' : 'bg-surface text-slate border-line hover:text-navy'}`}
+                className={`px-[13px] py-[8px] rounded-card border text-xs font-bold transition-colors duration-[144ms] ${addKind === 'manual' ? 'bg-navy text-on-navy border-navy' : 'bg-surface text-slate border-line hover:text-navy'}`}
               >
                 Manual Entry
               </button>
               <button
                 onClick={() => setAddKind('recipe')}
-                className={`px-[13px] py-[8px] rounded-card border text-xs font-bold transition-colors duration-[144ms] ${addKind === 'recipe' ? 'bg-navy text-cream border-navy' : 'bg-surface text-slate border-line hover:text-navy'}`}
+                className={`px-[13px] py-[8px] rounded-card border text-xs font-bold transition-colors duration-[144ms] ${addKind === 'recipe' ? 'bg-navy text-on-navy border-navy' : 'bg-surface text-slate border-line hover:text-navy'}`}
               >
                 From Recipe
               </button>
@@ -449,7 +449,7 @@ export default function ChefDashboard({ onNavigate, onOpenRecipe, onOpenDevelopm
               <button
                 onClick={handleAddFeature}
                 disabled={!featureForm.name.trim() || savingFeature}
-                className="px-[13px] py-[8px] rounded-card bg-navy text-cream text-xs font-bold hover:bg-navy-deep transition-colors duration-[144ms] disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-[13px] py-[8px] rounded-card bg-navy text-on-navy text-xs font-bold hover:bg-navy-deep transition-colors duration-[144ms] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {savingFeature ? 'Saving…' : 'Save Feature'}
               </button>
