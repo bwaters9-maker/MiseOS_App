@@ -783,7 +783,7 @@ trend_reports claim fix. Note: repo PROMPTS.md is a different file
 
 ---
 
-## P-021 — Two small UX fixes: Clients contrast + Structural key — QUEUED 2026-08-21
+## P-021 — Two small UX fixes: Clients contrast + Structural key — DONE 2026-08-28 (commit eaf0b8b), deployed 2026-08-31
 
 **Origin:** Brian's parking-lot notes 2026-07-19; carried on the APP-MAP as the pre-tester polish pair.
 
@@ -803,6 +803,21 @@ caption near the section header, informational not alert.
 Verify: tsc --noEmit clean, npm run build clean, all vitest pass.
 Do not fix anything else — report additional issues only.
 ```
+
+**Outcome (commit eaf0b8b, 2026-08-28):** Item 1's helper text fixed —
+4.36:1 → `text-slate`, same treatment checked against sibling helper
+lines in the view (none repeated). Item 2's Structural/Short-term key
+added to both the trends rail and the full-report drawer. Amendment
+found mid-prompt, not in the original scope: both Events & Clients
+section h1s were `text-white` on the cream page shell, measuring 1.11:1
+— invisible, not merely low-contrast. Fixing only the originally-scoped
+helper text would have shipped a contrast fix that still left the
+headings unreadable, so both were pulled in. This is what led to the
+app-wide ghost-white-heading inventory that became P-030 item 2.
+
+Verified: `tsc --noEmit` clean, `npm run build` clean, all vitest pass.
+Pushed to origin/main and deployed (hosting) 2026-08-31, alongside
+P-026/P-029/P-030/P-031.
 
 ---
 
@@ -1057,7 +1072,7 @@ environment.
 
 ---
 
-## P-026 — Replace Sous chat with extraction intake — DONE 2026-08-28
+## P-026 — Replace Sous chat with extraction intake — DONE 2026-08-28, deployed 2026-08-31
 
 **Status:** DONE 2026-08-28. Executed as amended in a follow-up message
 (the amendments corrected the stale test count, applied P-028's
@@ -1435,7 +1450,7 @@ act on unilaterally.
 
 ---
 
-## P-029 — CI pipeline for the colour guard — DONE 2026-08-29
+## P-029 — CI pipeline for the colour guard — DONE 2026-08-29, pushed 2026-08-31
 
 **Scope, per P-028 item 7's amendment:** GitHub Actions workflow running
 build, test, and `npm run check:color`; `stylelint-declaration-strict-value`
@@ -1545,9 +1560,15 @@ pre-existing dependency vulnerabilities (1 low, 7 moderate, 2 high) —
 own dependency chain, and `xlsx` (no fix available upstream). All
 pre-existed this prompt's work.
 
+**Pushed to origin/main 2026-08-31** alongside P-021/P-026/P-030/P-031 —
+`.github/workflows/ci.yml` is now live on the remote. Not a hosting
+deploy (this prompt is repo/CI infrastructure, not app code), so "not
+deployed" never applied to it the way it did to P-030; "pushed" is the
+correct milestone here.
+
 ---
 
-## P-030 — Surface parity: fix what only works in one surface — DONE 2026-08-29
+## P-030 — Surface parity: fix what only works in one surface — DONE 2026-08-29, deployed 2026-08-31
 
 **Origin:** Brian's own both-surface measurement pass on P-026's
 DishBuildPanel.tsx elements (asked for directly, after the P-026 closeout
@@ -1614,7 +1635,11 @@ exits 1 against the pre-existing backlog its extension surfaced — this
 is the intended, expected result of item 5, not a regression, and none
 of it was fixed in this prompt per its own closing instruction.
 
-**Not deployed**, per instruction.
+**Deployed 2026-08-31** — held at "not deployed, per instruction" for
+two days after this prompt closed, alongside P-021/P-026/P-029/P-031,
+until Brian ran the push-and-deploy sequence and verified both fixes
+live on production in DAY and SERVICE (the navy/cream token collision —
+the blank nav pill — and the 10 ghost-white headings).
 
 **Findings surfaced here that belong to no existing prompt are logged
 under P-031** (queued, not fixed in this pass): `cream` on `bg-teal`
@@ -1624,7 +1649,7 @@ and its two off-palette icons).
 
 ---
 
-## P-031 — Colour findings with no home prompt — PARTIALLY DONE (item 1 DONE 2026-08-29, commit dfa8119; items 2–3 QUEUED)
+## P-031 — Colour findings with no home prompt — PARTIALLY DONE (fix items 1–2 DONE, deployed 2026-08-31, commits dfa8119 + 1d6f719; the original findings-list items 2–3 — Service CVD + dark-zinc backlog — still QUEUED, unrelated numbering, see note below)
 
 **Origin:** P-030's both-surface measurement and extended-`check-color`
 work surfaced three findings that don't belong to P-030 itself (different
@@ -1636,6 +1661,17 @@ already-shipped surfaces, not backlog** — they read as real WCAG/CVD
 failures today, in Service, right now. Item 3 is backlog: part of the
 already-documented ~24-screen legacy-dark-zinc migration, not a new
 regression.
+
+**Numbering note (added 2026-08-31):** two unrelated "item" sequences
+exist in this entry. The list right below is the ORIGINAL findings list
+(1 = cream/teal, 2 = CVD, 3 = dark-zinc backlog), logged 2026-08-29 and
+never renumbered. Separately, the FIX work that shipped is tracked as
+"P-031 item 1" (the on-teal token) and "P-031 item 2" (the teal-hover
+token) — action items, assigned later, that happen to reuse "1" and "2."
+Fix item 1 covers findings-list item 1's root cause but not its exact
+site (see the item 1 outcome below); fix item 2 is the hover-affordance
+follow-up discovered while verifying item 1, not findings-list item 2
+(CVD) at all. Findings-list items 2 and 3 remain completely untouched.
 
 **Findings:**
 
@@ -1797,7 +1833,25 @@ Confirmed visually in a standalone reproduction (exact CSS values, real
 `:hover` state, verified live via `getComputedStyle`/`matches(':hover')`
 before screenshotting, not assumed): the candidate is clearly,
 unmistakably distinct from resting in both surfaces, unlike the current
-`/95` in Service. **Not applied — proposal only, per instruction.**
+`/95` in Service.
+
+### Item 2 — DONE 2026-08-29, commit 1d6f719, deployed 2026-08-31
+
+Approved as specified: Day `#073F3A`, Service `#5FC0B8`. Applied to
+`BTN_ACTION`'s `hover:bg-teal` → `hover:bg-teal-hover` plus
+`hover:border-teal-hover`, all 8 sites via the shared constant. New
+`teal-hover`-vs-`on-teal` regression guard added to `check-color.mjs`,
+mirroring item 1's `on-teal`-vs-`teal` guard; sanity-tested by
+deliberately breaking the Service value (measured 1.00:1, guard fired
+correctly) and restoring via `sed` (not `git checkout`, after item 1's
+near-miss with that command on this same file the prior day). Documented
+in CLAUDE.md as a PRINCIPLE, not just values: the hover deliberately
+moves away from its own surface's baseline — darker in Day, lighter in
+Service — and that asymmetry is not a defect to reconcile. Baselined
+count unchanged at 1318. Pushed to origin/main and deployed (hosting)
+2026-08-31 alongside P-021/P-026/P-029/P-030; Brian verified both the
+resting-state fix (item 1) and the hover fix (item 2) live on production,
+both surfaces.
 
 ---
 
