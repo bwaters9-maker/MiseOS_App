@@ -71,6 +71,9 @@ const nullFieldHeldMessage = (field: NullGuardedField, unitSystem: UnitSystem): 
     ? `Batch yield isn't set — give me the yield (e.g. '2 ${unitSystem === 'imperial' ? 'qt' : 'L'}') and I'll apply it.`
     : "Portions aren't set — tell me how many.";
 
+const sameYield = (a: DishDraft['batchYield'], b: DishDraft['batchYield']): boolean =>
+  a === b || (!!a && !!b && a.qty === b.qty && a.measureType === b.measureType && a.unit === b.unit);
+
 export default function DishBuildPanel({ unitSystem, onOpenRecipe }: DishBuildPanelProps) {
   const restaurantId = useRestaurantId();
   const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
@@ -97,6 +100,12 @@ export default function DishBuildPanel({ unitSystem, onOpenRecipe }: DishBuildPa
   const [refinementHistory, setRefinementHistory] = useState<string[]>([]);
   const [refining, setRefining] = useState(false);
   const [refineError, setRefineError] = useState<string | null>(null);
+  // Transient: the last refinement changed portions or batch yield, so the
+  // chef sees a resized dish with identical ingredient quantities — correct
+  // (kept lines are immutable to the model, 2026-08-21 ruling) but
+  // unexplained without a caption (P-032 item 3, defect 4). Cleared on the
+  // next refinement or on any chef edit to the yield/portions row.
+  const [sizeChanged, setSizeChanged] = useState(false);
 
   const toggleLine = (index: number) => {
     setKeptLines(prev => {
@@ -126,6 +135,7 @@ export default function DishBuildPanel({ unitSystem, onOpenRecipe }: DishBuildPa
   const setDishName = (name: string) => setDraft(prev => (prev ? { ...prev, dishName: name } : prev));
 
   const setPortions = (raw: string) => {
+    setSizeChanged(false);
     const n = parseInt(raw, 10);
     setDraft(prev => (prev ? { ...prev, portions: isFinite(n) && n > 0 ? n : null } : prev));
   };
@@ -136,6 +146,7 @@ export default function DishBuildPanel({ unitSystem, onOpenRecipe }: DishBuildPa
   // unit selects only apply once a qty exists, and default to a plated
   // dish's each/each.
   const setYieldQty = (raw: string) => {
+    setSizeChanged(false);
     const n = parseFloat(raw);
     setDraft(prev => {
       if (!prev) return prev;
@@ -148,6 +159,7 @@ export default function DishBuildPanel({ unitSystem, onOpenRecipe }: DishBuildPa
   };
 
   const setYieldMeasureType = (measureType: MeasureType) => {
+    setSizeChanged(false);
     setDraft(prev =>
       prev && prev.batchYield
         ? { ...prev, batchYield: { ...prev.batchYield, measureType, unit: defaultDisplayUnit(measureType, unitSystem) } }
@@ -156,11 +168,13 @@ export default function DishBuildPanel({ unitSystem, onOpenRecipe }: DishBuildPa
   };
 
   const setYieldUnit = (unit: string) => {
+    setSizeChanged(false);
     setDraft(prev => (prev && prev.batchYield ? { ...prev, batchYield: { ...prev.batchYield, unit } } : prev));
   };
 
   // Plated-dish shortcut where yield-vs-portions is redundant.
   const yieldSameAsPortions = () => {
+    setSizeChanged(false);
     setDraft(prev =>
       prev && prev.portions != null && prev.portions > 0
         ? { ...prev, batchYield: { qty: prev.portions, measureType: 'each', unit: 'each' } }
@@ -236,6 +250,7 @@ export default function DishBuildPanel({ unitSystem, onOpenRecipe }: DishBuildPa
     if (!refinementInput.trim() || refining || !draft || refinementHistory.length >= REFINEMENT_CAP) return;
     setRefining(true);
     setRefineError(null);
+    setSizeChanged(false);
     const instruction = refinementInput.trim();
     try {
       const userContent = JSON.stringify({
@@ -264,6 +279,7 @@ export default function DishBuildPanel({ unitSystem, onOpenRecipe }: DishBuildPa
       const { draft: guarded, reverted } = guardNullFields(draft, merged, instruction);
       setDraft(guarded);
       setKeptLines(mergedKept);
+      setSizeChanged(draft.portions !== guarded.portions || !sameYield(draft.batchYield, guarded.batchYield));
       setParseFailed(false);
       setRefinementHistory(prev => [...prev, instruction]);
       setRefinementInput('');
@@ -288,6 +304,7 @@ export default function DishBuildPanel({ unitSystem, onOpenRecipe }: DishBuildPa
     setRefinementInput('');
     setRefinementHistory([]);
     setRefineError(null);
+    setSizeChanged(false);
   };
 
   const canHandOff = !!draft && !!draft.dishName.trim() && !!draft.batchYield && draft.portions != null;
@@ -451,6 +468,13 @@ export default function DishBuildPanel({ unitSystem, onOpenRecipe }: DishBuildPa
               />
             </div>
           </div>
+
+          {sizeChanged && (
+            <div className="flex items-start gap-[5px] rounded-[8px] border border-line bg-saffron-soft px-[8px] py-[5px] text-[10px] text-navy leading-snug">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
+              Portions changed — ingredient quantities are kept as written. Scale in the Recipe Builder after hand-off.
+            </div>
+          )}
 
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate mb-[5px]">Ingredients</p>
