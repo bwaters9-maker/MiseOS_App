@@ -40,9 +40,11 @@ import {
   DISH_DRAFT_SYSTEM_PROMPT,
   EMPTY_DISH_DRAFT,
   MEASURE_TYPES,
+  guardNullFields,
   normalizeDishDraft,
   normalizeIngredientName,
   reconcileRefinement,
+  type NullGuardedField,
 } from '../../lib/dishExtraction';
 import { AiIngredientLookup } from '../ingredients/AiIngredientLookup';
 import type { DishDraft, DishDraftLine, Ingredient, MeasureType, RestaurantProfile, Vendor } from '../../types';
@@ -59,6 +61,15 @@ interface DishBuildPanelProps {
 // window no longer applies here; this cap exists purely so a draft
 // doesn't accumulate an unbounded refinement trail.
 const REFINEMENT_CAP = 10;
+
+// Inline, per-field line shown in the refineError slot when the null-field
+// guard (guardNullFields, P-032 item 2) held a field back: the refinement
+// tried to populate a field the draft had null, without supplying a value
+// of its own. The rest of the refinement still applied.
+const nullFieldHeldMessage = (field: NullGuardedField, unitSystem: UnitSystem): string =>
+  field === 'batchYield'
+    ? `Batch yield isn't set — give me the yield (e.g. '2 ${unitSystem === 'imperial' ? 'qt' : 'L'}') and I'll apply it.`
+    : "Portions aren't set — tell me how many.";
 
 export default function DishBuildPanel({ unitSystem, onOpenRecipe }: DishBuildPanelProps) {
   const restaurantId = useRestaurantId();
@@ -246,11 +257,19 @@ export default function DishBuildPanel({ unitSystem, onOpenRecipe }: DishBuildPa
       }
       const normalized = normalizeDishDraft(parsed, ingredients, unitSystem);
       const { draft: merged, keptLines: mergedKept } = reconcileRefinement(draft, keptLines, normalized);
-      setDraft(merged);
+      // Null-field guard runs on the reconciled draft, so kept lines are
+      // already settled before it looks at yield/portions — it never
+      // touches lines, and hasUnresolvedLines / canHandOff read the
+      // result exactly as they read any draft (P-032 item 2).
+      const { draft: guarded, reverted } = guardNullFields(draft, merged, instruction);
+      setDraft(guarded);
       setKeptLines(mergedKept);
       setParseFailed(false);
       setRefinementHistory(prev => [...prev, instruction]);
       setRefinementInput('');
+      if (reverted.length > 0) {
+        setRefineError(reverted.map(f => nullFieldHeldMessage(f, unitSystem)).join('\n'));
+      }
     } catch (e: any) {
       setRefineError(e?.message || 'Could not apply that refinement. Try again.');
     } finally {
@@ -535,7 +554,7 @@ export default function DishBuildPanel({ unitSystem, onOpenRecipe }: DishBuildPa
             )}
             {refineError && (
               <div className="flex items-start justify-between gap-[8px] mb-[5px] text-[10px] text-danger">
-                <span className="flex items-start gap-[5px]"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-[1px]" />{refineError}</span>
+                <span className="flex items-start gap-[5px] whitespace-pre-line"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-[1px]" />{refineError}</span>
                 <button onClick={() => setRefineError(null)} className="text-slate hover:text-navy shrink-0 uppercase font-bold text-[9px]">Dismiss</button>
               </div>
             )}

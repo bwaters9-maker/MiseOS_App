@@ -36,7 +36,7 @@ export const DISH_DRAFT_SYSTEM_PROMPT = (unitSystem: UnitSystem): string => `You
 - A fresh description: {"description":"...","pantry":[{"id":"...","name":"..."}]}
 - A refinement of an existing draft: {"description":"...","currentDraft":{...same shape as your output below...},"refinement":"...","pantry":[{"id":"...","name":"..."}]}
 
-For a refinement payload, start from "currentDraft" and apply only the change described in "refinement" — do not invent unrelated changes, and leave every field "refinement" doesn't address exactly as it was in "currentDraft". "currentDraft" is the sole source of truth for every numeric field: portions, batchYield, and line quantities. "description" is context for ingredient identity and method only. Where "description" and "currentDraft" disagree on a number, "currentDraft" wins — the chef has already changed it. Relative instructions ("double", "halve", "one more") are computed from "currentDraft"'s value, never from a number in "description".
+For a refinement payload, start from "currentDraft" and apply only the change described in "refinement" — do not invent unrelated changes, and leave every field "refinement" doesn't address exactly as it was in "currentDraft". "currentDraft" is the sole source of truth for every numeric field: portions, batchYield, and line quantities. "description" is context for ingredient identity and method only. Where "description" and "currentDraft" disagree on a number, "currentDraft" wins — the chef has already changed it. Relative instructions ("double", "halve", "one more") are computed from "currentDraft"'s value, never from a number in "description". Never populate a field that is null in "currentDraft" from a relative instruction: if "refinement" targets a field that is null in "currentDraft" and gives no explicit value of its own, leave that field null.
 
 Respond with ONLY valid JSON, no markdown, no commentary, in exactly this shape:
 {"dishName":"...","batchYield":{"qty":0,"measureType":"weight","unit":"..."},"portions":0,"lines":[{"ingredientId":"...","qty":0,"unit":"...","note":"..."}],"notInPantry":["..."],"methodSteps":["..."]}
@@ -148,4 +148,55 @@ export const reconcileRefinement = (
     draft: { ...revised, lines: [...keptOldLines, ...acceptedRevisedLines] },
     keptLines: new Set(keptOldLines.map((_, i) => i)),
   };
+};
+
+/** The two draft fields the null-field guard below covers. */
+export type NullGuardedField = 'batchYield' | 'portions';
+
+const NUMBER_WORDS = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'dozen', 'half'];
+const EXPLICIT_NUMBER_RE = new RegExp(`\\d|\\b(?:${NUMBER_WORDS.join('|')})\\b`, 'i');
+
+/** Whether a refinement instruction supplies an explicit absolute value:
+ * any digit, or a number word one–twelve / dozen / half (P-032 item 2).
+ * Relative words — double, triple, halve, more, less — deliberately do
+ * not count: they scale a value that must already exist. */
+export const hasExplicitNumber = (instruction: string): boolean => EXPLICIT_NUMBER_RE.test(instruction);
+
+/**
+ * Null-field guard (P-032 item 2, code-enforced — the prompt mirrors the
+ * rule but is not trusted with it): a refinement may not populate a
+ * field that was null in the chef's draft unless the instruction itself
+ * supplies an explicit absolute value. "double the batch" against a null
+ * batchYield has nothing to double, and the model's two observed
+ * fallbacks — moving portions instead (defect 2) or inventing "2 each"
+ * (defect 3) — are the same silent-fallback class P-019 killed for units.
+ *
+ * A sibling of reconcileRefinement rather than an extension of it: that
+ * function's contract is kept-line immutability (line-level), this one's
+ * is field population gated on the instruction (non-line fields). Kept
+ * separate so each invariant carries its own signature and tests, and
+ * reconcileRefinement's existing callers and tests stay untouched.
+ * Called on reconcileRefinement's output; lines are never touched here.
+ *
+ * A field that was non-null in oldDraft is never guarded — computing the
+ * right value for "double the batch" from an existing yield is the
+ * prompt's job (item 1), not this function's.
+ */
+export const guardNullFields = (
+  oldDraft: DishDraft,
+  revised: DishDraft,
+  instruction: string,
+): { draft: DishDraft; reverted: NullGuardedField[] } => {
+  if (hasExplicitNumber(instruction)) return { draft: revised, reverted: [] };
+  const reverted: NullGuardedField[] = [];
+  let draft = revised;
+  if (oldDraft.batchYield === null && revised.batchYield !== null) {
+    draft = { ...draft, batchYield: null };
+    reverted.push('batchYield');
+  }
+  if (oldDraft.portions === null && revised.portions !== null) {
+    draft = { ...draft, portions: null };
+    reverted.push('portions');
+  }
+  return { draft, reverted };
 };

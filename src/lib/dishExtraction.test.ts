@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   DISH_DRAFT_SYSTEM_PROMPT,
   EMPTY_DISH_DRAFT,
+  guardNullFields,
+  hasExplicitNumber,
   normalizeDishDraft,
   normalizeIngredientName,
   reconcileRefinement,
@@ -64,6 +66,17 @@ describe('DISH_DRAFT_SYSTEM_PROMPT', () => {
 
   it('instructs against stating a price', () => {
     expect(prompt.toLowerCase()).toContain('never state a price');
+  });
+
+  it('states currentDraft precedence over description for numbers (P-032 item 1)', () => {
+    expect(prompt).toContain('"currentDraft" is the sole source of truth for every numeric field');
+    expect(prompt).toContain('"currentDraft" wins');
+    expect(prompt).toContain('never from a number in "description"');
+  });
+
+  it('mirrors the null-field guard (P-032 item 2)', () => {
+    expect(prompt).toContain('Never populate a field that is null in "currentDraft" from a relative instruction');
+    expect(prompt).toContain('leave that field null');
   });
 });
 
@@ -222,5 +235,107 @@ describe('reconcileRefinement', () => {
     };
     const { draft } = reconcileRefinement(oldDraft, keptLines, revised);
     expect(draft.lines).toEqual([oldDraft.lines[0]]); // the model's corn line was discarded as a match
+  });
+});
+
+describe('hasExplicitNumber', () => {
+  it('digits count', () => {
+    expect(hasExplicitNumber('makes 2 quarts')).toBe(true);
+    expect(hasExplicitNumber('make it 6 portions')).toBe(true);
+  });
+
+  it('number words one–twelve, dozen, half count', () => {
+    expect(hasExplicitNumber('make it six portions')).toBe(true);
+    expect(hasExplicitNumber('a dozen portions')).toBe(true);
+    expect(hasExplicitNumber('half a quart')).toBe(true);
+    expect(hasExplicitNumber('Twelve servings')).toBe(true);
+  });
+
+  it('relative words do not count', () => {
+    for (const s of ['double the batch', 'triple it', 'halve the batch', 'a bit more', 'less sauce', 'Double the portions']) {
+      expect(hasExplicitNumber(s), s).toBe(false);
+    }
+  });
+
+  it('number words match whole words only', () => {
+    expect(hasExplicitNumber('tone it down')).toBe(false); // "one" inside "tone"
+    expect(hasExplicitNumber('tender greens')).toBe(false); // "ten" inside "tender"
+    expect(hasExplicitNumber('halfway through, rest it')).toBe(false); // "half" inside "halfway"
+  });
+});
+
+describe('guardNullFields (P-032 item 2)', () => {
+  const nullYieldDraft: DishDraft = {
+    dishName: 'Corn Side',
+    batchYield: null,
+    portions: 4,
+    lines: [{ ingredientId: 'i-corn', name: 'Corn', qty: 2, unit: 'each' }],
+    notInPantry: [],
+    methodSteps: [],
+  };
+
+  it('null yield + "double the batch" → yield stays null, reverted names batchYield', () => {
+    // Defects 2 and 3's shared root: the model had nothing to double and
+    // invented a yield. The guard reverts it and says which field.
+    const revised: DishDraft = { ...nullYieldDraft, batchYield: { qty: 2, measureType: 'each', unit: 'each' } };
+    const { draft, reverted } = guardNullFields(nullYieldDraft, revised, 'double the batch');
+    expect(draft.batchYield).toBeNull();
+    expect(reverted).toEqual(['batchYield']);
+  });
+
+  it('null yield + "makes 2 quarts" → accepted', () => {
+    const revised: DishDraft = { ...nullYieldDraft, batchYield: { qty: 2, measureType: 'volume', unit: 'qt' } };
+    const { draft, reverted } = guardNullFields(nullYieldDraft, revised, 'makes 2 quarts');
+    expect(draft.batchYield).toEqual({ qty: 2, measureType: 'volume', unit: 'qt' });
+    expect(reverted).toEqual([]);
+  });
+
+  it('null portions + "make it six portions" → accepted (number word)', () => {
+    const old: DishDraft = { ...nullYieldDraft, portions: null };
+    const revised: DishDraft = { ...old, portions: 6 };
+    const { draft, reverted } = guardNullFields(old, revised, 'make it six portions');
+    expect(draft.portions).toBe(6);
+    expect(reverted).toEqual([]);
+  });
+
+  it('non-null yield + "double the batch" → not touched by the guard (prompt\'s job)', () => {
+    const old: DishDraft = { ...nullYieldDraft, batchYield: { qty: 2, measureType: 'volume', unit: 'qt' } };
+    const revised: DishDraft = { ...old, batchYield: { qty: 4, measureType: 'volume', unit: 'qt' } };
+    const { draft, reverted } = guardNullFields(old, revised, 'double the batch');
+    expect(draft.batchYield).toEqual({ qty: 4, measureType: 'volume', unit: 'qt' });
+    expect(reverted).toEqual([]);
+  });
+
+  it('holds back only the reverted field — the rest of the refinement still applies', () => {
+    // Portions was non-null (4 → 8 is the prompt's business); yield was
+    // null and gets reverted. Lines and dish name pass through untouched.
+    const revised: DishDraft = {
+      ...nullYieldDraft,
+      dishName: 'Doubled Corn Side',
+      batchYield: { qty: 2, measureType: 'each', unit: 'each' },
+      portions: 8,
+    };
+    const { draft, reverted } = guardNullFields(nullYieldDraft, revised, 'double the batch');
+    expect(draft.batchYield).toBeNull();
+    expect(draft.portions).toBe(8);
+    expect(draft.dishName).toBe('Doubled Corn Side');
+    expect(draft.lines).toEqual(revised.lines);
+    expect(reverted).toEqual(['batchYield']);
+  });
+
+  it('both fields null + a relative instruction → both reverted, in a fixed order', () => {
+    const old: DishDraft = { ...nullYieldDraft, portions: null };
+    const revised: DishDraft = { ...old, batchYield: { qty: 2, measureType: 'each', unit: 'each' }, portions: 2 };
+    const { draft, reverted } = guardNullFields(old, revised, 'double it');
+    expect(draft.batchYield).toBeNull();
+    expect(draft.portions).toBeNull();
+    expect(reverted).toEqual(['batchYield', 'portions']);
+  });
+
+  it('a field the model left null is never reported as reverted', () => {
+    const revised: DishDraft = { ...nullYieldDraft }; // model did the right thing: yield still null
+    const { draft, reverted } = guardNullFields(nullYieldDraft, revised, 'double the batch');
+    expect(draft).toEqual(revised);
+    expect(reverted).toEqual([]);
   });
 });
