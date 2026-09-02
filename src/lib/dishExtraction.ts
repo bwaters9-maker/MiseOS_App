@@ -36,7 +36,7 @@ export const DISH_DRAFT_SYSTEM_PROMPT = (unitSystem: UnitSystem): string => `You
 - A fresh description: {"description":"...","pantry":[{"id":"...","name":"..."}]}
 - A refinement of an existing draft: {"description":"...","currentDraft":{...same shape as your output below...},"refinement":"...","pantry":[{"id":"...","name":"..."}]}
 
-For a refinement payload, start from "currentDraft" and apply only the change described in "refinement" — do not invent unrelated changes, and leave every field "refinement" doesn't address exactly as it was in "currentDraft".
+For a refinement payload, start from "currentDraft" and apply only the change described in "refinement" — do not invent unrelated changes, and leave every field "refinement" doesn't address exactly as it was in "currentDraft". "currentDraft" is the sole source of truth for every numeric field: portions, batchYield, and line quantities. "description" is context for ingredient identity and method only. Where "description" and "currentDraft" disagree on a number, "currentDraft" wins — the chef has already changed it. Relative instructions ("double", "halve", "one more") are computed from "currentDraft"'s value, never from a number in "description".
 
 Respond with ONLY valid JSON, no markdown, no commentary, in exactly this shape:
 {"dishName":"...","batchYield":{"qty":0,"measureType":"weight","unit":"..."},"portions":0,"lines":[{"ingredientId":"...","qty":0,"unit":"...","note":"..."}],"notInPantry":["..."],"methodSteps":["..."]}
