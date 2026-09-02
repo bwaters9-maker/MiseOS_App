@@ -1855,7 +1855,7 @@ both surfaces.
 
 ---
 
-## P-032 — Refinement state and field-targeting defects — ISSUED 2026-09-02
+## P-032 — Refinement state and field-targeting defects — ISSUED 2026-09-02 (items 1–3 DONE 2026-09-02, commits 051cf89 + 1a0cf81 + 3b4c5d1; awaiting the chef verification run before DONE)
 
 **Origin:** live chef testing of P-026's dish-description intake, 2026-08-29 — local dev, real Firestore, real model calls, not a simulated or unit-test scenario.
 
@@ -1958,3 +1958,118 @@ line, nothing invented) → "makes 2 quarts" (expect: yield 2 qt) →
 portions" (expect: 12) → "make it six portions" (expect: 6). Corn and
 shallots must stay unit-flagged and Send disabled throughout. Record the
 run under P-032, then flip to DONE.
+
+### Root causes — confirmed against the code 2026-09-02
+
+All three read as stated. `handleRefine` sends the live `draft` (React
+state at call time, no ref or stale closure in play), so defect 1 cannot
+be stale state; the payload does carry `description` alongside
+`currentDraft`, and the prompt's refinement paragraph said only "start
+from currentDraft" — nothing about which wins on a number. `batchYield`
+null in `currentDraft` is exactly the state the P-019 chef script leaves
+the draft in (extraction correctly returns null when the description
+gives no yield), so defects 2 and 3 were reachable on every run.
+
+### Item 1 — DONE 2026-09-02, commit 051cf89
+
+Prompt only. Added to the refinement paragraph: `currentDraft` is the
+sole source of truth for every numeric field (portions, batchYield, line
+quantities); `description` is context for ingredient identity and method
+only; where the two disagree on a number, `currentDraft` wins; relative
+instructions compute from `currentDraft`'s value, never from a number in
+`description`. 15 existing tests pass unchanged, including the
+no-persona / no-refusal word guards (the new text avoids every guarded
+term). One new prompt assertion added in item 2's commit.
+
+### Item 2 — DONE 2026-09-02, commit 1a0cf81
+
+**Sibling, not extension.** `guardNullFields(oldDraft, revised,
+instruction)` is a new pure function in `dishExtraction.ts`, called from
+`handleRefine` on `reconcileRefinement`'s output — not folded into
+`reconcileRefinement`. Reason: that function's contract is kept-line
+immutability (line-level); the guard's is field population gated on the
+instruction text (non-line fields). Separate signatures keep each
+invariant independently testable, and `reconcileRefinement`'s callers
+and five tests are untouched.
+
+`hasExplicitNumber` is the gate: any digit, or a whole-word match on
+one–twelve / dozen / half (so "tone", "tender", "halfway" don't count).
+Relative words never count. If the instruction has no explicit number
+and a field went null → non-null, that field reverts to null and is
+named in the returned list; a field that was non-null is never guarded
+(computing "double" from an existing value is item 1's job). The rest of
+the refinement — dish name, lines, the other field — applies as normal
+and the instruction still counts toward the 10-round history.
+
+`handleRefine` renders one line per reverted field in the existing
+`refineError` slot (`whitespace-pre-line` added so two fields render as
+two lines), non-toast, verbatim from the ruling. The `'2 qt'` example
+follows the kitchen's unit system (`'2 L'` for metric) — the one
+deviation from the ruled text, so a metric kitchen isn't shown an
+imperial example.
+
+**P-019 gate not weakened, verified by diff:** no line touching
+`canHandOff`, `hasUnresolvedLines`, `yieldNeedsAttention`, kept lines,
+or the Send handler's early return changed (the only diff hit on those
+names is a comment). The guard only ever moves a field toward null,
+which every gate reads as "not ready".
+
+Tests: 13 new (28 in the file, 197 across the suite) — the four ruled
+cases, partial hold-back, both-fields-reverted ordering, no false revert
+when the model correctly left the field null, `hasExplicitNumber`'s
+word-boundary cases, and prompt assertions for items 1 and 2.
+
+**Two rule edges, logged for a ruling — implemented exactly as ruled,
+not widened:**
+
+1. **The gate is instruction-wide, not field-targeted.** "make it six
+   portions" against a null yield passes the gate (it contains a number
+   word), so a yield the model invents *during that instruction* is
+   accepted. That is defect 3's suspected trigger phrasing. The prompt
+   mirror ("if the refinement targets a field that is null ... and gives
+   no explicit value of its own, leave that field null") is the only
+   defence on that path — exactly the not-trusted layer this item exists
+   to back up in code. If the verification run's "make it 6 portions"
+   step produces an invented yield, the fix is a field-targeted gate
+   (number must sit near a yield/unit word for `batchYield`, near
+   portion/serving/cover for `portions`), which is a heuristic the ruling
+   deliberately did not ask for.
+2. **"one more" contains "one".** The ruling lists "one more" as
+   relative (item 1) and "one" as an explicit number word (item 2); by
+   the letter of item 2, "one more portion" passes the gate. Against a
+   non-null field it's harmless (not guarded). Against a null field it
+   would let the model populate. Not special-cased.
+
+### Item 3 — DONE 2026-09-02, commit 3b4c5d1
+
+`DishBuildPanel.tsx` only. `handleRefine` compares portions and
+batchYield before/after the guarded merge (`sameYield`: null-aware
+qty/measureType/unit equality) and sets one transient `sizeChanged`
+flag. Caption renders under the yield/portions row in the existing
+saffron-soft caption style, wording verbatim from the ruling. Cleared at
+the start of the next refinement, on Start Over, and on any chef edit to
+the yield/portions row (portions, yield qty, measure type, unit, Same as
+portions). No new state beyond the flag. A guard-reverted field
+(null → null) never trips it — nothing changed.
+
+**Pointer confirmed reachable, with a caveat.** `Recipes.tsx` renders
+`CostPanel` (Batch Scale: 0.5× / 1× / 2× / custom, `scaleRecipe` +
+`scaleFactor`) beside `RecipeEditor` for every selected recipe, no status
+gate, so the development-status recipe the hand-off opens has it. But
+that control scales the **Live Cost Analysis display only** — `scaled`
+is a virtual recipe and nothing writes it back; the editor's line
+quantities don't change. "Scale in the Recipe Builder" is therefore
+true for seeing the cost at the new size, not for rewriting the lines.
+Used the ruled wording as instructed; if the verification run shows the
+chef expecting the Builder's lines to rescale, the caption wording (or
+an actual apply-scale write in the Builder, a separate feature) needs
+its own ruling.
+
+**Also verbatim, flagged:** the caption says "Portions changed" even when
+only batch yield changed (the flag covers both). One caption per the
+ruling; wording didn't get a yield variant.
+
+### VERIFY — pending (Brian, local dev, real model)
+
+Not run in this session — the script requires the real model and the
+chef's own pantry. Record the run here, then flip the header to DONE.
