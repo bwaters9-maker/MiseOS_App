@@ -1855,7 +1855,7 @@ both surfaces.
 
 ---
 
-## P-032 — Refinement state and field-targeting defects — QUEUED 2026-08-29
+## P-032 — Refinement state and field-targeting defects — ISSUED 2026-09-02
 
 **Origin:** live chef testing of P-026's dish-description intake, 2026-08-29 — local dev, real Firestore, real model calls, not a simulated or unit-test scenario.
 
@@ -1876,3 +1876,85 @@ In an earlier run the following refinement then doubled correctly from current s
 **DEFECT 4 — design gap, not a bug.** "make it 6 portions" changes portions and leaves every ingredient quantity untouched — correct per the 2026-08-21 immutable-kept-lines ruling, but the chef sees a rescaled dish with identical quantities and nothing explains why.
 
 **Not investigated, not fixed — log only, per instruction.**
+
+**Ruling (Claude.ai, 2026-09-02) — decided, not open. Three items, in
+order, one commit each, verified before the next starts.**
+
+**Root causes, read from the code (confirmed 2026-09-02 before any fix —
+see the per-item notes below for where the code agrees and where it
+adds a caveat):**
+
+- **Defect 1 is NOT stale React state.** `handleRefine` sends the live
+  `draft` as `currentDraft`. But the refinement payload also carries the
+  original `description` ("makes 4 portions"), and
+  `DISH_DRAFT_SYSTEM_PROMPT` never says which wins when `description` and
+  `currentDraft` disagree on a number. The model anchored on the
+  description's 4. That also explains the run-to-run inconsistency: with
+  no precedence stated, which source the model anchors on is a coin
+  flip.
+- **Defects 2 and 3 share a root.** `batchYield` was `null` in
+  `currentDraft`, so "double the batch" had nothing to double — the
+  model either moved portions instead (2) or invented "2 each" (3). Same
+  silent-fallback class P-019 killed for units.
+- **Defect 4 is correct behaviour** (immutable kept lines, 2026-08-21
+  ruling) with no explanation shown to the chef.
+
+**ITEM 1 — precedence rule (prompt only, `src/lib/dishExtraction.ts`).**
+In `DISH_DRAFT_SYSTEM_PROMPT`'s refinement paragraph, add: for a
+refinement payload, `currentDraft` is the sole source of truth for every
+numeric field (portions, batchYield, line quantities). `description` is
+context for ingredient identity and method only. Where `description` and
+`currentDraft` disagree on a number, `currentDraft` wins — the chef has
+already changed it. Relative instructions ("double", "halve", "one more")
+are computed from `currentDraft`'s value, never from the description. No
+code change. Existing tests must still pass.
+
+**ITEM 2 — null-field guard (code-enforced, `src/lib/dishExtraction.ts`
++ `DishBuildPanel.tsx`).** Rule: a refinement may not populate a field
+that was `null` in `currentDraft` unless the refinement instruction
+itself supplies an explicit absolute value. Enforced in code, not the
+prompt:
+
+- Extend `reconcileRefinement` (or add a sibling called from
+  `handleRefine` — implementer's call, say which and why) to take the
+  instruction string. For `batchYield` and `portions`: if `oldDraft`'s
+  field is `null` and `revised`'s is non-null, accept only if the
+  instruction contains an explicit number (digits, or a number word
+  one–twelve / dozen / half). Relative words — double, triple, halve,
+  more, less — do NOT count. Otherwise revert that field to `null` and
+  return a list of reverted field names.
+- `handleRefine`: when a field was reverted, show an inline line in the
+  existing `refineError` slot, non-toast, per field: "Batch yield isn't
+  set — give me the yield (e.g. '2 qt') and I'll apply it." / "Portions
+  aren't set — tell me how many." The rest of the refinement still
+  applies; only the reverted field is held back.
+- Mirror the rule in the prompt: never populate a null field from a
+  relative instruction; if the refinement targets a field that is null
+  in `currentDraft` and gives no value, leave it null.
+- Kept lines untouched. `hasUnresolvedLines` untouched. `canHandOff` /
+  the Send gate untouched — this must not weaken the P-019 gate; the
+  commit message states that it doesn't.
+- Tests in `src/lib/dishExtraction.test.ts`: null yield + "double the
+  batch" → yield stays null, reverted list names `batchYield`; null
+  yield + "makes 2 quarts" → accepted; null portions + "make it six
+  portions" → accepted (number word); non-null yield + "double the
+  batch" → not touched by the guard (prompt's job).
+
+**ITEM 3 — explanation caption (`DishBuildPanel.tsx` only).** After a
+refinement changes portions or batchYield (compare pre/post in
+`handleRefine`, set a transient flag cleared on the next refinement or
+edit), render one caption in the existing saffron-soft caption style
+under the yield/portions row: "Portions changed — ingredient quantities
+are kept as written. Scale in the Recipe Builder after hand-off."
+`Recipes.tsx` already has `scaleRecipe`/`scaleFactor`, so the pointer is
+true; confirm it's reachable from the Builder the draft lands in before
+using that wording. No new state beyond the flag.
+
+**VERIFY (Brian runs, local dev, real model):** extraction from a
+description ending "It makes 4 portions" → "make it 6 portions" →
+"double the batch" (expect: portions 6 unchanged, inline yield-not-set
+line, nothing invented) → "makes 2 quarts" (expect: yield 2 qt) →
+"double the batch" (expect: 4 qt, portions still 6) → "Double the
+portions" (expect: 12) → "make it six portions" (expect: 6). Corn and
+shallots must stay unit-flagged and Send disabled throughout. Record the
+run under P-032, then flip to DONE.
