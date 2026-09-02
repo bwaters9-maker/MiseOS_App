@@ -1855,7 +1855,7 @@ both surfaces.
 
 ---
 
-## P-032 — Refinement state and field-targeting defects — ISSUED 2026-09-02 (items 1–3 DONE 2026-09-02, commits 051cf89 + 1a0cf81 + 3b4c5d1; awaiting the chef verification run before DONE)
+## P-032 — Refinement state and field-targeting defects — DONE 2026-09-02 (commits 926bd92..ac375ed; chef run recorded below; findings A and B open, small, fold into the next DishBuildPanel touch)
 
 **Origin:** live chef testing of P-026's dish-description intake, 2026-08-29 — local dev, real Firestore, real model calls, not a simulated or unit-test scenario.
 
@@ -1981,6 +1981,18 @@ instructions compute from `currentDraft`'s value, never from a number in
 no-persona / no-refusal word guards (the new text avoids every guarded
 term). One new prompt assertion added in item 2's commit.
 
+**Interim ruling A (2026-09-02, from the chef run's step 4 — not yet in
+the prompt, no code change in this close-out; add on the next
+DishBuildPanel touch):** a batch-scaling instruction ("double the
+batch", "half batch") scales `batchYield` and `portions` together from
+`currentDraft` — a batch that serves 6 doubled serves 12. Defect 2's
+definition ("batch = yield field only") was too narrow; the model's
+step-4 result (4 qt / 12 portions) was right. The line to add to the
+refinement paragraph, verbatim: *A batch-scaling instruction ("double
+the batch", "half batch") scales "batchYield" and "portions" together
+from their "currentDraft" values; a portions-only instruction ("make it
+6 portions") changes "portions" alone.*
+
 ### Item 2 — DONE 2026-09-02, commit 1a0cf81
 
 **Sibling, not extension.** `guardNullFields(oldDraft, revised,
@@ -2077,7 +2089,89 @@ logged directly above). Caption is now exactly: "Portions changed —
 ingredient quantities are kept as written." Nothing else changed —
 flag, set/clear points, and styling are as in 3b4c5d1.
 
-### VERIFY — pending (Brian, local dev, real model)
+### VERIFY — chef run, 2026-09-02 (Brian, local dev, real model)
 
-Not run in this session — the script requires the real model and the
-chef's own pantry. Record the run here, then flip the header to DONE.
+Corn Test Dish: "2 oz corn, 1 lb unsalted butter, 3 shallots, makes 4
+portions."
+
+- **Step 0 — Extract:** portions 4, yield null. NOTE: corn extracted as
+  "2 each" with no unit flag this run — the model resolved the unit
+  itself rather than returning "oz" for the app to flag. Legitimate
+  variance; the Send gate was held by the null yield instead of an
+  unresolved line.
+- **Step 1 — "make it 6 portions":** portions 6, yield stayed null,
+  caption shown, lines untouched. **PASS.** The instruction-wide number
+  test (item 2's rule edge 1) did not admit an invented yield on this
+  phrasing.
+- **Step 2 — "double the batch" (yield null):** portions 6, yield null,
+  nothing invented. **PASS on outcome.** **FINDING A:** no inline "Batch
+  yield isn't set" line appeared — the model left yield null itself, so
+  `guardNullFields` reverted nothing and said nothing. The chef's
+  instruction was a silent no-op. Log, don't fix here.
+- **Step 3 — "makes 2 quarts":** yield 2 qt volume, portions 6. **PASS.**
+  Send enabled — correct, nothing unresolved. **FINDING B:** caption
+  reads "Portions changed" when only yield changed; the flag fires on
+  either field, the wording names one.
+- **Step 4 — "double the batch" (yield 2 qt, portions 6):** yield 4 qt,
+  portions 12. Script expected portions 6. **RULING (interim A):** the
+  model is right — a batch that serves 6 doubled serves 12; yield and
+  portions per batch scale together. Defect 2's definition ("batch =
+  yield field only") was too narrow. What the step exposed is the
+  immutable-kept-lines ruling colliding with batch scaling: 4 qt / 12
+  portions from the same 2 ears of corn. The caption is the disclosure;
+  the real fix is P-033. The prompt line for interim A is recorded under
+  item 1 above.
+- **Steps 5–6 — "Double the portions" / "make it six portions":** NOT
+  RUN.
+- **Gate:** `hasUnresolvedLines` untouched, nothing reached Firestore.
+  Start Over used, no cleanup needed.
+
+**Open, small, fold into the next DishBuildPanel touch:** Finding A (a
+refinement that changes nothing says nothing — the guard only speaks
+when it reverts; a no-op refinement needs its own line), Finding B
+(caption wording names portions only), and the interim-A prompt line
+under item 1.
+
+---
+
+## P-033 — Yield leaves the intake; Builder-owned, computed default, chef-verified — QUEUED 2026-09-02
+
+**Ruling (Brian, 2026-09-02):** yield is a property of the recipe, not
+something the chef describes to the AI. Yield is derived from the
+recipe and adjusted only via portions/batch size.
+
+**Origin:** P-032 step 4 — "double the batch" against 2 qt / 6 portions
+returned 4 qt / 12 portions from the same 2 ears of corn, because the
+immutable-kept-lines ruling (2026-08-21) and batch scaling collide the
+moment yield lives in the draft: the lines can't move, so a scaled yield
+detaches from what the lines actually produce. The P-032 caption is the
+disclosure; this is the fix.
+
+**Scope:**
+
+- **Intake:** remove `batchYield` from the extraction/refinement output
+  contract (`DISH_DRAFT_SYSTEM_PROMPT`) and from `DishDraft`; the intake
+  hands off `dishName` + `portions` + `lines` + `methodSteps`.
+  `guardNullFields` narrows to `portions`. The panel's yield row, its
+  "Same as portions" shortcut, `yieldNeedsAttention`, and the
+  yield-not-set held-back line all go with it.
+- **Recipe Builder:** computes a default yield from the lines (weight-in
+  / volume-in, converted to the batch's `measureType`) and shows it with
+  the pantry's saffron unverified dot. The chef enters the measured yield
+  once (real batch, after reduction / trim / evaporation loss); that
+  value is the recipe's truth. **Never a pure calculation with no
+  override** — sum of inputs ≠ output for any reduced or trimmed recipe,
+  and that error would understate every sub-recipe's cost per unit.
+- **Scaling:** Batch Scale, and any future "double the batch"
+  refinement, multiplies lines and measured yield together; ratio
+  locked.
+- **Requirement by type:** menu recipes require portions, sub recipes
+  require yield — not both for everything. `canHandOff` and the
+  Builder's validation follow.
+- **Cost engine:** `costPerDisplayUnit` and the per-portion math are
+  unchanged in formula; the inputs change. The P-017 / P-020 suites must
+  pass; add tests for the computed default vs the measured override.
+
+**Sequence:** after P-012 Prep Checklist. **Not a tester blocker** —
+today's chef-typed yield is as right as the chef makes it; P-033 makes
+it easier, not newly possible.
