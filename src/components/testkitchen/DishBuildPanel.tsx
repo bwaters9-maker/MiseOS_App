@@ -472,7 +472,7 @@ export default function DishBuildPanel({ unitSystem, onOpenRecipe }: DishBuildPa
           {sizeChanged && (
             <div className="flex items-start gap-[5px] rounded-[8px] border border-line bg-saffron-soft px-[8px] py-[5px] text-[10px] text-navy leading-snug">
               <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
-              Portions changed — ingredient quantities are kept as written. Scale in the Recipe Builder after hand-off.
+              Portions changed — ingredient quantities are kept as written.
             </div>
           )}
 

@@ -2069,6 +2069,14 @@ its own ruling.
 only batch yield changed (the flag covers both). One caption per the
 ruling; wording didn't get a yield variant.
 
+**Amendment (Claude.ai review, 2026-09-02) — DONE, commit noted in the
+header line below.** The caption's second sentence ("Scale in the Recipe
+Builder after hand-off.") implied the Builder rewrites line quantities;
+Batch Scale only rescales the Live Cost Analysis display (the caveat
+logged directly above). Caption is now exactly: "Portions changed —
+ingredient quantities are kept as written." Nothing else changed —
+flag, set/clear points, and styling are as in 3b4c5d1.
+
 ### VERIFY — pending (Brian, local dev, real model)
 
 Not run in this session — the script requires the real model and the
