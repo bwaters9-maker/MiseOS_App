@@ -2121,8 +2121,10 @@ portions."
   portions from the same 2 ears of corn. The caption is the disclosure;
   the real fix is P-033. The prompt line for interim A is recorded under
   item 1 above.
-- **Steps 5–6 — "Double the portions" / "make it six portions":** NOT
-  RUN.
+- **Steps 5–6 — "Double the portions" / "make it six portions":** final
+  state portions 6, yield 4 qt unchanged, lines untouched. **PASS** —
+  number word accepted, yield untouched by a portions instruction.
+  Intermediate value after step 5 not captured in the record.
 - **Gate:** `hasUnresolvedLines` untouched, nothing reached Firestore.
   Start Over used, no cleanup needed.
 
