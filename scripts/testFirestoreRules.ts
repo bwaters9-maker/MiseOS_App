@@ -49,6 +49,12 @@ async function main() {
     const db = ctx.firestore();
     await setDoc(doc(db, 'restaurants/restaurant-a/recipes/r1'), { name: 'A Recipe' });
     await setDoc(doc(db, 'restaurants/restaurant-b/recipes/r2'), { name: 'B Recipe' });
+    await setDoc(doc(db, 'restaurants/restaurant-a/prep_history/h1'), {
+      date: '2026-09-11',
+      station: 'Sauté',
+      items: [{ name: 'Carrots', spec: 'oblique cut', makeQty: 3, unit: 'lb', prepMinutes: 20 }],
+      printedAt: '2026-09-11T10:00:00.000Z',
+    });
     await setDoc(doc(db, 'recipes/legacy1'), { name: 'Legacy Recipe' });
     await setDoc(doc(db, 'users/uid-a'), { restaurantId: 'restaurant-a', role: 'chef' });
     await setDoc(doc(db, 'aiUsage/uid-a_2026-07-29'), { uid: 'uid-a', date: '2026-07-29', count: 5 });
@@ -85,6 +91,29 @@ async function main() {
 
   await check('post-cutover: old flat path denied to an unauthenticated user', async () => {
     await assertFails(getDoc(doc(anon.firestore(), 'recipes/legacy1')));
+  });
+
+  await check('prep_history: chef A can read own restaurant\'s print record', async () => {
+    await assertSucceeds(getDoc(doc(chefA.firestore(), 'restaurants/restaurant-a/prep_history/h1')));
+  });
+
+  await check('prep_history: chef A can write a new print record', async () => {
+    await assertSucceeds(
+      setDoc(doc(chefA.firestore(), 'restaurants/restaurant-a/prep_history/h2'), {
+        date: '2026-09-11',
+        station: 'Grill',
+        items: [],
+        printedAt: '2026-09-11T11:00:00.000Z',
+      })
+    );
+  });
+
+  await check('prep_history: chef B cannot read restaurant A\'s print record', async () => {
+    await assertFails(getDoc(doc(chefB.firestore(), 'restaurants/restaurant-a/prep_history/h1')));
+  });
+
+  await check('prep_history: chef B cannot write into restaurant A\'s history', async () => {
+    await assertFails(setDoc(doc(chefB.firestore(), 'restaurants/restaurant-a/prep_history/h3'), { date: '2026-09-11' }));
   });
 
   await check('users/{uid}: owner can read own doc', async () => {

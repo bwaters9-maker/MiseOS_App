@@ -1,21 +1,22 @@
 /**
- * Represents a single task on the daily back-of-house prep checklist.
- * This type is also used for `ProductionRun` props in components.
+ * A prep task scoped to one station. `checked` (done) and `notNeeded`
+ * (skipped this shift) both exclude the line from print and both clear
+ * on Reset Shift; `spec` disambiguates the same `name` prepped
+ * differently on two stations. Also used for `ProductionRun` props.
  */
 export interface PrepItem {
   id: string;
   name: string;
-  quantity: number;
+  assignedStation: string;
+  spec?: string;
   unit: string;
+  onHand: number;
+  par: number;
+  prepMinutes?: number;
   checked: boolean;
-  assignedStation: 'Sauté' | 'Grill' | 'Garde Manger' | 'Pastry';
-  priority: 'low' | 'medium' | 'high';
-  par?: number;
-  requires_temp_check?: boolean;
-  station?: string;
-  notes?: string;
+  notNeeded?: boolean;
+  printedDate?: string;
   lastModified?: string;
-  recipe_id?: string;
 }
 
 /**

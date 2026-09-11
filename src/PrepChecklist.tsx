@@ -49,14 +49,14 @@ export const PrepChecklist: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-zinc-900">
               {prepItems.map((item) => {
-                const onHand = item.quantity || 0;
+                const onHand = item.onHand || 0;
                 const par = item.par || 0;
                 const deficit = Math.max(0, par - onHand);
                 const status = deficit > 0 ? 'SHORTAGE' : 'STABLE';
                 return (
                   <tr key={item.id} className="hover:bg-zinc-900/30 transition-colors">
                     <td className="p-4 font-bold text-zinc-200">{item.name}</td>
-                    <td className="p-4 text-center text-zinc-400">{item.station}</td>
+                    <td className="p-4 text-center text-zinc-400">{item.assignedStation}</td>
                     <td className="p-4 text-right text-zinc-400">{onHand} {item.unit}</td>
                     <td className="p-4 text-right text-zinc-400">{par} {item.unit}</td>
                     <td className={`p-4 text-right font-bold ${deficit > 0 ? 'text-red-400' : 'text-zinc-600'}`}>

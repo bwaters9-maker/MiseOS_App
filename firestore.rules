@@ -32,6 +32,10 @@ service cloud.firestore {
     //   doc at a fixed id ("latest"), not a growing collection. Read-only
     //   editorial content — see Test Kitchen Phase B's hard boundary in
     //   CLAUDE.md: never written to by any pantry/costing code path.
+    // Collection: prep_history   — one doc per printed prep sheet (date,
+    //   station, items[], printedAt). Write-once audit log, not part of
+    //   useKitchenState's live listeners — see the Prep Checklist section
+    //   in CLAUDE.md.
     // Ingredient fields (src/types.ts):
     //   - name: string (required, 1-200 chars)
     //   - category: string (required) — IngredientCategory enum
@@ -104,6 +108,7 @@ service cloud.firestore {
       match /vendors/{id}              { allow read, write: if isOwner(restaurantId); }
       match /restaurant_profile/{id}   { allow read, write: if isOwner(restaurantId); }
       match /trend_reports/{id}        { allow read, write: if isOwner(restaurantId); }
+      match /prep_history/{id}         { allow read, write: if isOwner(restaurantId); }
 
       match /ingredients/{id} {
         allow read: if isOwner(restaurantId);
