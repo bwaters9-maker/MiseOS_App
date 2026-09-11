@@ -14,6 +14,12 @@ npm start        # production — Express serves ./dist
 
 NODE_ENV must be set to `development` or `production` — the server throws on startup if it isn't.
 
+```bash
+npm run test:rules   # Firestore rules suite against the local emulator
+```
+
+`npm run test:rules` requires a JVM on PATH — the Firestore/Auth emulator needs Java (Temurin 21 installed 2026-09-11: `winget install EclipseAdoptium.Temurin.21.JDK`). The wrapper (`scripts/runFirestoreRulesTest.ts`) fails loudly when the emulator can't start rather than reporting a false exit 0: `firebase emulators:exec` can exit 0 even when Java is missing and the emulator never actually ran, so the wrapper preflights the JVM directly and verifies `scripts/testFirestoreRules.ts`'s own summary line appeared in the captured output before trusting the result.
+
 ## Tech stack
 
 - **Frontend:** React 19, TypeScript, Tailwind CSS v4, Vite 6
@@ -74,7 +80,7 @@ src/
   Features.tsx                   Nightly specials CRUD — 86 toggle syncs to Crib Sheet live
   Staff.tsx                      Employee directory + shift scheduling — feeds Crib Sheet and Chef's Dashboard (today's shifts only). Shift station select sources from `useStationPresets()` (live, chef-customizable) rather than a hardcoded list — see Chef's Dashboard section. Schedule section carries a List/Calendar toggle (`components/staff/ScheduleCalendar.tsx`) merging shifts with Events — see the Staff Schedule Calendar section below.
   EventCalendar.tsx              Events & Clients — event/client CRUD, grouped by date, upcoming/past split, feeds Crib Sheet; clicking an event opens EventDetailView, which can also be deep-linked into directly via a `selectedEventId` prop (used by the Staff schedule calendar)
-  PrepChecklist.tsx              Par-level deficit tracking table
+  PrepChecklist.tsx              Prep Checklist — station-tabbed print-to-paper workflow: prepEngine-sorted list per station (execution-critical, prepMinutes descending), check-off/Not-Needed, print (writeBatch: prep_history doc + printedDate stamps), Reset Shift, in-view History toggle (PrepHistoryView)
   TestKitchenHub.tsx             Development workspace (Recipes > Development sub-tab; formerly the standalone Test Kitchen nav tab, filename unchanged) — trends reference rail plus the Recipe Build panel (calls server-side /api/ai proxy): a "Describe the dish" textarea drives extraction into a structured draft, a refinement input applies incremental edits, and the chef hands a reviewed draft off to the Recipe Builder (P-026, replacing the retired Sous chat)
   Settings.tsx                   Theme toggle + station preset CRUD + recipe category CRUD
   IngredientsTable.tsx           Master Pantry — static human-verified ingredient CRUD, unit conversion
@@ -99,9 +105,9 @@ src/
     events/
       EventDetailView.tsx        Event detail: header card (name/type/date/attendees/staff strip) + Timeline, Tentative Menu, Client, Change Log panel grid
 
-    dashboard/
-      PrepRegistrationForm.tsx
-      TrendSidebar.tsx
+    prep/
+      PrepItemForm.tsx            Shared add/edit form for a prep catalog item — toDoc is a partial write of the 7 catalog fields only, never checked/notNeeded/printedDate
+      PrepHistoryView.tsx         Read-only browse of prep_history — date-range query (no composite index) + client-side station filter, CSV export
 
     staff/
       ScheduleCalendar.tsx        Week/month schedule calendar — shifts merged with Events, read-only (Staff.tsx's Schedule section, List/Calendar toggle)
@@ -120,6 +126,7 @@ src/
     dishExtraction.ts            Development workspace's extraction/refinement system prompt, response normalization, and the refinement-reconciliation merge (P-026) — extracted from DishBuildPanel.tsx so it's unit-tested without mounting the panel, same pattern as dishDraftToRecipe.ts
     seasonalData.ts              Static seasonal produce/protein reference by US region (the Development workspace's Seasonal Matrix, also feeding the Dashboard trends strip) — no runtime calls, same pattern as yieldReference.ts
     yieldReference.ts            Common product usable-yield percentages, grounds the AI ingredient lookup's yieldPercent proposals
+    prepEngine.ts                 Prep Checklist's pure sort/print functions — tiered sort (execution-critical, notNeeded outranks checked), printableItems (single source for print AND prep_history, so the two can't drift), makeQty, UNMATCHED_STATION_KEY
 ```
 
 ## Navigation / routing
@@ -136,13 +143,13 @@ Current nav tabs (in order): Dashboard · Staff · Events & Clients · Recipes �
 
 Features later moved out of `RecipesHub` entirely (Chef's Dashboard split, part two), and Test Kitchen moved *in* (Streamline ruling, 2026-08-09 — see the Product Vision section). `RecipesHub` is now **Recipe Builder / Menu / Collections / Development** — the Development sub-tab renders `src/TestKitchenHub.tsx` unchanged (relocation only, no feature changes), lazily via its own `React.lazy`/`Suspense` so the trends/build-panel chunk still loads only on demand. `test-kitchen` is gone from `viewMap` and `navItems` entirely — unlike Crib Sheet and Features, it kept no view key, because it is no longer a view.
 
-**Cross-view sub-tab requests**: `App.tsx`'s `AppShell` holds a `recipesSubTab` request (plus `openRecipesDevelopment()`), threaded down and consumed-then-cleared by `RecipesHub` — the same consume-once mechanism `selectedRecipeId` and `selectedEventId` already use, so revisiting Recipes later never re-forces a tab. The Dashboard's trends strip and In Development card use it to land on Development.
+**Cross-view sub-tab requests**: `App.tsx`'s `AppShell` holds a `recipesSubTab` request (plus `openRecipesDevelopment()`), threaded down and consumed-then-cleared by `RecipesHub` — the same consume-once mechanism `selectedRecipeId`, `selectedEventId`, and (P-012) `selectedStation` already use, so revisiting Recipes later never re-forces a tab. The Dashboard's trends strip and In Development card use it to land on Development. `selectedStation`/`setSelectedStation` (`onOpenPrepStation`) is the same mechanism scoped to the Prep List: `ChefDashboard.tsx`'s Prep Sheets card row click lands on that station's tab, consumed and cleared by `PrepChecklist.tsx`.
 
 The Recipe Builder sub-tab also carries a "View Menu" button (`onViewMenu` prop) that jumps straight to the Menu sub-tab.
 
 **Ingredients** and **Vendors** are no longer top-level tabs — both moved inside Settings (`src/Settings.tsx`) as a General / Ingredients / Vendors sub-tab switcher, rendering the same untouched `IngredientsTable.tsx`/`Vendors.tsx` components. They're reference data edited rarely, so they live behind Settings deliberately.
 
-**Prep List** (`view: 'prep'`) — label only; still `PrepChecklist.tsx`, same par-level deficit table, unchanged.
+**Prep List** (`view: 'prep'`) — label only; still `PrepChecklist.tsx`, rebuilt (P-012) as a print-to-paper workflow — station tabs, execution-critical sort, print, Reset Shift, history. See the Prep Checklist section below.
 
 **Chef's Dashboard split — complete.** `ChefDashboard.tsx` is the landing page and morning planning surface: a trends strip, today's schedule with station coverage, today's events, Tonight's Features, the In Development card, quick actions, a compact alerts indicator. Crib Sheet is a Quick Action button from the Dashboard rather than a top-level nav tab — it keeps its `viewMap` key (`dashboard`) so `onNavigate` calls still resolve; only its `navItems` entry was removed. Features management moved the same way: `Features.tsx` keeps its `viewMap` key (`features`, newly added) and is reached via the Dashboard's "Manage Features" link — full edit/delete/86-toggle/schedule-ahead capability is unchanged, just no longer a nav tab or a RecipesHub sub-tab.
 
@@ -154,7 +161,8 @@ The Recipe Builder sub-tab also carries a "View Menu" button (`onViewMenu` prop)
 
 | Collection | Used by |
 |---|---|
-| `prepItems` | `useKitchenState`, `PrepChecklist` |
+| `prepItems` | `useKitchenState`, `PrepChecklist`, `PrepItemForm` (catalog write), `ChefDashboard` (Prep Sheets card, read-only) — P-012 rewrite: `quantity` renamed `onHand` (legacy docs read via `onHandValue()` fallback), `assignedStation` loosened to `string`, `notes`/`priority`/`requires_temp_check`/`recipe_id` dropped, `spec`/`prepMinutes`/`notNeeded`/`printedDate` added |
+| `prep_history` | `PrepHistoryView` (scoped `getDocs` only) — write-once, one doc per printed station sheet (date, station, items[], printedAt); written only by `PrepChecklist`'s print batch; never in `useKitchenState`'s live listeners, never touched by Reset Shift — see the Prep Checklist section |
 | `recipes` | `useKitchenState`, `Recipes.tsx`, `ChefDashboard` (In Development card, read-only), `DishBuildPanel` (extraction hand-off write) — `status`/`variants` added by P-022 with no migration write; a doc without `status` reads as `'active'` |
 | `features` | `useKitchenState`, `Features`, `DailyCribSheet` |
 | `staff` | `useKitchenState`, `Staff.tsx` — employee directory (repurposed from daily roster) |
@@ -176,7 +184,7 @@ The Recipe Builder sub-tab also carries a "View Menu" button (`onViewMenu` prop)
 
 | Type | Description |
 |---|---|
-| `PrepItem` / `ProductionRun` | Prep checklist task |
+| `PrepItem` / `ProductionRun` | Station-scoped prep catalog task: id, name, assignedStation: string, spec?, unit, onHand, par, prepMinutes?, checked, notNeeded?, printedDate?, lastModified?. `spec` disambiguates the same `name` prepped differently on two stations (e.g. pantry carrots for salad vs. sauté oblique-cut/blanched/shocked). `assignedStation` is a plain string, not `PrepStation` — an item's station survives a preset being renamed or removed in Settings, surfacing under Prep List's "Unmatched Station" group instead of breaking. `prepMinutes` absent reads as `0` and sorts last (same "absent reads as a stated default" convention as `recipeStatus()`) — no migration write. `onHand` was renamed from `quantity`; a doc saved before the rename has no `onHand` and is read through `onHandValue()` (`prepEngine.ts`), same code-level-fallback convention as `KitchenEvent.attendees`/`covers` — no migration write. `ProductionRun` is a legacy alias for the same type. |
 | `Recipe` | id, name, recipeType ('sub' \| 'menu'), course, categoryId?, batchYield { qty, measureType }, portions, lines: RecipeLine[], methodSteps, menuPrice?, menuDescription?, onMenu?, status?: RecipeStatus, variants?: RecipeVariant[], updatedAt |
 | `RecipeStatus` | `'development' \| 'active'` — where a menu recipe sits in its own lifecycle. Optional on `Recipe`; every reader defaults a missing value to `'active'` via `recipeStatus()` (costEngine.ts), so no migration write was needed and nothing on the menu dropped off. Sub-recipes carry no status — they were never menu-eligible, and `toDoc` omits the field for them |
 | `RecipeVariant` | One trial version of a dish in development: `{ id, name, notes }` — **notes only**, never its own lines, cost, or nutrition, and never written to another collection. `id` is a client-side render key, not a Firestore document id. Capped at `MAX_RECIPE_VARIANTS` (3), enforced in the editor UI and by a `.slice()` on both read and write — a hand-written doc with more is silently truncated to 3 on next save |
@@ -212,7 +220,7 @@ The Recipe Builder sub-tab also carries a "View Menu" button (`onViewMenu` prop)
 | `PricePoint` | `'$' \| '$$' \| '$$$' \| '$$$$'` — `RestaurantProfile.pricePoint` |
 | `RestaurantProfile` | Singleton doc at `restaurant_profile/main`: name?, chefName?, brandColor?, cuisineStyle?, pricePoint?, city?, state?, regionalNotes?, targetFcPercent?, menuTemplate? — every field optional, edited from Settings' Restaurant Profile section. `regionalNotes` is free text by design (chef commentary on local ingredients/traditions); `state` is a plain string (USPS code) rather than a union, UI-constrained to a fixed select. `targetFcPercent`/`menuTemplate` were migrated here from App.tsx state + localStorage — see the Restaurant Profile section below |
 
-Note: `useKitchenState.ts` also defines `PrepItem` locally (pre-existing duplication). `Recipe` was de-duplicated — `useKitchenState.ts` now imports the canonical type from `src/types.ts` directly. New types belong in `src/types.ts` only.
+Note: `useKitchenState.ts` no longer defines any local duplicate types — `Recipe` and `PrepItem` are both imported from `src/types.ts` directly. New types belong in `src/types.ts` only, with one deliberate exception: a `prep_history` doc's item shape (`PrintSheetLine` — name, spec?, makeQty, unit, prepMinutes) lives in `src/lib/prepEngine.ts` alongside the print/history logic that produces it, not in `src/types.ts` — see the Prep Checklist section below.
 
 ## Design system
 
@@ -310,6 +318,7 @@ The app's landing page and **morning planning surface** — default view on sign
 - **Today's Schedule**: every configured station preset (`useStationPresets()`) renders as its own row — covered stations show the assigned employee(s) and times, an uncovered station (no shift assigned today) shows a bold red "Uncovered" badge. Shifts with no station assigned surface separately underneath, never silently dropped. A plain one-line summary ("No shifts scheduled today" / "N shifts today") sits above the breakdown so the zero-shift case is stated outright, not just implied by an all-uncovered list.
 - **Fixed a real bug while wiring this up**: `Staff.tsx`'s shift form previously sourced station options from its own hardcoded array (`['Sauté', 'Grill', 'Garde Manger', 'Pastry']`), completely ignoring the customizable `station_presets` collection — a chef who renamed or added a station in Settings could never actually assign a shift to it. `useStationPresets()` (previously an unused/orphaned hook) is now the single source of truth for both the shift form's options and the dashboard's coverage check — same one-source-of-truth principle as `isRecipeOnMenu`. The hook now falls back to the 4 original names only when `station_presets` is empty. Existing shifts keep whatever station string they were saved with regardless of later renames — there's no live join, just a stored string, same "survives until re-saved" convention as a deleted recipe category.
 - **Today's Events**: today's events from `useKitchenState`'s `events`, resolved against `clients` for display name (same `clientsById` map pattern as `EventCalendar.tsx`). No events = plain empty state.
+- **Prep Sheets** (P-012): one row per station with printable items right now or already printed today — a station with neither is omitted entirely, not shown empty (a reminder to print an empty sheet is noise, not signal). Printed-today state reads "Prep list is with the {Station}." plus a `· N added since print` counter (font-mono) when items became printable after that print — added, or carried over from a Reset Shift, but never captured by the standing print itself. Not-yet-printed state is a navy outline badge ("Not printed") — deliberately not danger red (this isn't a failure) and not saffron (reserved for the trends strip's one signal per screen). Includes an "Unmatched Station" row on the same terms as real station presets, same grouping `PrepChecklist.tsx` itself uses. Zero new listeners — derives entirely from the already-live `prepItems` and `useStationPresets()`, and never reads `prep_history`; `printedDate` on the item itself is the only "is this station handled" signal needed. Row click opens Prep List on that station via `selectedStation`/`setSelectedStation` (`onOpenPrepStation`), the same consume-once mechanism as `selectedRecipeId`/`onOpenRecipe`.
 - **Tonight's Features**: read-only list of today's active (not 86'd, within `activeFrom`/`activeTo`) features — the exact same filter `DailyCribSheet.tsx`'s own "Features Tonight" card uses. No inline 86-toggle here (see the write-exception note above); a "Manage Features" link navigates to the full `Features.tsx` view for that.
 - **Quick Actions**: a button to Crib Sheet (`onNavigate`, threaded down from `App.tsx`'s `setActiveView`), plus "Add Feature" — opens an inline form (Manual Entry or From Recipe) that writes a new `features` doc via the shared `toDoc`/`FormState`/`BLANK` exported from `Features.tsx`, so the write shape can never drift between the two entry points.
 - Today's date is computed via the shared `todayDateKey()` helper (`src/utils.ts`) — see the app-wide date/time convention below.
@@ -424,6 +433,88 @@ Staff & Scheduling part 2 (Approved Feature Map's "Week/month calendar merged wi
 - **A real cross-browser `toLocaleDateString` bug surfaced and was fixed here**: calling it with `{ day: 'numeric', year: 'numeric' }` (day+year, no month) rendered a malformed string in testing (`"2026 (day: 18)"` instead of `"18, 2026"`) — the week-range label now always includes the month, sidestepping that options combination entirely.
 - **Weekly Hours strip** — the Approved Feature Map's last STAFF & SCHEDULING item ("per-employee projected weekly hours with overtime flag"), attached to Week mode only (month mode carries no per-employee summary): a chip per employee below the 7-day grid, name + summed hours (one decimal place) across the visible week, alphabetical by name, employees with zero hours that week omitted entirely. Hours sum every shift regardless of navigation direction (past/current/future week) — a projection of the schedule as planned, not a timesheet; there's no time-clock concept anywhere in the app. A flat **40-hr threshold** is the only tier: `hours >= 40` gets the same red `Overtime` badge styling as the `Uncovered` badge elsewhere — no second "approaching" tier. An inactive employee with hours in the visible week still appears, suffixed `(inactive)`, since an already-scheduled shift for a since-deactivated employee shouldn't vanish from the projection (mirrors `DayContent` resolving `staffById` regardless of `active`). No `hourlyRate`/pay figure is shown — deliberately narrower than the Feature Map technically permits (scheduler-view-only), scoped to what the item actually asked for. Overnight shifts and week-boundary-spanning shifts are non-issues by construction: `isShiftValid` (`Staff.tsx`) requires same-day `endTime > startTime` on every saved shift, so no shift can wrap past midnight or span two calendar weeks.
 
+## Prep Checklist (PrepChecklist.tsx)
+
+P-012 rebuild (2026-09-11). The chef is the app's user; cooks work from
+printed paper — the same user model as the earlier timers ruling (this
+app is the chef's own tool, not a shared kitchen screen). The chef builds
+and maintains the prep catalog in the app; `PrepChecklist.tsx` sorts each
+station's list by production time and prints a station sheet for the
+cooks to work from. Check-off and Not Needed never require a cook to
+touch the app at all.
+
+- **Sort is execution-critical, three tiers, nothing else orders the
+  list** (`sortPrepItems`, `src/lib/prepEngine.ts`): printable items first
+  (`prepMinutes` descending, name tiebreak — the longest production goes
+  first so it isn't started late), then checked, then notNeeded.
+  **`notNeeded` outranks `checked` for tier placement even when an item is
+  both** — it's the stronger, shift-defining statement ("not doing this at
+  all, period"), matching the original ruling's "at the very bottom"
+  wording literally rather than "below checked unless also notNeeded."
+- **`printableItems` (not checked, not notNeeded) is the single source for
+  both the printed sheet and the `prep_history` doc it writes** — neither
+  the print DOM nor the history write carries its own filter, so the two
+  can never drift apart. A checked or notNeeded line is excluded from
+  both for the same reason: a printed row a cook cannot act on costs
+  attention mid-service, and a history log should read as what was
+  actually asked for, not what was already handled or skipped.
+- **`makeQty` = `par − onHand`, floored at 0** — the production quantity,
+  not the on-hand count, is what prints (labeled "Make"). An over-stocked
+  item never prints or logs as a negative instruction.
+- **`toDoc` (PrepItemForm.tsx) is a partial-write contract**: the add/edit
+  form owns exactly the seven catalog fields (name, station, spec, unit,
+  par, onHand, prepMinutes) and never touches
+  checked/notNeeded/printedDate. `updateDoc`'s partial-merge semantics
+  mean a catalog fix — a chef correcting a par level — can never silently
+  un-check a cook's already-finished prep.
+- **Print is one `writeBatch`**: a `prep_history` doc (one per printed
+  station sheet) plus a `printedDate` stamp on every printed item, or
+  neither — a log entry with no printed marker, or a printed marker with
+  no log, are both states the chef can't reason about later. `window.
+  print()` fires only after the batch commits, in an explicit success
+  branch — never incidentally from a statement that just happens not to
+  throw. **Deliberate tradeoff**: if the chef cancels the print dialog,
+  the history entry and printedDate stamp both stand anyway — the browser
+  can't reliably report a cancelled print across browsers. This is
+  acceptable specifically because **Reset Shift** is the one-click
+  recovery: a second `writeBatch` clears checked/notNeeded/printedDate for
+  every item on the active station, and nothing else — the catalog
+  (items, pars, times, specs) is untouched. `prep_history` is never
+  touched by Reset Shift; it is a write-once log, not shift state.
+- **Unmatched Station**: a pseudo-tab (`UNMATCHED_STATION_KEY`, not a real
+  station, never selectable on the add/edit form) grouping every item
+  whose stored `assignedStation` matches no current preset — a preset was
+  renamed or removed in Settings since the item was saved. The sentinel
+  lives in `prepEngine.ts` rather than `PrepChecklist.tsx` so
+  `ChefDashboard.tsx`'s Prep Sheets card can reference it without
+  statically importing this lazy-loaded view's whole module.
+- **`PREP_UNIT_GROUPS`/`PREP_UNITS` (PrepItemForm.tsx) are deliberately
+  separate from `units.ts`'s `DisplayUnit`** and not meant to be unified
+  later: `units.ts` is cost-basis conversion gated on `measureType`,
+  feeding `toBase`/`fromBase` for the Recipe/Ingredient costing pipeline.
+  Prep quantities are never costed or converted — `PrepItem` has no
+  `measureType` at all — so routing a prep unit through that system would
+  mean bolting a fake measure type onto a checklist. A future shared
+  vocabulary is a deliberate redesign of both call sites, not a
+  find-and-replace import.
+- **History (`PrepHistoryView.tsx`) queries by date range only, station
+  filtered client-side**: a single-field range on `date` plus
+  `orderBy('date', 'desc')` needs no composite index; station + date-range
+  together would. Deliberately unoptimized — volume is at most one doc per
+  printed station per day, so a 14-day range is a handful of docs and
+  filtering it in memory is free. Scoped `getDocs` on demand, never
+  `onSnapshot`, never added to `useKitchenState.ts` — an always-on
+  listener on a write-once, ever-growing log would mean every session
+  loads the whole history forever.
+- **CSV export** headers are the raw field names
+  (`date,station,printedAt,name,spec,makeQty,unit,prepMinutes`), one row
+  per item across every history doc in the current filtered range,
+  RFC4180-escaped.
+- **Delete uses the inline per-row two-step swap** (action buttons →
+  confirm text + check/X icons), matching the convention actually used by
+  `Vendors.tsx`/`Staff.tsx`/`EventCalendar.tsx` — not the `AlertDialog`
+  modal component, which only `Settings.tsx`/`Recipes.tsx` use.
+
 ## Date/time convention
 
 Every "what day is today" comparison in the app must go through `todayDateKey()` (`src/utils.ts`) — `new Date().toLocaleDateString('en-CA')`, local time, `YYYY-MM-DD`. Never use `new Date().toISOString().slice(0, 10)` for this: it's UTC-based and rolls to tomorrow's date hours before local midnight (for Pacific time, starting mid-afternoon — most of dinner service). `ChefDashboard.tsx` and `TestKitchenHub.tsx` originated this pattern; `DailyCribSheet.tsx`, `Staff.tsx`, `EventCalendar.tsx`, `EventDetailView.tsx`, and the ingredient `lastVerified` stamps (`IngredientForm.tsx`, `InvoicePriceUpdate.tsx`) were audited and migrated to the shared helper, closing the divergence this file used to document between ChefDashboard and Crib Sheet. `toISOString()`/`toLocaleTimeString()` remain fine for full instants (`updatedAt`, `generatedAt`) and pure display formatting where no "is this today" comparison is involved.
@@ -439,6 +530,7 @@ Date-grid math (as opposed to single-date comparisons) also lives in `src/utils.
 ## Working Session Protocol
 
 - Feature tests must never write to real pantry ingredients. Test with disposable ingredients created for the test and deleted afterward.
+- Feature tests must never leave `prep_history` docs behind. The collection is write-once by design (see the Prep Checklist section) — there is no in-app delete path, so a test print has to be removed from the Firebase console afterward, same disposable-data discipline as pantry ingredients.
 
 ## Orphaned / notable files
 

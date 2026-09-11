@@ -445,7 +445,7 @@ Do not write or change any code. Brian reviews the inventory, rules on each item
 
 ---
 
-## P-012 — Prep Checklist rebuild: time-sorted station sheets, print-to-paper workflow — QUEUED 2026-07-19
+## P-012 — Prep Checklist rebuild: time-sorted station sheets, print-to-paper workflow — DONE 2026-09-11 (commits c34f0e0..9b09269, plus 9f37499 false-green fix; firestore.rules deployed 2026-09-11; app not yet deployed to hosting)
 
 **Origin:** Brian's Copilot-built MiseOS Prep reference (2026-07-19). Adopted the workflow ideas, not the code: time-priority sort, Not Needed state, per-station sheets, print/share. Rejected: localStorage, PIN admin, cook:boolean (was a stand-in for prep duration), qty-required-at-checkoff.
 
@@ -488,6 +488,29 @@ CONSTRAINTS:
 - Do not fix pre-existing TypeScript errors unless they block this work.
 - One change at a time; verify with me at each step; commit per verified working change. Firestore rules changes emulator-tested before deploy.
 ```
+
+**Decisions log (build, 2026-09-11) — every ruling made while executing the 8 steps, in order:**
+- STEP 0 report: SPEC-prep-checklist-add-item.md / SPEC-prep-checklist-edit-checkoff.md were gone from the repo — nothing of them had landed; `PrepItem` was defined twice (`types.ts` had drifted from a stale local copy in `useKitchenState.ts`, itself still carrying `quantity: string`). `assignedStation` was loosened from the `PrepStation` union to `string` so a renamed/removed station preset degrades to "Unmatched Station" instead of breaking existing docs. `prepMinutes` defaults to `0` when absent (sorts last) rather than requiring a migration write — amendments folded into the plan before STEP 1 was issued.
+- `checked` means done and is excluded from print, same as `notNeeded` — a finished item costs a cook's attention on the sheet the same as a skipped one.
+- `spec` (free-text prep description) replaces the old `notes` field; `priority` and `requires_temp_check` are retired — neither had a UI consumer or a place in the print-to-paper model.
+- Delete added to the catalog (the old registration form had none).
+- Printed quantity is `makeQty` (`par − onHand`), labeled "Make" on the sheet — not `onHand`, not `par` alone.
+- `quantity` renamed `onHand` for clarity against `par`; legacy docs read through `onHandValue()`'s fallback, no migration write (same convention as `KitchenEvent.attendees`/`covers`).
+- `prepMinutes` required on every save, add **and** edit — the sort is execution-critical (a missing estimate sinks an item to the bottom, so a 3-hour braise could print below a 10-minute garnish) and the chef is already in the form, so an edit is the opportunistic point a legacy item without one gets one, without a separate migration pass.
+- `PREP_UNIT_GROUPS`/`PREP_UNITS` (PrepItemForm.tsx) kept deliberately separate from `units.ts`'s `DisplayUnit` — prep quantities are never costed or converted, so routing them through the costing unit system would mean bolting a fake `measureType` onto a checklist.
+- `toDoc` is a partial-write contract: the form owns only the seven catalog fields, never checked/notNeeded/printedDate — a catalog edit can never silently un-check a cook's finished prep.
+- `notNeeded` outranks `checked` for sort-tier placement even when an item is both — the stronger, shift-defining statement, matching the original ruling's "at the very bottom" wording literally rather than "below checked unless also notNeeded."
+- `isPrintable`/`printableItems` kept as shared private/exported predicates in `prepEngine.ts` rather than duplicated in the print DOM and the history write, so the two can't drift apart.
+- Delete convention: initially built on the `AlertDialog` modal; grep showed `Vendors.tsx`/`Staff.tsx`/`EventCalendar.tsx` actually use an inline per-row two-step swap. Ruled in favor of matching the majority convention (inline swap), correcting the initial implementation.
+- Print is commit-then-print: the `writeBatch` (history doc + printedDate stamps) commits first, `window.print()` fires only in the explicit success branch. A cancelled print dialog leaves the write standing regardless — accepted specifically because Reset Shift is a one-click recovery. Ruled explicit, not incidental, after the first version's print-on-success only happened to work because a thrown error short-circuited the call before reaching it.
+- "Nothing to print" (no printable items on the active station) disables the Print button rather than printing an empty sheet.
+- History query is a date-range-only Firestore query (`where('date', ...)` + `orderBy('date', 'desc')`, no composite index) with station filtered client-side — ruled unearned to add `firestore.indexes.json` for at-most-one-doc-per-station-per-day volume.
+- Dashboard Prep Sheets card: three states (printed-today with an "N added since print" counter, not-printed as a navy outline badge, and no row at all when a station has nothing printable and nothing printed) — navy outline chosen over danger (not a failure) and over saffron (reserved for the trends strip's one signal per screen); a station with neither state renders nothing at all, not an empty row, so an empty-sheet reminder never reads as signal.
+- `UNMATCHED_STATION_KEY` moved out of `PrepChecklist.tsx` into `prepEngine.ts` (side-effect-free, no React/Firestore) so `ChefDashboard.tsx`'s Prep Sheets card could reference the same sentinel without statically importing `PrepChecklist`'s whole lazy-loaded module into the Dashboard's bundle.
+
+**Verification log:** two real bugs were caught only by browser verification against live dev Firestore data, never by `tsc`/tests — a legacy `quantity` field on pre-rebuild docs (`PrepRegistrationForm.tsx`-era) rendering "NaN kg"/blank on every old item until `onHandValue()`'s fallback was wired into the display line, the form prefill, and `makeQty`; and an `activeStation` `useState` lazy initializer that captured `useStationPresets()`'s pre-resolution hardcoded fallback and never corrected once real presets loaded, producing a phantom tab matching no rendered button — fixed with a self-heal `useEffect`. A live permissions-denied error on the first print attempt (rules not yet deployed) rolled the `writeBatch` back atomically with no partial write — direct proof the print batch is correctly all-or-nothing. `firestore.rules` was deployed only after diffing the live console ruleset (copied to a gitignored `live-rules.tmp`, deleted immediately after diffing, confirmed via `git status` never staged) against the local file and confirming `prep_history` was the only substantive difference.
+
+**Side effects:** Temurin 21 JDK installed (`npm run test:rules` needs a JVM for the Firestore/Auth emulator); `scripts/runFirestoreRulesTest.ts` added to stop `firebase emulators:exec` reporting a false exit 0 when the emulator never actually started; `firestore.rules` deployed live 2026-09-11 (`prep_history` collection); two findings logged to PARKING-LOT.md's Inbox — untyped Firestore writes (no write anywhere is type-checked against `src/types.ts`; `rCollection`/`rDoc` are untyped `DocumentData` refs) and `RecipesHub.tsx`'s `text-cream`-on-`bg-teal` contrast defect (same class as the P-031 item 1 defect, missed on that pass because it's a hand-rolled class bypassing `formStyles.ts` — an audit-methodology gap, not a new defect); CI does not run the Firestore rules suite — logged as its own future prompt, not fixed here.
 
 ---
 
@@ -2174,6 +2197,6 @@ disclosure; this is the fix.
   unchanged in formula; the inputs change. The P-017 / P-020 suites must
   pass; add tests for the computed default vs the measured override.
 
-**Sequence:** after P-012 Prep Checklist. **Not a tester blocker** —
-today's chef-typed yield is as right as the chef makes it; P-033 makes
-it easier, not newly possible.
+**Sequence:** after P-012 Prep Checklist — cleared 2026-09-11 (P-012
+DONE). **Not a tester blocker** — today's chef-typed yield is as right as
+the chef makes it; P-033 makes it easier, not newly possible.
