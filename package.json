@@ -10,6 +10,7 @@
     "lint": "tsc --noEmit",
     "lint:css": "stylelint \"src/**/*.css\"",
     "test": "vitest run",
+    "test:rules": "tsx scripts/runFirestoreRulesTest.ts",
     "check:color": "node scripts/check-color.mjs",
     "check:arbitrary-color": "node scripts/check-arbitrary-color.mjs"
   },

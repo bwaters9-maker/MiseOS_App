@@ -1,7 +1,10 @@
 /**
  * scripts/testFirestoreRules.ts
  * Automated firestore.rules tests against the local emulator only —
- * never touches the real project. Run via:
+ * never touches the real project. Run via `npm run test:rules`
+ * (scripts/runFirestoreRulesTest.ts), not directly — that wrapper is what
+ * makes a missing JVM or a failed emulator spawn a real failure instead of
+ * a silent false-green. If you must run it directly:
  *   firebase emulators:exec --only firestore,auth "npx tsx scripts/testFirestoreRules.ts"
  */
 import { readFileSync } from 'fs';
