@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
-import { Plus, Pencil, Trash2, Check, X, CheckCircle2, Ban, ClipboardList } from 'lucide-react';
-import { addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import React, { useState, useEffect } from 'react';
+import { Plus, Pencil, Trash2, Check, X, CheckCircle2, Ban, ClipboardList, Printer, RotateCcw } from 'lucide-react';
+import { addDoc, updateDoc, deleteDoc, writeBatch, doc, deleteField } from 'firebase/firestore';
+import { db } from './firebaseConfig';
 import { rCollection, rDoc } from './lib/firestorePaths';
 import { useRestaurantId } from './components/AuthContext';
 import { useKitchenSelector } from './components/KitchenStateContext';
 import { useStationPresets } from './hooks/useStationPresets';
-import { sortPrepItems, makeQty, onHandValue } from './lib/prepEngine';
+import { sortPrepItems, makeQty, onHandValue, printableItems, buildPrintSheet } from './lib/prepEngine';
 import { PrepItemForm, BLANK, toForm, toDoc, type FormState } from './components/prep/PrepItemForm';
-import { BTN_ACTION, BADGE } from './lib/formStyles';
+import { BTN_ACTION, BTN_GHOST, BADGE } from './lib/formStyles';
+import { todayDateKey } from './utils';
 import type { PrepItem } from './types';
 
 /** Not a real station — a chef-visible bucket for items whose stored
@@ -34,7 +36,25 @@ export const PrepChecklist: React.FC = () => {
   const stationPresets: string[] = stationPresetsRaw;
 
   const unmatchedItems = prepItems.filter(i => !stationPresets.includes(i.assignedStation));
-  const [activeStation, setActiveStation] = useState<string>(stationPresets[0] ?? '');
+  const [activeStation, setActiveStation] = useState<string>('');
+
+  // useStationPresets() starts on its own hardcoded fallback before the
+  // live station_presets listener resolves, so seeding activeStation from
+  // stationPresets[0] at mount (a useState lazy initializer only ever
+  // runs once) would freeze it on that fallback's first entry forever --
+  // a phantom tab that isn't one of the real, rendered tab buttons and
+  // matches nothing the chef clicked. Correct it here instead: once real
+  // presets exist and the current value isn't one of them (and isn't the
+  // Unmatched pseudo-tab, which is never a preset), fall back to the
+  // first real preset. Same self-heal covers a station being renamed or
+  // removed in Settings while this view is already open.
+  useEffect(() => {
+    if (stationPresets.length === 0) return;
+    if (activeStation === UNMATCHED_KEY) return;
+    if (!stationPresets.includes(activeStation)) {
+      setActiveStation(stationPresets[0]);
+    }
+  }, [stationPresets, activeStation]);
 
   const [showAdd, setShowAdd] = useState(false);
   const [addForm, setAddForm] = useState<FormState>(BLANK);
@@ -43,6 +63,10 @@ export const PrepChecklist: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const [printError, setPrintError] = useState<string | null>(null);
+  const [resetConfirm, setResetConfirm] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const openAdd = () => {
     setAddForm({ ...BLANK, assignedStation: stationPresets.includes(activeStation) ? activeStation : '' });
@@ -105,13 +129,134 @@ export const PrepChecklist: React.FC = () => {
   const toggleNotNeeded = (item: PrepItem) =>
     updateDoc(rDoc(restaurantId, 'prepItems', item.id), { notNeeded: !item.notNeeded });
 
+  const switchStation = (s: string) => {
+    setActiveStation(s);
+    setShowAdd(false);
+    setEditId(null);
+    setDeleteConfirmId(null);
+    setResetConfirm(false);
+    setPrintError(null);
+  };
+
   const activeItems = activeStation === UNMATCHED_KEY
     ? unmatchedItems
     : prepItems.filter(i => i.assignedStation === activeStation);
   const sortedItems = sortPrepItems(activeItems);
+  const printSheet = buildPrintSheet(activeItems);
+  const canPrint = activeStation !== UNMATCHED_KEY && printSheet.length > 0;
+  const canReset = activeItems.some(i => i.checked || i.notNeeded || i.printedDate);
+
+  /**
+   * Writes the prep_history doc and stamps printedDate on every included
+   * item in ONE writeBatch (the doc's id is pre-generated via doc() so it
+   * can join the batch) -- a log entry with no printed marker, or a
+   * printed marker with no log, are both states the chef can't reason
+   * about later, so neither write happens without the other.
+   *
+   * Deliberate tradeoff, do not "fix": the batch commits, THEN (and only
+   * on that commit's success) window.print() is invoked. If the chef
+   * cancels the print dialog, the history entry and the printed stamp
+   * both stand anyway -- the browser cannot reliably report a cancelled
+   * print (afterprint/onafterprint is inconsistent across browsers and
+   * would trade a recoverable failure for an unreliable one). This is
+   * acceptable specifically BECAUSE Reset Shift clears printedDate and
+   * un-marks the station in one action, so a cancelled print is a
+   * one-click recovery, not a stuck state.
+   *
+   * The commit-then-print ordering is explicit, not incidental: success
+   * and failure are two separate branches below, not one statement that
+   * happens to throw before reaching the next. A failed commit prints
+   * nothing and surfaces inline; window.print() sits ONLY in the success
+   * branch. A future refactor that reorders these two calls must not end
+   * up printing a sheet whose write failed.
+   */
+  const handlePrint = async () => {
+    if (printing || !canPrint) return;
+    setPrinting(true);
+    setPrintError(null);
+    try {
+      const today = todayDateKey();
+      const printable = printableItems(activeItems);
+      const batch = writeBatch(db);
+      const historyRef = doc(rCollection(restaurantId, 'prep_history'));
+      batch.set(historyRef, {
+        date: today,
+        station: activeStation,
+        items: printSheet,
+        printedAt: new Date().toISOString(),
+      });
+      printable.forEach(item => {
+        batch.update(rDoc(restaurantId, 'prepItems', item.id), { printedDate: today });
+      });
+      await batch.commit();
+    } catch (e: any) {
+      setPrinting(false);
+      setPrintError(e?.message || 'Could not save the print record. Nothing was printed.');
+      return;
+    }
+    setPrinting(false);
+    window.print();
+  };
+
+  // One writeBatch, catalog fields (name/spec/unit/par/onHand/prepMinutes/
+  // assignedStation) untouched -- same toDoc partial-fields contract as
+  // the add/edit form. prep_history is never touched here: it's a
+  // write-once log, not shift state.
+  const handleResetShift = async () => {
+    if (resetting) return;
+    setResetting(true);
+    try {
+      const batch = writeBatch(db);
+      activeItems.forEach(item => {
+        batch.update(rDoc(restaurantId, 'prepItems', item.id), {
+          checked: false,
+          notNeeded: false,
+          printedDate: deleteField(),
+        });
+      });
+      await batch.commit();
+      setResetConfirm(false);
+    } finally {
+      setResetting(false);
+    }
+  };
 
   return (
-    <div className="max-w-[987px] mx-auto px-[21px] py-[34px]">
+    <>
+      <style>{`
+        @media print {
+          @page { size: letter portrait; margin: 0.5in; }
+          header, .no-print { display: none !important; }
+          .print-show { display: block !important; }
+          body, html, main { background: white !important; padding: 0 !important; margin: 0 !important; }
+          .print-page * { color: #111 !important; }
+          .print-page table { border-collapse: collapse; width: 100%; }
+          .print-page th, .print-page td { border-bottom: 1px solid #d1d5db; padding: 8px; text-align: left; }
+          .print-page th { text-transform: uppercase; font-size: 10px; letter-spacing: 0.08em; }
+        }
+      `}</style>
+
+      <div className="print-show hidden print-page">
+        <h1 className="text-xl font-bold">Prep Sheet — {activeStation}</h1>
+        <p className="text-xs mb-[21px]">{todayDateKey()}</p>
+        <table>
+          <thead>
+            <tr><th>Item</th><th>Spec</th><th>Make</th><th>Unit</th></tr>
+          </thead>
+          <tbody>
+            {printSheet.map(line => (
+              <tr key={line.name}>
+                <td>{line.name}</td>
+                <td>{line.spec ?? ''}</td>
+                <td>{line.makeQty}</td>
+                <td>{line.unit}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+    <div className="no-print max-w-[987px] mx-auto px-[21px] py-[34px]">
       <div className="flex items-start justify-between mb-[21px]">
         <div>
           <h1 className="text-xl font-black font-display uppercase tracking-wider text-navy flex items-center gap-[8px]">
@@ -136,7 +281,7 @@ export const PrepChecklist: React.FC = () => {
               <button
                 key={s}
                 type="button"
-                onClick={() => setActiveStation(s)}
+                onClick={() => switchStation(s)}
                 aria-pressed={activeStation === s}
                 className={segClass(activeStation === s)}
               >
@@ -147,7 +292,7 @@ export const PrepChecklist: React.FC = () => {
           {unmatchedItems.length > 0 && (
             <button
               type="button"
-              onClick={() => setActiveStation(UNMATCHED_KEY)}
+              onClick={() => switchStation(UNMATCHED_KEY)}
               aria-pressed={activeStation === UNMATCHED_KEY}
               className={segClass(activeStation === UNMATCHED_KEY)}
             >
@@ -162,6 +307,58 @@ export const PrepChecklist: React.FC = () => {
         <p className="text-[11px] text-slate mb-[13px]">
           These items' stored station no longer matches a station preset — a preset was renamed or removed in Settings. Edit each to reassign it.
         </p>
+      )}
+
+      {stationPresets.length > 0 && (
+        <div className="flex items-center gap-[8px] mb-[21px]">
+          {activeStation !== UNMATCHED_KEY && (
+            <button
+              onClick={handlePrint}
+              disabled={!canPrint || printing}
+              title={canPrint ? undefined : `Nothing to print — no active items on ${activeStation}.`}
+              className={`${BTN_ACTION} flex items-center gap-[8px] disabled:opacity-40 disabled:cursor-not-allowed`}
+            >
+              <Printer className="w-3.5 h-3.5" />
+              {printing ? 'Printing…' : 'Print'}
+            </button>
+          )}
+          {resetConfirm ? (
+            <div className="flex items-center gap-[8px]">
+              <span className="text-[10px] text-danger whitespace-nowrap">
+                Clear checked, Not Needed, and printed status for every item on {activeStation === UNMATCHED_KEY ? 'this list' : activeStation}?
+              </span>
+              <button
+                onClick={handleResetShift}
+                disabled={resetting}
+                className={`${BADGE} text-danger border-danger bg-danger-wash hover:bg-danger/10 transition-colors duration-[144ms] disabled:opacity-40`}
+                title="Confirm reset"
+              >
+                <Check className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => setResetConfirm(false)}
+                className={`${BADGE} text-slate border-line hover:text-navy transition-colors duration-[144ms]`}
+                title="Cancel"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setResetConfirm(true)}
+              disabled={!canReset}
+              title={canReset ? undefined : 'Nothing to reset — no item here has been checked, skipped, or printed.'}
+              className={`${BTN_GHOST} flex items-center gap-[8px] disabled:opacity-40 disabled:cursor-not-allowed`}
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Reset Shift
+            </button>
+          )}
+        </div>
+      )}
+
+      {printError && (
+        <p className="text-[11px] text-danger mb-[21px]">{printError}</p>
       )}
 
       {showAdd && (
@@ -219,6 +416,7 @@ export const PrepChecklist: React.FC = () => {
         </div>
       )}
     </div>
+    </>
   );
 };
 
