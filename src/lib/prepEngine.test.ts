@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { prepMinutesValue, makeQty, printableItems, sortPrepItems, buildPrintSheet } from './prepEngine';
+import { prepMinutesValue, onHandValue, makeQty, printableItems, sortPrepItems, buildPrintSheet } from './prepEngine';
 import type { PrepItem } from '../types';
 
 const mkItem = (o: Partial<PrepItem> & { id: string; name: string }): PrepItem => ({
@@ -21,6 +21,25 @@ describe('prepMinutesValue', () => {
   });
 });
 
+describe('onHandValue', () => {
+  it('returns onHand when present, even when it is 0', () => {
+    expect(onHandValue(mkItem({ id: '1', name: 'Carrots', onHand: 0 }))).toBe(0);
+    expect(onHandValue(mkItem({ id: '1', name: 'Carrots', onHand: 5 }))).toBe(5);
+  });
+
+  it('falls back to a legacy quantity field when onHand is missing entirely', () => {
+    // Reproduces a real doc written by the pre-rebuild PrepRegistrationForm.tsx:
+    // onHand didn't exist yet, the same value was stored under quantity.
+    const legacy = { id: '1', name: 'Duck', assignedStation: 'Grill', unit: 'kg', par: 1, checked: false, quantity: 3 } as unknown as PrepItem;
+    expect(onHandValue(legacy)).toBe(3);
+  });
+
+  it('defaults to 0 when neither onHand nor a legacy quantity is present', () => {
+    const bare = { id: '1', name: 'Duck', assignedStation: 'Grill', unit: 'kg', par: 1, checked: false } as unknown as PrepItem;
+    expect(onHandValue(bare)).toBe(0);
+  });
+});
+
 describe('makeQty', () => {
   it('returns par minus onHand when onHand is below par', () => {
     expect(makeQty(mkItem({ id: '1', name: 'Carrots', par: 10, onHand: 4 }))).toBe(6);
@@ -28,6 +47,11 @@ describe('makeQty', () => {
 
   it('floors at 0 rather than going negative when onHand exceeds par', () => {
     expect(makeQty(mkItem({ id: '1', name: 'Carrots', par: 4, onHand: 10 }))).toBe(0);
+  });
+
+  it('falls back to a legacy quantity field, same as onHandValue, rather than computing NaN', () => {
+    const legacy = { id: '1', name: 'Duck', assignedStation: 'Grill', unit: 'kg', par: 5, checked: false, quantity: 2 } as unknown as PrepItem;
+    expect(makeQty(legacy)).toBe(3);
   });
 
   it('returns 0 when onHand equals par', () => {

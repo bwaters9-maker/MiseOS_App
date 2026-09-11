@@ -1,81 +1,304 @@
 import React, { useState } from 'react';
-import { PrepItem } from './types';
-import { PrepRegistrationForm } from './components/dashboard/PrepRegistrationForm';
+import { Plus, Pencil, Trash2, Check, X, CheckCircle2, Ban, ClipboardList } from 'lucide-react';
+import { addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { rCollection, rDoc } from './lib/firestorePaths';
+import { useRestaurantId } from './components/AuthContext';
 import { useKitchenSelector } from './components/KitchenStateContext';
+import { useStationPresets } from './hooks/useStationPresets';
+import { sortPrepItems, makeQty, onHandValue } from './lib/prepEngine';
+import { PrepItemForm, BLANK, toForm, toDoc, type FormState } from './components/prep/PrepItemForm';
+import { BTN_ACTION, BADGE } from './lib/formStyles';
+import type { PrepItem } from './types';
+
+/** Not a real station — a chef-visible bucket for items whose stored
+ * assignedStation matches no current preset (the preset was renamed or
+ * removed in Settings since the item was saved). Never a selectable value
+ * on the add/edit form itself; only ever assigned by history. */
+const UNMATCHED_KEY = '__unmatched_station__';
+
+/** Compact segmented control, same idiom as RecipesHub.tsx's sub-tab
+ * switcher: one connected bar, active segment filled teal. Deliberately
+ * NOT copying that file's text-cream active-segment class — text-cream on
+ * bg-teal collides to 2.46:1 in Service (CLAUDE.md, P-031 item 1); it was
+ * only caught for BTN_ACTION's 8 sites, and this is a different, unfixed
+ * site of the same defect. text-on-teal is the correct token here. */
+const segClass = (active: boolean) =>
+  `px-[11px] py-[5px] text-[11px] font-display font-semibold flex items-center gap-[5px] border-r border-line last:border-r-0 transition-colors duration-[144ms] ${
+    active ? 'bg-teal text-on-teal' : 'bg-surface text-slate hover:text-navy'
+  }`;
 
 export const PrepChecklist: React.FC = () => {
-  const [showAddForm, setShowAddForm] = useState(false);
+  const restaurantId = useRestaurantId();
   const prepItems = (useKitchenSelector((s: any) => s.prepItems) as PrepItem[]) ?? [];
+  const { presets: stationPresetsRaw } = useStationPresets();
+  const stationPresets: string[] = stationPresetsRaw;
+
+  const unmatchedItems = prepItems.filter(i => !stationPresets.includes(i.assignedStation));
+  const [activeStation, setActiveStation] = useState<string>(stationPresets[0] ?? '');
+
+  const [showAdd, setShowAdd] = useState(false);
+  const [addForm, setAddForm] = useState<FormState>(BLANK);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<FormState>(BLANK);
+  const [saving, setSaving] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const openAdd = () => {
+    setAddForm({ ...BLANK, assignedStation: stationPresets.includes(activeStation) ? activeStation : '' });
+    setShowAdd(true);
+    setEditId(null);
+    setDeleteConfirmId(null);
+  };
+
+  const startEdit = (item: PrepItem) => {
+    setEditForm(toForm(item));
+    setEditId(item.id);
+    setShowAdd(false);
+    setDeleteConfirmId(null);
+  };
+
+  const handleAdd = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await addDoc(rCollection(restaurantId, 'prepItems'), { ...toDoc(addForm), checked: false });
+      setShowAdd(false);
+      setAddForm(BLANK);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEdit = async () => {
+    if (!editId || saving) return;
+    setSaving(true);
+    try {
+      // toDoc returns only the seven catalog fields it owns -- never
+      // checked/notNeeded/printedDate. updateDoc's partial merge leaves
+      // today's shift state exactly as it was; a catalog fix can never
+      // silently un-check a cook's finished prep. See PrepItemForm.tsx.
+      await updateDoc(rDoc(restaurantId, 'prepItems', editId), toDoc(editForm));
+      setEditId(null);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (item: PrepItem) => {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await deleteDoc(rDoc(restaurantId, 'prepItems', item.id));
+      setDeleteConfirmId(null);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // The first write this app has ever made to PrepItem.checked. Direct
+  // single-field updateDoc, same shape as Features.tsx's toggle86 -- never
+  // a whole-document write, which would collide with the toDoc contract.
+  const toggleChecked = (item: PrepItem) =>
+    updateDoc(rDoc(restaurantId, 'prepItems', item.id), { checked: !item.checked });
+
+  const toggleNotNeeded = (item: PrepItem) =>
+    updateDoc(rDoc(restaurantId, 'prepItems', item.id), { notNeeded: !item.notNeeded });
+
+  const activeItems = activeStation === UNMATCHED_KEY
+    ? unmatchedItems
+    : prepItems.filter(i => i.assignedStation === activeStation);
+  const sortedItems = sortPrepItems(activeItems);
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-6 bg-zinc-950 text-zinc-100 font-mono tracking-tight">
-      <div className="border-b border-zinc-900 pb-4 mb-6 flex items-center justify-between">
+    <div className="max-w-[987px] mx-auto px-[21px] py-[34px]">
+      <div className="flex items-start justify-between mb-[21px]">
         <div>
-          <h1 className="text-2xl font-black text-cream tracking-tighter uppercase">Line Prep Checklist</h1>
-          <p className="text-xs text-zinc-500 mt-1">Automated par-to-hand deficiency tracking</p>
+          <h1 className="text-xl font-black font-display uppercase tracking-wider text-navy flex items-center gap-[8px]">
+            <ClipboardList className="w-5 h-5 text-navy" />
+            Prep Checklist
+          </h1>
+          <p className="text-xs text-slate mt-[5px]">Build the day's list, sorted by production time per station</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowAddForm((v) => !v)}
-          className="bg-emerald-700 hover:bg-emerald-600 border border-emerald-800 text-zinc-100 text-xs uppercase px-4 py-2 rounded-lg font-bold tracking-wider transition-colors shadow-md"
-        >
-          + Add Prep Item
-        </button>
+        {!showAdd && (
+          <button onClick={openAdd} className={`${BTN_ACTION} flex items-center gap-[8px]`}>
+            <Plus className="w-3.5 h-3.5" />
+            Add Prep Item
+          </button>
+        )}
       </div>
-      {showAddForm && (
-        <div className="mb-6">
-          <PrepRegistrationForm
-            onSuccess={() => setShowAddForm(false)}
-            onCancel={() => setShowAddForm(false)}
+
+      {stationPresets.length > 0 && (
+        <div className="inline-flex items-stretch rounded-[8px] border border-line overflow-hidden mb-[21px] flex-wrap">
+          {stationPresets.map(s => {
+            const count = prepItems.filter(i => i.assignedStation === s).length;
+            return (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setActiveStation(s)}
+                aria-pressed={activeStation === s}
+                className={segClass(activeStation === s)}
+              >
+                {s}{count > 0 && <span className="opacity-70">({count})</span>}
+              </button>
+            );
+          })}
+          {unmatchedItems.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setActiveStation(UNMATCHED_KEY)}
+              aria-pressed={activeStation === UNMATCHED_KEY}
+              className={segClass(activeStation === UNMATCHED_KEY)}
+            >
+              <span className="w-[5px] h-[5px] rounded-full bg-saffron shrink-0" />
+              Unmatched Station ({unmatchedItems.length})
+            </button>
+          )}
+        </div>
+      )}
+
+      {activeStation === UNMATCHED_KEY && (
+        <p className="text-[11px] text-slate mb-[13px]">
+          These items' stored station no longer matches a station preset — a preset was renamed or removed in Settings. Edit each to reassign it.
+        </p>
+      )}
+
+      {showAdd && (
+        <div className="mb-[21px]">
+          <PrepItemForm
+            form={addForm}
+            setForm={setAddForm}
+            onSave={handleAdd}
+            onCancel={() => setShowAdd(false)}
+            saving={saving}
+            stationPresets={stationPresets}
+            isEditing={false}
           />
         </div>
       )}
-      <div className="border border-zinc-900 rounded-xl overflow-hidden bg-zinc-900/10">
-        {prepItems.length === 0 ? (
-          <div className="p-8 text-center text-zinc-500 text-sm">
-            No prep items registered. Add the first item to begin par tracking.
+
+      {sortedItems.length === 0 && !showAdd && (
+        <div className="bg-surface border border-line rounded-card p-[55px] text-center">
+          <ClipboardList className="w-8 h-8 text-line mx-auto mb-[13px]" />
+          <p className="text-xs text-slate">
+            {stationPresets.length === 0 ? 'No stations configured — add one in Settings.' : `No prep items on ${activeStation}.`}
+          </p>
+        </div>
+      )}
+
+      {sortedItems.length > 0 && (
+        <div className="space-y-[8px]">
+          {sortedItems.map(item =>
+            editId === item.id ? (
+              <PrepItemForm
+                key={item.id}
+                form={editForm}
+                setForm={setEditForm}
+                onSave={handleEdit}
+                onCancel={() => setEditId(null)}
+                saving={saving}
+                stationPresets={stationPresets}
+                isEditing
+              />
+            ) : (
+              <PrepItemCard
+                key={item.id}
+                item={item}
+                isConfirmDelete={deleteConfirmId === item.id}
+                deleting={deleting}
+                onEdit={() => startEdit(item)}
+                onRequestDelete={() => setDeleteConfirmId(item.id)}
+                onConfirmDelete={() => handleDelete(item)}
+                onCancelDelete={() => setDeleteConfirmId(null)}
+                onToggleChecked={() => toggleChecked(item)}
+                onToggleNotNeeded={() => toggleNotNeeded(item)}
+              />
+            )
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const PrepItemCard: React.FC<{
+  item: PrepItem;
+  isConfirmDelete: boolean;
+  deleting: boolean;
+  onEdit: () => void;
+  onRequestDelete: () => void;
+  onConfirmDelete: () => void;
+  onCancelDelete: () => void;
+  onToggleChecked: () => void;
+  onToggleNotNeeded: () => void;
+}> = ({ item, isConfirmDelete, deleting, onEdit, onRequestDelete, onConfirmDelete, onCancelDelete, onToggleChecked, onToggleNotNeeded }) => {
+  const settled = item.checked || item.notNeeded;
+
+  return (
+    <div className={`bg-surface border border-line rounded-card p-[13px] ${settled ? 'opacity-60' : ''}`}>
+      <div className="flex items-start justify-between gap-[13px]">
+        <div className="min-w-0">
+          <span className={`font-bold text-navy ${settled ? 'line-through' : ''}`}>{item.name}</span>
+          {item.spec && <p className="text-xs text-slate mt-[2px]">{item.spec}</p>}
+          <p className="text-[11px] text-slate font-mono mt-[5px]">
+            Par {item.par} {item.unit} · On Hand {onHandValue(item)} {item.unit}
+            {item.prepMinutes != null ? ` · ${item.prepMinutes} min` : ' · No estimate'}
+          </p>
+        </div>
+        <div className="text-right shrink-0">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate">Make</p>
+          <p className="text-sm font-bold font-mono text-navy">{makeQty(item)} {item.unit}</p>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end gap-[5px] mt-[13px] pt-[8px] border-t border-line">
+        {isConfirmDelete ? (
+          <div className="flex items-center gap-[8px]">
+            <span className="text-[10px] text-danger whitespace-nowrap">Delete "{item.name}"?</span>
+            <button
+              onClick={onConfirmDelete}
+              disabled={deleting}
+              className={`${BADGE} text-danger border-danger bg-danger-wash hover:bg-danger/10 transition-colors duration-[144ms] disabled:opacity-40`}
+              title="Confirm delete"
+            >
+              <Check className="w-3 h-3" />
+            </button>
+            <button
+              onClick={onCancelDelete}
+              className={`${BADGE} text-slate border-line hover:text-navy transition-colors duration-[144ms]`}
+              title="Cancel"
+            >
+              <X className="w-3 h-3" />
+            </button>
           </div>
         ) : (
-          <table className="w-full text-left text-xs">
-            <thead className="bg-zinc-950 text-zinc-500 uppercase font-bold border-b border-zinc-900">
-              <tr>
-                <th className="p-4">Item</th>
-                <th className="p-4 text-center">Station</th>
-                <th className="p-4 text-right">On-Hand</th>
-                <th className="p-4 text-right">Par</th>
-                <th className="p-4 text-right">Deficit Order</th>
-                <th className="p-4 text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-900">
-              {prepItems.map((item) => {
-                const onHand = item.onHand || 0;
-                const par = item.par || 0;
-                const deficit = Math.max(0, par - onHand);
-                const status = deficit > 0 ? 'SHORTAGE' : 'STABLE';
-                return (
-                  <tr key={item.id} className="hover:bg-zinc-900/30 transition-colors">
-                    <td className="p-4 font-bold text-zinc-200">{item.name}</td>
-                    <td className="p-4 text-center text-zinc-400">{item.assignedStation}</td>
-                    <td className="p-4 text-right text-zinc-400">{onHand} {item.unit}</td>
-                    <td className="p-4 text-right text-zinc-400">{par} {item.unit}</td>
-                    <td className={`p-4 text-right font-bold ${deficit > 0 ? 'text-red-400' : 'text-zinc-600'}`}>
-                      {deficit > 0 ? `${deficit} ${item.unit}` : '0'}
-                    </td>
-                    <td className="p-4 text-center">
-                      <span className={`inline-block border px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wider ${
-                        status === 'SHORTAGE'
-                          ? 'border-red-950 bg-red-950/20 text-red-400'
-                          : 'border-zinc-800 bg-zinc-900 text-zinc-500'
-                      }`}>
-                        {status}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <>
+            <button
+              onClick={onToggleChecked}
+              className={`${BADGE} flex items-center gap-[3px] transition-colors duration-[144ms] ${
+                item.checked ? 'text-teal border-teal bg-bg-cool' : 'text-slate border-line hover:text-navy'
+              }`}
+            >
+              <CheckCircle2 className="w-3 h-3" />
+              {item.checked ? 'Done' : 'Mark Done'}
+            </button>
+            <button
+              onClick={onToggleNotNeeded}
+              className={`${BADGE} flex items-center gap-[3px] transition-colors duration-[144ms] ${
+                item.notNeeded ? 'text-danger border-danger bg-danger-wash' : 'text-slate border-line hover:text-navy'
+              }`}
+            >
+              <Ban className="w-3 h-3" />
+              {item.notNeeded ? 'Not Needed' : 'Skip This Shift'}
+            </button>
+            <button onClick={onEdit} className="p-[5px] text-slate hover:text-navy transition-colors duration-[144ms]" title="Edit">
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+            <button onClick={onRequestDelete} className="p-[5px] text-slate hover:text-danger transition-colors duration-[144ms]" title="Delete">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </>
         )}
       </div>
     </div>

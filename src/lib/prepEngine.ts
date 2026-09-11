@@ -13,13 +13,26 @@ export const prepMinutesValue = (item: Pick<PrepItem, 'prepMinutes'>): number =>
   item.prepMinutes ?? 0;
 
 /**
+ * onHand was renamed from `quantity` in the P-012 schema rewrite with no
+ * migration write — same code-level-fallback convention as
+ * KitchenEvent.attendees (renamed from `covers`, old docs read via a
+ * fallback, no data migration). A doc saved by the pre-rebuild
+ * PrepRegistrationForm.tsx still carries `quantity`, never `onHand`; read
+ * through this rather than `item.onHand` anywhere a stored doc might
+ * predate the rename, or it reads as `undefined` and every number derived
+ * from it (makeQty, the edit form) breaks silently.
+ */
+export const onHandValue = (item: Pick<PrepItem, 'onHand'>): number =>
+  item.onHand ?? (item as unknown as { quantity?: number }).quantity ?? 0;
+
+/**
  * The production quantity — what a cook needs to make, not what's on
  * hand. Floored at 0 so an over-stocked item never prints/logs as a
  * negative "make" instruction. This is the figure that prints on the
  * sheet (labeled "Make") and freezes into prep_history as `makeQty`.
  */
 export const makeQty = (item: Pick<PrepItem, 'par' | 'onHand'>): number =>
-  Math.max(0, item.par - item.onHand);
+  Math.max(0, item.par - onHandValue(item));
 
 /** Descending by prepMinutesValue, tiebreak alphabetical by name. Array.prototype.sort is stable, so any remaining tie keeps input order. */
 const byPrepMinutesThenName = (a: PrepItem, b: PrepItem): number =>

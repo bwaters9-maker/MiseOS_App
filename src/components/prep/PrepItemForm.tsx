@@ -17,8 +17,21 @@
  */
 import React from 'react';
 import { INPUT, INPUT_NUMERIC, FIELD_LABEL, BTN_ACTION, BTN_GHOST } from '../../lib/formStyles';
+import { onHandValue } from '../../lib/prepEngine';
 import type { PrepItem } from '../../types';
 
+/**
+ * Deliberately separate from src/lib/units.ts's DisplayUnit set and NOT to
+ * be unified with it later. units.ts is cost-basis conversion — a 9-value
+ * list gated on measureType and imperial/metric, feeding toBase/fromBase
+ * for the Recipe/Ingredient costing pipeline. Prep quantities are never
+ * costed or converted (PrepItem has no measureType at all), so pulling a
+ * prep unit through that system would mean either bolting a fake measure
+ * type onto a checklist or dragging live conversion into a screen that has
+ * no use for it. If a future pass wants one shared unit vocabulary, that's
+ * a deliberate redesign of both call sites, not a "just import the other
+ * one" fix.
+ */
 export const PREP_UNIT_GROUPS: { label: string; units: string[] }[] = [
   { label: 'Weight', units: ['oz', 'lb', 'g', 'kg'] },
   { label: 'Volume', units: ['cup', 'pt', 'qt', 'gal', 'fl oz', 'mL', 'L'] },
@@ -52,7 +65,7 @@ export const toForm = (item: PrepItem): FormState => ({
   spec: item.spec ?? '',
   unit: item.unit,
   par: String(item.par),
-  onHand: String(item.onHand),
+  onHand: String(onHandValue(item)),
   prepMinutes: item.prepMinutes != null ? String(item.prepMinutes) : '',
 });
 
@@ -77,9 +90,12 @@ export const toDoc = (f: FormState): PrepItemCatalogFields => {
 
 /**
  * par and onHand must be positive, matching what the form this replaces
- * already required. prepMinutes is required only when adding — an
- * existing item may predate the field (no migration write, see
- * types.ts), and editing some other catalog field must not force it in.
+ * already required. prepMinutes is required on every save, add or edit —
+ * the sort is execution-critical (a missing estimate sinks an item to the
+ * bottom of the printed sheet, so a 3-hour braise could print below a
+ * 10-minute garnish) and the chef is already in the form, so this is the
+ * point a legacy item without one gets converted, opportunistically and
+ * without a migration.
  */
 export const canSavePrepItemForm = (f: FormState, isEditing: boolean): boolean =>
   f.name.trim() !== ''
@@ -87,7 +103,7 @@ export const canSavePrepItemForm = (f: FormState, isEditing: boolean): boolean =
   && f.unit !== ''
   && parseFloat(f.par) > 0
   && parseFloat(f.onHand) > 0
-  && (isEditing || parseFloat(f.prepMinutes) > 0);
+  && parseFloat(f.prepMinutes) > 0;
 
 /** Presets plus the form's current value if it isn't one — an item whose
  * stored station/unit was since renamed or removed must still show and
