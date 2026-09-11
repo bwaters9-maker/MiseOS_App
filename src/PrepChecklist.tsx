@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2, Check, X, CheckCircle2, Ban, ClipboardList, Printer, RotateCcw } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, X, CheckCircle2, Ban, ClipboardList, Printer, RotateCcw, History } from 'lucide-react';
 import { addDoc, updateDoc, deleteDoc, writeBatch, doc, deleteField } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { rCollection, rDoc } from './lib/firestorePaths';
@@ -8,6 +8,7 @@ import { useKitchenSelector } from './components/KitchenStateContext';
 import { useStationPresets } from './hooks/useStationPresets';
 import { sortPrepItems, makeQty, onHandValue, printableItems, buildPrintSheet } from './lib/prepEngine';
 import { PrepItemForm, BLANK, toForm, toDoc, type FormState } from './components/prep/PrepItemForm';
+import { PrepHistoryView } from './components/prep/PrepHistoryView';
 import { BTN_ACTION, BTN_GHOST, BADGE } from './lib/formStyles';
 import { todayDateKey } from './utils';
 import type { PrepItem } from './types';
@@ -34,6 +35,7 @@ export const PrepChecklist: React.FC = () => {
   const prepItems = (useKitchenSelector((s: any) => s.prepItems) as PrepItem[]) ?? [];
   const { presets: stationPresetsRaw } = useStationPresets();
   const stationPresets: string[] = stationPresetsRaw;
+  const [showHistory, setShowHistory] = useState(false);
 
   const unmatchedItems = prepItems.filter(i => !stationPresets.includes(i.assignedStation));
   const [activeStation, setActiveStation] = useState<string>('');
@@ -221,6 +223,10 @@ export const PrepChecklist: React.FC = () => {
     }
   };
 
+  if (showHistory) {
+    return <PrepHistoryView onBack={() => setShowHistory(false)} />;
+  }
+
   return (
     <>
       <style>{`
@@ -265,12 +271,18 @@ export const PrepChecklist: React.FC = () => {
           </h1>
           <p className="text-xs text-slate mt-[5px]">Build the day's list, sorted by production time per station</p>
         </div>
-        {!showAdd && (
-          <button onClick={openAdd} className={`${BTN_ACTION} flex items-center gap-[8px]`}>
-            <Plus className="w-3.5 h-3.5" />
-            Add Prep Item
+        <div className="flex items-center gap-[8px]">
+          <button onClick={() => setShowHistory(true)} className={`${BTN_GHOST} flex items-center gap-[8px]`}>
+            <History className="w-3.5 h-3.5" />
+            History
           </button>
-        )}
+          {!showAdd && (
+            <button onClick={openAdd} className={`${BTN_ACTION} flex items-center gap-[8px]`}>
+              <Plus className="w-3.5 h-3.5" />
+              Add Prep Item
+            </button>
+          )}
+        </div>
       </div>
 
       {stationPresets.length > 0 && (
