@@ -110,6 +110,9 @@ const AppShell: React.FC = () => {
   // mechanism as selectedRecipeId/selectedEventId — RecipesHub consumes it
   // and clears it so returning to Recipes later doesn't re-force the tab.
   const [recipesSubTab, setRecipesSubTab] = useState<string | null>(null);
+  // A pending "open Prep List on this station" request, same mechanism —
+  // ChefDashboard's Prep Sheets card row click; PrepChecklist consumes it.
+  const [selectedPrepStation, setSelectedPrepStation] = useState<string | null>(null);
 
   // targetFcPercent and menuTemplate now live on the restaurant profile doc
   // (migrated from App.tsx state + localStorage) — read fallback to the old
@@ -130,6 +133,11 @@ const AppShell: React.FC = () => {
   const openRecipesDevelopment = () => {
     setRecipesSubTab('development');
     setActiveView('recipes');
+  };
+
+  const openPrepStation = (station: string) => {
+    setSelectedPrepStation(station);
+    setActiveView('prep');
   };
 
   const openEventDetail = (eventId: string) => {
@@ -197,6 +205,9 @@ const AppShell: React.FC = () => {
               onOpenRecipe={openRecipeInBuilder}
               recipesSubTab={recipesSubTab}
               setRecipesSubTab={setRecipesSubTab}
+              selectedStation={selectedPrepStation}
+              setSelectedStation={setSelectedPrepStation}
+              onOpenPrepStation={openPrepStation}
               onOpenDevelopment={openRecipesDevelopment}
               selectedEventId={selectedEventId}
               setSelectedEventId={setSelectedEventId}

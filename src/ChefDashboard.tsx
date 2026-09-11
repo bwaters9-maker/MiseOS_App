@@ -1,27 +1,29 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Users, CalendarDays, Printer, Star, Plus, X, Sprout, FlaskConical, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Users, CalendarDays, Printer, Star, Plus, X, Sprout, FlaskConical, ChevronRight, ClipboardList } from 'lucide-react';
 import { addDoc } from 'firebase/firestore';
 import { rCollection } from './lib/firestorePaths';
 import { useKitchenSelector } from './components/KitchenStateContext';
 import { useRestaurantId } from './components/AuthContext';
 import { useStationPresets } from './hooks/useStationPresets';
 import { featureFieldsFromRecipe, costPerPortion, fcPercent, fcIndicator, isRecipeInDevelopment } from './lib/costEngine';
+import { printableItems, UNMATCHED_STATION_KEY } from './lib/prepEngine';
 import { FcValue } from './components/FcValue';
 import { regionForState, itemsForRegion } from './lib/seasonalData';
 import { monthStatus, STATUS_LABEL } from './components/testkitchen/trendsDisplay';
 import { COURSES, BLANK as BLANK_FEATURE, toDoc as featureToDoc, type FormState as FeatureFormState } from './Features';
 import { todayDateKey, formatTime12h } from './utils';
 import { MAX_RECIPE_VARIANTS } from './types';
-import type { Employee, Shift, KitchenEvent, Client, Feature, Recipe, Ingredient, RestaurantProfile, TrendReport } from './types';
+import type { Employee, Shift, KitchenEvent, Client, Feature, Recipe, Ingredient, RestaurantProfile, TrendReport, PrepItem } from './types';
 
 interface ChefDashboardProps {
   onNavigate?: (view: string) => void;
   onOpenRecipe?: (recipeId: string) => void;
   onOpenDevelopment?: () => void;
+  onOpenPrepStation?: (station: string) => void;
   targetFcPercent?: number;
 }
 
-export default function ChefDashboard({ onNavigate, onOpenRecipe, onOpenDevelopment, targetFcPercent = 30 }: ChefDashboardProps) {
+export default function ChefDashboard({ onNavigate, onOpenRecipe, onOpenDevelopment, onOpenPrepStation, targetFcPercent = 30 }: ChefDashboardProps) {
   const restaurantId = useRestaurantId();
   const staff = (useKitchenSelector((s: any) => s.staff) as Employee[]) ?? [];
   const shifts = (useKitchenSelector((s: any) => s.shifts) as Shift[]) ?? [];
@@ -30,9 +32,14 @@ export default function ChefDashboard({ onNavigate, onOpenRecipe, onOpenDevelopm
   const features = (useKitchenSelector((s: any) => s.features) as Feature[]) ?? [];
   const allRecipes = (useKitchenSelector((s: any) => s.recipes) as Recipe[]) ?? [];
   const allIngredients = (useKitchenSelector((s: any) => s.ingredients) as Ingredient[]) ?? [];
+  const prepItems = (useKitchenSelector((s: any) => s.prepItems) as PrepItem[]) ?? [];
   const restaurantProfile = useKitchenSelector((s: any) => s.restaurantProfile) as RestaurantProfile | null;
   const trendReport = useKitchenSelector((s: any) => s.trendReport) as TrendReport | null;
-  const { presets: stationPresets } = useStationPresets();
+  const { presets: stationPresetsRaw } = useStationPresets();
+  // Widened from PrepStation[] -- PrepItem.assignedStation is a plain
+  // string (P-012), and Array.includes()/comparisons against it need the
+  // array typed to match. Same widening PrepChecklist.tsx does.
+  const stationPresets: string[] = stationPresetsRaw;
 
   const todayStr = todayDateKey();
   const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
@@ -40,6 +47,32 @@ export default function ChefDashboard({ onNavigate, onOpenRecipe, onOpenDevelopm
   const staffById = new Map(staff.map(e => [e.id, e]));
   const clientsById = new Map(clients.map(c => [c.id, c]));
   const menuRecipes = allRecipes.filter(r => r.recipeType === 'menu').sort((a, b) => a.name.localeCompare(b.name));
+
+  // Prep Sheets — zero new listeners: derives entirely from prepItems and
+  // stationPresets, both already live (the latter is the exact hook
+  // Today's Schedule already uses). Never reads prep_history; printedDate
+  // on the item itself is the only signal "is this station handled"
+  // needs. A station is a row only if it has something to make right now
+  // (printableItems non-empty) or something was printed today — a
+  // station with neither is not a row at all, not an empty one; a
+  // reminder to print an empty sheet is noise, not signal.
+  const prepStationGroups = [
+    ...stationPresets.map(s => ({ key: s, label: s, items: prepItems.filter(i => i.assignedStation === s) })),
+    { key: UNMATCHED_STATION_KEY, label: 'Unmatched Station', items: prepItems.filter(i => !stationPresets.includes(i.assignedStation)) },
+  ]
+    .map(g => {
+      const printable = printableItems(g.items);
+      return {
+        ...g,
+        printable,
+        printedToday: g.items.some(i => i.printedDate === todayStr),
+        // Printable right now but not part of today's print -- added
+        // after the print (or carried over, never captured) either way,
+        // the honest "what's not reflected in what's with the station".
+        addedSinceCount: printable.filter(i => i.printedDate !== todayStr).length,
+      };
+    })
+    .filter(g => g.printable.length > 0 || g.printedToday);
 
   // Trends strip — a read-only glance at what the Development workspace
   // already loads. Seasonal data is static and bundled (no fetch); the
@@ -245,6 +278,38 @@ export default function ChefDashboard({ onNavigate, onOpenRecipe, onOpenDevelopm
           )}
         </div>
       </div>
+
+      {/* PREP SHEETS */}
+      {prepStationGroups.length > 0 && (
+        <div className="bg-surface border border-line rounded-card p-[21px] mb-[21px]">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-navy flex items-center gap-[8px] mb-[13px]">
+            <ClipboardList className="w-4 h-4 text-teal" /> Prep Sheets
+          </h2>
+          <div className="divide-y divide-line">
+            {prepStationGroups.map(g => (
+              <button
+                key={g.key}
+                onClick={() => onOpenPrepStation?.(g.key)}
+                className="w-full flex items-center justify-between gap-[13px] py-[8px] text-left hover:bg-bg-cool transition-colors duration-[144ms]"
+              >
+                <span className="text-xs font-bold text-navy shrink-0">{g.label}</span>
+                {g.printedToday ? (
+                  <span className="text-xs text-slate text-right">
+                    Prep list is with the {g.label}.
+                    {g.addedSinceCount > 0 && (
+                      <> · <span className="font-mono">{g.addedSinceCount}</span> added since print</>
+                    )}
+                  </span>
+                ) : (
+                  <span className="px-[8px] py-[3px] rounded-[5px] text-[10px] font-bold uppercase tracking-wider border border-navy text-navy bg-transparent shrink-0">
+                    Not printed
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* TONIGHT'S FEATURES */}
       <div className="bg-surface border border-line rounded-card p-[21px] mb-[21px]">

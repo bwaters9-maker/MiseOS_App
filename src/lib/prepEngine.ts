@@ -8,6 +8,15 @@
  */
 import type { PrepItem } from '../types';
 
+/** Not a real station — the shared sentinel for the chef-visible bucket
+ * of items whose stored assignedStation matches no current preset (the
+ * preset was renamed or removed in Settings since the item was saved).
+ * Lives here rather than in PrepChecklist.tsx so ChefDashboard.tsx's Prep
+ * Sheets card can reference it without statically importing that
+ * lazy-loaded view's whole module. Never a selectable value on the
+ * add/edit form; only ever assigned by history. */
+export const UNMATCHED_STATION_KEY = '__unmatched_station__';
+
 /** Missing prepMinutes reads as 0 — sorts last in the descending sort below, same "absent reads as a stated default" convention as recipeStatus(). */
 export const prepMinutesValue = (item: Pick<PrepItem, 'prepMinutes'>): number =>
   item.prepMinutes ?? 0;

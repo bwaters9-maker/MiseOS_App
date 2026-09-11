@@ -6,18 +6,18 @@ import { rCollection, rDoc } from './lib/firestorePaths';
 import { useRestaurantId } from './components/AuthContext';
 import { useKitchenSelector } from './components/KitchenStateContext';
 import { useStationPresets } from './hooks/useStationPresets';
-import { sortPrepItems, makeQty, onHandValue, printableItems, buildPrintSheet } from './lib/prepEngine';
+import { sortPrepItems, makeQty, onHandValue, printableItems, buildPrintSheet, UNMATCHED_STATION_KEY } from './lib/prepEngine';
 import { PrepItemForm, BLANK, toForm, toDoc, type FormState } from './components/prep/PrepItemForm';
 import { PrepHistoryView } from './components/prep/PrepHistoryView';
 import { BTN_ACTION, BTN_GHOST, BADGE } from './lib/formStyles';
 import { todayDateKey } from './utils';
 import type { PrepItem } from './types';
 
-/** Not a real station — a chef-visible bucket for items whose stored
- * assignedStation matches no current preset (the preset was renamed or
- * removed in Settings since the item was saved). Never a selectable value
- * on the add/edit form itself; only ever assigned by history. */
-const UNMATCHED_KEY = '__unmatched_station__';
+// Local short alias -- the sentinel itself lives in prepEngine.ts (a
+// side-effect-free module with no React/Firestore) so ChefDashboard.tsx's
+// Prep Sheets card can reference it without statically importing this
+// whole lazy-loaded view.
+const UNMATCHED_KEY = UNMATCHED_STATION_KEY;
 
 /** Compact segmented control, same idiom as RecipesHub.tsx's sub-tab
  * switcher: one connected bar, active segment filled teal. Deliberately
@@ -30,7 +30,13 @@ const segClass = (active: boolean) =>
     active ? 'bg-teal text-on-teal' : 'bg-surface text-slate hover:text-navy'
   }`;
 
-export const PrepChecklist: React.FC = () => {
+export const PrepChecklist: React.FC<{
+  /** Pending "open this station" request, e.g. from ChefDashboard.tsx's
+   * Prep Sheets card row click -- consume-once, same mechanism as
+   * selectedRecipeId/selectedEventId in App.tsx. */
+  selectedStation?: string | null;
+  setSelectedStation?: (s: string | null) => void;
+}> = ({ selectedStation, setSelectedStation }) => {
   const restaurantId = useRestaurantId();
   const prepItems = (useKitchenSelector((s: any) => s.prepItems) as PrepItem[]) ?? [];
   const { presets: stationPresetsRaw } = useStationPresets();
@@ -50,13 +56,27 @@ export const PrepChecklist: React.FC = () => {
   // Unmatched pseudo-tab, which is never a preset), fall back to the
   // first real preset. Same self-heal covers a station being renamed or
   // removed in Settings while this view is already open.
+  //
+  // A pending selectedStation request is consumed first, ahead of the
+  // self-heal, and takes it to a real preset or the Unmatched pseudo-tab
+  // only -- a stale request naming a station that's since vanished is
+  // cleared without being applied, and falls through to the same
+  // self-heal below rather than stranding the view on a phantom value.
   useEffect(() => {
     if (stationPresets.length === 0) return;
+    if (selectedStation != null) {
+      if (selectedStation === UNMATCHED_KEY || stationPresets.includes(selectedStation)) {
+        setActiveStation(selectedStation);
+        setSelectedStation?.(null);
+        return;
+      }
+      setSelectedStation?.(null);
+    }
     if (activeStation === UNMATCHED_KEY) return;
     if (!stationPresets.includes(activeStation)) {
       setActiveStation(stationPresets[0]);
     }
-  }, [stationPresets, activeStation]);
+  }, [stationPresets, activeStation, selectedStation]);
 
   const [showAdd, setShowAdd] = useState(false);
   const [addForm, setAddForm] = useState<FormState>(BLANK);
