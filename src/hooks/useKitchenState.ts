@@ -1,21 +1,7 @@
 import { useState, useEffect } from 'react';
 import { onSnapshot, DocumentData, DocumentSnapshot, QuerySnapshot, QueryDocumentSnapshot, FirestoreError } from 'firebase/firestore';
 import { rCollection, rDoc } from '../lib/firestorePaths';
-import type { Feature, Employee, Shift, KitchenEvent, CribNote, Ingredient, Recipe, Client, Vendor, RestaurantProfile, TrendReport } from '../types';
-
-// Based on firebase-blueprint.json
-export interface PrepItem {
-  id: string;
-  name: string;
-  quantity: string;
-  unit: string;
-  checked: boolean;
-  assignedStation: 'Sauté' | 'Grill' | 'Garde Manger' | 'Pastry';
-  priority: 'low' | 'medium' | 'high';
-  notes?: string;
-  lastModified?: string;
-  recipe_id: string;
-}
+import type { PrepItem, Feature, Employee, Shift, KitchenEvent, CribNote, Ingredient, Recipe, Client, Vendor, RestaurantProfile, TrendReport } from '../types';
 
 export const useKitchenState = (restaurantId: string) => {
   const [prepItems, setPrepItems] = useState<PrepItem[]>([]);
