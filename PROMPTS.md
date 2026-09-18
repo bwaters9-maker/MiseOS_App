@@ -2200,3 +2200,86 @@ disclosure; this is the fix.
 **Sequence:** after P-012 Prep Checklist — cleared 2026-09-11 (P-012
 DONE). **Not a tester blocker** — today's chef-typed yield is as right as
 the chef makes it; P-033 makes it easier, not newly possible.
+
+## P-034 — Prep time splits into active and inactive — QUEUED 2026-09-17
+
+**Origin:** Brian, 2026-09-17, while setting up the P-012 print
+read-through. Raised as a usability point ("chefs will need to
+understand how to edit these"); it is also a correctness defect, which
+is why it is a P-ID and not a parking-lot note.
+
+**The defect:** `prepMinutes` has no defined meaning. Nothing in the
+field name, the form, or the type tells a chef whether to enter
+hands-on time or wall-clock time. Stock is 5 minutes to a chef thinking
+hands-on and 360 to a chef thinking elapsed — same item, same kitchen,
+same field. The printed sheet sorts on that number descending, so the
+start order flips depending on who typed it in. Same defect class as the
+P-019 unit fallback: a field whose meaning silently varies, feeding
+something that acts on it.
+
+**Why the split is the fix, not a better label:** inactive time still
+consumes the clock. A six-hour braise with five minutes of hands-on has
+to go on first or it misses service; ninety minutes of straight butchery
+does not. Sorting on active time inverts the order on exactly the
+long-hold items that wreck a prep day. Sorting on total gets it right —
+but only if total is captured, which today it may or may not be.
+
+**Rulings (2026-09-17 — delegated by Brian to Claude in session; Brian
+overrules any of these at will, and 4 and 5 are the two most worth his
+second look):**
+
+1. **Two stored fields, total derived.** `activeMinutes` and
+   `inactiveMinutes` are stored; total is computed for display and sort,
+   never stored. Three editable numbers where only two are independent
+   lets a chef save a total that is not the sum, and then something has
+   to decide which wins. Same reasoning as `buildPrintSheet` /
+   `printableItems` sharing one source.
+2. **Active required, inactive optional defaulting to 0.** P-012 already
+   made the estimate required on every save incl. edit; that requirement
+   carries to `activeMinutes` only. Most prep has no wait, and two
+   mandatory numbers on every add is real friction against the
+   Friday-service bar.
+3. **Sort on total descending**, name tiebreak unchanged. Inactive time
+   consumes the clock: a six-hour braise with five minutes hands-on must
+   go on before ninety minutes of butchery. Sorting on active inverts the
+   order on exactly the long-hold items that wreck a prep day.
+4. **Labels.** Form: "Hands-on time" (required) and "Wait time"
+   (optional), the latter with help text naming what it means —
+   unattended: braise, brine, cure, chill, proof, thaw. Row and sheet:
+   ACTIVE and WAIT. Chose kitchen language over "active/inactive", which
+   reads like a spec at the moment of entry. **Brian: this is yours to
+   overrule — it should sound like your kitchen, not a form.**
+5. **Print display is conditional.** Show the split only when
+   `inactiveMinutes > 0` ("20 ACTIVE / 340 WAIT"); otherwise show the
+   single number. A cook reading "340 WAIT" knows to start it and walk
+   away; printing "90 ACTIVE / 0 WAIT" on every butchery row is noise on
+   a document whose whole value is that it is scannable mid-shift.
+6. **Legacy `prepMinutes` is flagged, never guessed.** Existing values
+   have unknown meaning by definition, so they are not mapped into either
+   new field — mapping to `activeMinutes` is precisely the wrong guess
+   for anything with a hold. Carry the old value forward as display-only
+   context and mark the item for re-entry with the saffron unverified dot,
+   the same affordance the pantry already uses for unverified prices and
+   the Builder uses for computed yield. Cost today is three rows (Grill 1,
+   Unmatched 2); after tester data it is a real decision with real loss —
+   which is the sequencing argument below.
+**Surface (scope):** `PrepItem` in types.ts;
+`prepMinutesValue`, `byPrepMinutesThenName`, `PrintSheetLine`,
+`buildPrintSheet`, `sortPrepItems` in src/lib/prepEngine.ts;
+PrepItemForm.tsx entry and validation; PrepChecklist.tsx row display and
+the print DOM; PrepHistoryView.tsx CSV headers (currently `date,
+station, printedAt, name, spec, makeQty, unit, prepMinutes`); the
+prep_history doc shape; prepEngine.test.ts.
+
+**Sequence — RULED 2026-09-17: before the P-012 deploy.** Three reasons.
+(1) The defect activates at the tester gate, not before it: today Brian is
+the only person entering items, so his values are internally consistent
+whatever he meant by them; the field only breaks when several chefs enter
+items under different assumptions, which is exactly what a tester cohort
+is. Deploying into that is the worst moment, not a neutral one. (2) Ruling
+6 is free at three rows and lossy after a month of tester data. (3) P-019
+already killed this defect class on principle — a field whose meaning
+silently varies, feeding something that acts on it — so shipping P-012
+with `prepMinutes` as-is would contradict a standing ruling. Cost accepted:
+g5a slips again, for a named bounded reason rather than drift. P-012 and
+P-034 deploy together; g5a is re-set on that evidence.
