@@ -6,7 +6,7 @@ import { rCollection, rDoc } from './lib/firestorePaths';
 import { useRestaurantId } from './components/AuthContext';
 import { useKitchenSelector } from './components/KitchenStateContext';
 import { useStationPresets } from './hooks/useStationPresets';
-import { sortPrepItems, makeQty, onHandValue, printableItems, buildPrintSheet, UNMATCHED_STATION_KEY } from './lib/prepEngine';
+import { sortPrepItems, makeQty, onHandValue, printableItems, buildPrintSheet, needsTimeReentry, prepMinutesValue, totalMinutes, UNMATCHED_STATION_KEY } from './lib/prepEngine';
 import { PrepItemForm, BLANK, toForm, toDoc, type FormState } from './components/prep/PrepItemForm';
 import { PrepHistoryView } from './components/prep/PrepHistoryView';
 import { BTN_ACTION, BTN_GHOST, BADGE } from './lib/formStyles';
@@ -464,16 +464,33 @@ const PrepItemCard: React.FC<{
   onToggleNotNeeded: () => void;
 }> = ({ item, isConfirmDelete, deleting, onEdit, onRequestDelete, onConfirmDelete, onCancelDelete, onToggleChecked, onToggleNotNeeded }) => {
   const settled = item.checked || item.notNeeded;
+  /* P-034 ruling 6: saved before the split, so its number means either
+   * hands-on or wall-clock and there is no way to tell which. Flagged for
+   * re-entry, never guessed into a new field. The old value shows here as
+   * read-only context and deliberately NOT in the edit form — a number
+   * sitting in the Hands-on field is an invitation to keep it, which is
+   * exactly the wrong guess for anything with a hold. */
+  const reentry = needsTimeReentry(item);
 
   return (
     <div className={`bg-surface border border-line rounded-card p-[13px] ${settled ? 'opacity-60' : ''}`}>
       <div className="flex items-start justify-between gap-[13px]">
         <div className="min-w-0">
-          <span className={`font-bold text-navy ${settled ? 'line-through' : ''}`}>{item.name}</span>
+          <span className="flex items-center gap-[5px]">
+            <span className={`font-bold text-navy ${settled ? 'line-through' : ''}`}>{item.name}</span>
+            {reentry && (
+              <span
+                title="Time needs re-entry — saved before hands-on and wait time were separate fields"
+                className="w-[6px] h-[6px] rounded-full bg-saffron shrink-0"
+              />
+            )}
+          </span>
           {item.spec && <p className="text-xs text-slate mt-[2px]">{item.spec}</p>}
           <p className="text-[11px] text-slate font-mono mt-[5px]">
             Par {item.par} {item.unit} · On Hand {onHandValue(item)} {item.unit}
-            {item.prepMinutes != null ? ` · ${item.prepMinutes} min` : ' · No estimate'}
+            {reentry
+              ? ` · was ${prepMinutesValue(item)} min — re-enter`
+              : item.activeMinutes != null ? ` · ${totalMinutes(item)} min` : ' · No estimate'}
           </p>
         </div>
         <div className="text-right shrink-0">
