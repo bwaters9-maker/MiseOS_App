@@ -6,7 +6,7 @@ import { rCollection, rDoc } from './lib/firestorePaths';
 import { useRestaurantId } from './components/AuthContext';
 import { useKitchenSelector } from './components/KitchenStateContext';
 import { useStationPresets } from './hooks/useStationPresets';
-import { sortPrepItems, makeQty, onHandValue, printableItems, buildPrintSheet, needsTimeReentry, prepMinutesValue, totalMinutes, UNMATCHED_STATION_KEY } from './lib/prepEngine';
+import { sortPrepItems, makeQty, onHandValue, printableItems, buildPrintSheet, formatPrepTime, needsTimeReentry, prepMinutesValue, UNMATCHED_STATION_KEY } from './lib/prepEngine';
 import { PrepItemForm, BLANK, toForm, toDoc, type FormState } from './components/prep/PrepItemForm';
 import { PrepHistoryView } from './components/prep/PrepHistoryView';
 import { BTN_ACTION, BTN_GHOST, BADGE } from './lib/formStyles';
@@ -267,7 +267,7 @@ export const PrepChecklist: React.FC<{
         <p className="text-xs mb-[21px]">{todayDateKey()}</p>
         <table>
           <thead>
-            <tr><th>Item</th><th>Spec</th><th>Make</th><th>Unit</th></tr>
+            <tr><th>Item</th><th>Spec</th><th>Make</th><th>Unit</th><th>Time</th></tr>
           </thead>
           <tbody>
             {printSheet.map(line => (
@@ -276,6 +276,7 @@ export const PrepChecklist: React.FC<{
                 <td>{line.spec ?? ''}</td>
                 <td>{line.makeQty}</td>
                 <td>{line.unit}</td>
+                <td>{formatPrepTime(line)}</td>
               </tr>
             ))}
           </tbody>
@@ -490,7 +491,7 @@ const PrepItemCard: React.FC<{
             Par {item.par} {item.unit} · On Hand {onHandValue(item)} {item.unit}
             {reentry
               ? ` · was ${prepMinutesValue(item)} min — re-enter`
-              : item.activeMinutes != null ? ` · ${totalMinutes(item)} min` : ' · No estimate'}
+              : item.activeMinutes != null ? ` · ${formatPrepTime(item)}` : ' · No estimate'}
           </p>
         </div>
         <div className="text-right shrink-0">

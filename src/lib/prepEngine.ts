@@ -136,6 +136,25 @@ export interface PrintSheetLine {
 }
 
 /**
+ * The one time string both the checklist row and the printed sheet show,
+ * pure so the conditional is unit-tested rather than eyeballed in a print
+ * preview. Split only when there is a hold (P-034 ruling 5): a cook
+ * reading "340 WAIT" knows to start it and walk away, while
+ * "90 ACTIVE / 0 WAIT" on every butchery row is noise on a document whose
+ * whole value is that it is scannable mid-shift.
+ *
+ * Accepts a PrepItem or a PrintSheetLine — the line's required numbers are
+ * assignable to the item's optional ones, so the row and the sheet cannot
+ * drift into two formats.
+ */
+export const formatPrepTime = (item: Pick<PrepItem, 'activeMinutes' | 'inactiveMinutes'>): string => {
+  const wait = inactiveMinutesValue(item);
+  return wait > 0
+    ? `${activeMinutesValue(item)} ACTIVE / ${wait} WAIT`
+    : `${activeMinutesValue(item)} min`;
+};
+
+/**
  * A prep_history line as READ BACK, which is not the shape being written.
  * prep_history is write-once by design, so a doc printed before P-034
  * carries `prepMinutes` and neither new field — exactly the legacy shape
