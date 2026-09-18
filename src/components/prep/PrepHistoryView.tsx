@@ -29,13 +29,13 @@ import { rCollection } from '../../lib/firestorePaths';
 import { useRestaurantId } from '../AuthContext';
 import { todayDateKey, addDays, formatTime12h } from '../../utils';
 import { BTN_ACTION, BTN_GHOST, INPUT } from '../../lib/formStyles';
-import type { PrintSheetLine } from '../../lib/prepEngine';
+import type { StoredPrintSheetLine } from '../../lib/prepEngine';
 
 interface PrepHistoryDoc {
   id: string;
   date: string;
   station: string;
-  items: PrintSheetLine[];
+  items: StoredPrintSheetLine[];
   printedAt: string;
 }
 
@@ -104,9 +104,12 @@ export const PrepHistoryView: React.FC<{ onBack: () => void }> = ({ onBack }) =>
   };
 
   const exportCsv = () => {
-    const headers = ['date', 'station', 'printedAt', 'name', 'spec', 'makeQty', 'unit', 'prepMinutes'];
+    const headers = ['date', 'station', 'printedAt', 'name', 'spec', 'makeQty', 'unit', 'activeMinutes', 'inactiveMinutes'];
+    // A pre-P-034 line has neither field; both export blank rather than
+    // the legacy number, which had no defined meaning to export as
+    // either one (ruling 6). Blank, never the string "undefined".
     const rows = filtered.flatMap(doc =>
-      doc.items.map(item => [doc.date, doc.station, doc.printedAt, item.name, item.spec ?? '', item.makeQty, item.unit, item.prepMinutes])
+      doc.items.map(item => [doc.date, doc.station, doc.printedAt, item.name, item.spec ?? '', item.makeQty, item.unit, item.activeMinutes ?? '', item.inactiveMinutes ?? ''])
     );
     const csv = [headers, ...rows].map(row => row.map(csvEscape).join(',')).join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -211,7 +214,8 @@ export const PrepHistoryView: React.FC<{ onBack: () => void }> = ({ onBack }) =>
                                 <th className="p-[8px] font-bold uppercase tracking-wider text-slate">Spec</th>
                                 <th className="p-[8px] font-bold uppercase tracking-wider text-slate text-right">Make</th>
                                 <th className="p-[8px] font-bold uppercase tracking-wider text-slate">Unit</th>
-                                <th className="p-[8px] font-bold uppercase tracking-wider text-slate text-right">Prep Min</th>
+                                <th className="p-[8px] font-bold uppercase tracking-wider text-slate text-right">Active</th>
+                                <th className="p-[8px] font-bold uppercase tracking-wider text-slate text-right">Wait</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -221,7 +225,14 @@ export const PrepHistoryView: React.FC<{ onBack: () => void }> = ({ onBack }) =>
                                   <td className="p-[8px] text-slate">{item.spec ?? ''}</td>
                                   <td className="p-[8px] font-mono text-navy text-right">{item.makeQty}</td>
                                   <td className="p-[8px] text-slate">{item.unit}</td>
-                                  <td className="p-[8px] font-mono text-slate text-right">{item.prepMinutes}</td>
+                                  {item.activeMinutes == null && item.prepMinutes != null ? (
+                                    <td colSpan={2} className="p-[8px] font-mono text-slate text-right">{item.prepMinutes} <span className="font-body not-italic text-[10px] uppercase tracking-wider">legacy</span></td>
+                                  ) : (
+                                    <>
+                                      <td className="p-[8px] font-mono text-slate text-right">{item.activeMinutes ?? ''}</td>
+                                      <td className="p-[8px] font-mono text-slate text-right">{item.inactiveMinutes ?? ''}</td>
+                                    </>
+                                  )}
                                 </tr>
                               ))}
                             </tbody>
