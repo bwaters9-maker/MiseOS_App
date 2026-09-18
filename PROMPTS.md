@@ -475,9 +475,9 @@ DATA MODEL (propose migrations before touching anything):
 
 BEHAVIOR:
 1. Add/edit item form asks the proper questions: name, station, spec, unit, par, on-hand, prepMinutes. Same-name items on different stations are distinct items.
-2. Station-scoped checklist view (tab or filter per station). Sort within a station: unchecked by prepMinutes descending (tiebreak alphabetical), checked sink below, Not Needed at the very bottom. This order is execution-critical — no other ordering anywhere.
+2. Station-scoped checklist view (tab or filter per station). Sort within a station: unchecked by prepMinutes descending (tiebreak alphabetical), checked sink below, Not Needed at the very bottom. This order is execution-critical — no other ordering anywhere. **[P-034: the three tiers and the tiebreak are unchanged; the sort key is now `totalMinutes`, not `prepMinutes`.]**
 3. Not Needed toggle per item: excluded from print, reversible, no qty required.
-4. Print: per-station print-optimized sheet (item, spec, quantity, unit, in prepMinutes order; Not Needed excluded). Printing writes the prep_history doc and marks the station printed for today.
+4. Print: per-station print-optimized sheet (item, spec, quantity, unit, in prepMinutes order; Not Needed excluded). Printing writes the prep_history doc and marks the station printed for today. **[SUPERSEDED by P-034, ruled 2026-09-17: the sheet gained a fifth column, Time, and orders by `totalMinutes`. Under this original ruling time was the sort key only and never reached paper.]**
 5. Reset Shift per station: clears checked/notNeeded/printed-today only.
 6. Dashboard section "Prep Sheets": one line per station — unprinted stations flagged as reminders; printed stations read "Prep list is with the {Station}."
 7. History view: prep_history browsable by station and date range, table layout, CSV export. Read-only.
@@ -2201,7 +2201,7 @@ disclosure; this is the fix.
 DONE). **Not a tester blocker** — today's chef-typed yield is as right as
 the chef makes it; P-033 makes it easier, not newly possible.
 
-## P-034 — Prep time splits into active and inactive — QUEUED 2026-09-17
+## P-034 — Prep time splits into active and inactive — DONE 2026-09-18 (commits 0dbd4bb..d2618c0; not deployed)
 
 **Origin:** Brian, 2026-09-17, while setting up the P-012 print
 read-through. Raised as a usability point ("chefs will need to
@@ -2283,3 +2283,78 @@ silently varies, feeding something that acts on it — so shipping P-012
 with `prepMinutes` as-is would contradict a standing ruling. Cost accepted:
 g5a slips again, for a named bounded reason rather than drift. P-012 and
 P-034 deploy together; g5a is re-set on that evidence.
+
+**BUILT 2026-09-18 — eight commits, one per step (`0dbd4bb` queue entry,
+`df08255` types, `ffe384e` engine+history, `5b1988b` form, `65a5143`
+legacy flag, `4df3021` row+sheet display, `84e228a` CSV amendment,
+`d2618c0` tests). `tsc` clean after every step. Tests 220 -> 238. NOT
+DEPLOYED.**
+
+**Two rulings Brian made mid-build, both on contradictions surfaced
+before any code was written:**
+
+7. **The printed sheet gains a Time column** — superseding P-012 item 4
+   above. Ruling 5 was written as a display rule ("show the split only
+   when `inactiveMinutes > 0`") on the assumption that time already
+   printed. It did not: the sheet was Item / Spec / Make / Unit, and
+   `prepMinutes` rode in `PrintSheetLine` purely to reach `prep_history`.
+   Offered the narrow reading (apply ruling 5 to the on-screen row only,
+   leave P-012's columns intact); Brian ruled to add the column, so a cook
+   working from paper can see that a braise is a six-hour hold.
+8. **Legacy history rows export under `legacyPrepMinutes`** — a third CSV
+   time column. `prep_history` is write-once, so sheets printed under
+   P-012 hold lines with `prepMinutes` and neither new field. Exporting
+   them blank would drop a number out of an audit log; exporting them as
+   `activeMinutes` would assert the meaning ruling 6 says nobody can
+   recover. They get their own header instead.
+
+**Amendments folded in during the build, not re-ruled:**
+- `activeMinutes` is **optional on the type, required at the form**. A
+  non-optional field would make ruling 6's legacy item — which carries
+  neither new field — untypeable. Exactly the split P-012 already used for
+  `prepMinutes`, which ruling 2's "required on every save" describes.
+- `inactiveMinutes` **writes an explicit `0` when blank**, where every
+  other optional field omits its key. Omitting would leave a stale value
+  in the doc under Firestore's partial merge, so a chef clearing a wait
+  time on edit would be silently ignored.
+- `byPrepMinutesThenName` renamed `byTotalMinutesThenName` (module-private,
+  no external call sites). Leaving "PrepMinutes" on the one function that
+  must not read `prepMinutes` is the exact ambiguity this prompt exists to
+  kill.
+- New `StoredPrintSheetLine` models a `prep_history` line **as read back**,
+  which is no longer the shape being written — same code-level-fallback
+  convention as `onHandValue()`/`KitchenEvent.attendees`, no migration
+  write over an archive.
+- The legacy value shows on the row and **deliberately not prefilled into
+  the edit form**. A number already sitting in the Hands-on field is an
+  invitation to keep it, which is the wrong guess ruling 6 exists to
+  prevent.
+- Ruling 6's "the same affordance the pantry already uses" is not
+  literally reusable: the pantry dot is raw `bg-amber-500` in the legacy
+  dark-zinc `IngredientsTable.tsx`, which `check:color` flags. Used
+  `bg-saffron`, the token `PrepChecklist.tsx` already renders on its
+  Unmatched Station chip.
+
+**Guard discipline:** the inversion test (5-minute-hands-on, 355-minute
+braise must sort above 90 minutes of butchery, asserted in both input
+orders) was sanity-tested by reverting the comparator to active-only —
+it and two others failed, then passed again on restore. A guard nobody
+has seen fail is not a guard. Same practice as P-031 item 2.
+
+**`firestore.rules` untouched and not needed** — `prep_history` is
+`allow read, write: if isOwner(restaurantId)` with no field validation,
+so the doc shape change passes as-is.
+
+**FINDING — `npm run check:color` is red, and it was red before this
+prompt.** It exits 1 at `472fc4a` (P-012's own close-out commit) for
+reasons wholly unrelated to P-034: `color-baseline.txt` was last written
+2026-08-29 (P-029, `09bc530`), and P-012 never re-baselined after it.
+2 NEW findings are `ChefDashboard.tsx`'s `bg-red-400`/`text-white` moving
+line 193 -> 226 in `9b09269`; 80 STALE entries are classes P-012's rebuild
+deleted but the baseline still lists (50 `PrepRegistrationForm.tsx`, 28
+`PrepChecklist.tsx`, 2 `ChefDashboard.tsx`). Counts are identical before
+and after P-034, and no file P-034 touched appears in the baseline at all.
+Not re-baselined here: the baseline is the tracked debt number and
+shrinking it is a deliberate reviewable act, not a side effect of an
+unrelated prompt. **This is P-012 debt and it blocks the joint P-012/P-034
+deploy — it needs its own prompt before that deploy, not after.**

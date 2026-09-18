@@ -80,7 +80,7 @@ src/
   Features.tsx                   Nightly specials CRUD — 86 toggle syncs to Crib Sheet live
   Staff.tsx                      Employee directory + shift scheduling — feeds Crib Sheet and Chef's Dashboard (today's shifts only). Shift station select sources from `useStationPresets()` (live, chef-customizable) rather than a hardcoded list — see Chef's Dashboard section. Schedule section carries a List/Calendar toggle (`components/staff/ScheduleCalendar.tsx`) merging shifts with Events — see the Staff Schedule Calendar section below.
   EventCalendar.tsx              Events & Clients — event/client CRUD, grouped by date, upcoming/past split, feeds Crib Sheet; clicking an event opens EventDetailView, which can also be deep-linked into directly via a `selectedEventId` prop (used by the Staff schedule calendar)
-  PrepChecklist.tsx              Prep Checklist — station-tabbed print-to-paper workflow: prepEngine-sorted list per station (execution-critical, prepMinutes descending), check-off/Not-Needed, print (writeBatch: prep_history doc + printedDate stamps), Reset Shift, in-view History toggle (PrepHistoryView)
+  PrepChecklist.tsx              Prep Checklist — station-tabbed print-to-paper workflow: prepEngine-sorted list per station (execution-critical, totalMinutes descending), check-off/Not-Needed, print (writeBatch: prep_history doc + printedDate stamps), Reset Shift, in-view History toggle (PrepHistoryView)
   TestKitchenHub.tsx             Development workspace (Recipes > Development sub-tab; formerly the standalone Test Kitchen nav tab, filename unchanged) — trends reference rail plus the Recipe Build panel (calls server-side /api/ai proxy): a "Describe the dish" textarea drives extraction into a structured draft, a refinement input applies incremental edits, and the chef hands a reviewed draft off to the Recipe Builder (P-026, replacing the retired Sous chat)
   Settings.tsx                   Theme toggle + station preset CRUD + recipe category CRUD
   IngredientsTable.tsx           Master Pantry — static human-verified ingredient CRUD, unit conversion
@@ -126,7 +126,7 @@ src/
     dishExtraction.ts            Development workspace's extraction/refinement system prompt, response normalization, and the refinement-reconciliation merge (P-026) — extracted from DishBuildPanel.tsx so it's unit-tested without mounting the panel, same pattern as dishDraftToRecipe.ts
     seasonalData.ts              Static seasonal produce/protein reference by US region (the Development workspace's Seasonal Matrix, also feeding the Dashboard trends strip) — no runtime calls, same pattern as yieldReference.ts
     yieldReference.ts            Common product usable-yield percentages, grounds the AI ingredient lookup's yieldPercent proposals
-    prepEngine.ts                 Prep Checklist's pure sort/print functions — tiered sort (execution-critical, notNeeded outranks checked), printableItems (single source for print AND prep_history, so the two can't drift), makeQty, UNMATCHED_STATION_KEY
+    prepEngine.ts                 Prep Checklist's pure sort/print functions — tiered sort (execution-critical, notNeeded outranks checked), totalMinutes (derived, the sort key), formatPrepTime (the one ACTIVE/WAIT string both the row and the sheet use), needsTimeReentry (P-034 legacy flag), printableItems (single source for print AND prep_history, so the two can't drift), makeQty, UNMATCHED_STATION_KEY
 ```
 
 ## Navigation / routing
@@ -161,7 +161,7 @@ The Recipe Builder sub-tab also carries a "View Menu" button (`onViewMenu` prop)
 
 | Collection | Used by |
 |---|---|
-| `prepItems` | `useKitchenState`, `PrepChecklist`, `PrepItemForm` (catalog write), `ChefDashboard` (Prep Sheets card, read-only) — P-012 rewrite: `quantity` renamed `onHand` (legacy docs read via `onHandValue()` fallback), `assignedStation` loosened to `string`, `notes`/`priority`/`requires_temp_check`/`recipe_id` dropped, `spec`/`prepMinutes`/`notNeeded`/`printedDate` added |
+| `prepItems` | `useKitchenState`, `PrepChecklist`, `PrepItemForm` (catalog write), `ChefDashboard` (Prep Sheets card, read-only) — P-012 rewrite: `quantity` renamed `onHand` (legacy docs read via `onHandValue()` fallback), `assignedStation` loosened to `string`, `notes`/`priority`/`requires_temp_check`/`recipe_id` dropped, `spec`/`prepMinutes`/`notNeeded`/`printedDate` added. P-034: `prepMinutes` superseded by `activeMinutes`/`inactiveMinutes` — never written again, never migrated, legacy docs flagged for re-entry instead |
 | `prep_history` | `PrepHistoryView` (scoped `getDocs` only) — write-once, one doc per printed station sheet (date, station, items[], printedAt); written only by `PrepChecklist`'s print batch; never in `useKitchenState`'s live listeners, never touched by Reset Shift — see the Prep Checklist section |
 | `recipes` | `useKitchenState`, `Recipes.tsx`, `ChefDashboard` (In Development card, read-only), `DishBuildPanel` (extraction hand-off write) — `status`/`variants` added by P-022 with no migration write; a doc without `status` reads as `'active'` |
 | `features` | `useKitchenState`, `Features`, `DailyCribSheet` |
@@ -184,7 +184,7 @@ The Recipe Builder sub-tab also carries a "View Menu" button (`onViewMenu` prop)
 
 | Type | Description |
 |---|---|
-| `PrepItem` / `ProductionRun` | Station-scoped prep catalog task: id, name, assignedStation: string, spec?, unit, onHand, par, prepMinutes?, checked, notNeeded?, printedDate?, lastModified?. `spec` disambiguates the same `name` prepped differently on two stations (e.g. pantry carrots for salad vs. sauté oblique-cut/blanched/shocked). `assignedStation` is a plain string, not `PrepStation` — an item's station survives a preset being renamed or removed in Settings, surfacing under Prep List's "Unmatched Station" group instead of breaking. `prepMinutes` absent reads as `0` and sorts last (same "absent reads as a stated default" convention as `recipeStatus()`) — no migration write. `onHand` was renamed from `quantity`; a doc saved before the rename has no `onHand` and is read through `onHandValue()` (`prepEngine.ts`), same code-level-fallback convention as `KitchenEvent.attendees`/`covers` — no migration write. `ProductionRun` is a legacy alias for the same type. |
+| `PrepItem` / `ProductionRun` | Station-scoped prep catalog task: id, name, assignedStation: string, spec?, unit, onHand, par, activeMinutes?, inactiveMinutes?, prepMinutes? (legacy), checked, notNeeded?, printedDate?, lastModified?. `spec` disambiguates the same `name` prepped differently on two stations (e.g. pantry carrots for salad vs. sauté oblique-cut/blanched/shocked). `assignedStation` is a plain string, not `PrepStation` — an item's station survives a preset being renamed or removed in Settings, surfacing under Prep List's "Unmatched Station" group instead of breaking. Time is two stored fields and one derived (P-034): `activeMinutes` is hands-on, `inactiveMinutes` is unattended, and the total is computed by `totalMinutes()` for display and sort, never stored — three editable numbers where only two are independent would let a chef save a total that isn't the sum. Both absent read as `0` (same "absent reads as a stated default" convention as `recipeStatus()`). `activeMinutes` is optional on the type and required at the form (`canSavePrepItemForm`), the same split `prepMinutes` used under P-012, and for a second reason now: a legacy doc must stay representable with neither field set. `prepMinutes` is legacy and read-only — see the Prep Checklist section's P-034 bullet. `onHand` was renamed from `quantity`; a doc saved before the rename has no `onHand` and is read through `onHandValue()` (`prepEngine.ts`), same code-level-fallback convention as `KitchenEvent.attendees`/`covers` — no migration write. `ProductionRun` is a legacy alias for the same type. |
 | `Recipe` | id, name, recipeType ('sub' \| 'menu'), course, categoryId?, batchYield { qty, measureType }, portions, lines: RecipeLine[], methodSteps, menuPrice?, menuDescription?, onMenu?, status?: RecipeStatus, variants?: RecipeVariant[], updatedAt |
 | `RecipeStatus` | `'development' \| 'active'` — where a menu recipe sits in its own lifecycle. Optional on `Recipe`; every reader defaults a missing value to `'active'` via `recipeStatus()` (costEngine.ts), so no migration write was needed and nothing on the menu dropped off. Sub-recipes carry no status — they were never menu-eligible, and `toDoc` omits the field for them |
 | `RecipeVariant` | One trial version of a dish in development: `{ id, name, notes }` — **notes only**, never its own lines, cost, or nutrition, and never written to another collection. `id` is a client-side render key, not a Firestore document id. Capped at `MAX_RECIPE_VARIANTS` (3), enforced in the editor UI and by a `.slice()` on both read and write — a hand-written doc with more is silently truncated to 3 on next save |
@@ -220,7 +220,7 @@ The Recipe Builder sub-tab also carries a "View Menu" button (`onViewMenu` prop)
 | `PricePoint` | `'$' \| '$$' \| '$$$' \| '$$$$'` — `RestaurantProfile.pricePoint` |
 | `RestaurantProfile` | Singleton doc at `restaurant_profile/main`: name?, chefName?, brandColor?, cuisineStyle?, pricePoint?, city?, state?, regionalNotes?, targetFcPercent?, menuTemplate? — every field optional, edited from Settings' Restaurant Profile section. `regionalNotes` is free text by design (chef commentary on local ingredients/traditions); `state` is a plain string (USPS code) rather than a union, UI-constrained to a fixed select. `targetFcPercent`/`menuTemplate` were migrated here from App.tsx state + localStorage — see the Restaurant Profile section below |
 
-Note: `useKitchenState.ts` no longer defines any local duplicate types — `Recipe` and `PrepItem` are both imported from `src/types.ts` directly. New types belong in `src/types.ts` only, with one deliberate exception: a `prep_history` doc's item shape (`PrintSheetLine` — name, spec?, makeQty, unit, prepMinutes) lives in `src/lib/prepEngine.ts` alongside the print/history logic that produces it, not in `src/types.ts` — see the Prep Checklist section below.
+Note: `useKitchenState.ts` no longer defines any local duplicate types — `Recipe` and `PrepItem` are both imported from `src/types.ts` directly. New types belong in `src/types.ts` only, with one deliberate exception: a `prep_history` doc's item shape (`PrintSheetLine` — name, spec?, makeQty, unit, activeMinutes, inactiveMinutes; plus `StoredPrintSheetLine`, the same shape as READ BACK, where a pre-P-034 doc carries `prepMinutes` and neither new field) lives in `src/lib/prepEngine.ts` alongside the print/history logic that produces it, not in `src/types.ts` — see the Prep Checklist section below.
 
 ## Design system
 
@@ -445,12 +445,51 @@ touch the app at all.
 
 - **Sort is execution-critical, three tiers, nothing else orders the
   list** (`sortPrepItems`, `src/lib/prepEngine.ts`): printable items first
-  (`prepMinutes` descending, name tiebreak — the longest production goes
+  (`totalMinutes` descending, name tiebreak — the longest production goes
   first so it isn't started late), then checked, then notNeeded.
   **`notNeeded` outranks `checked` for tier placement even when an item is
   both** — it's the stronger, shift-defining statement ("not doing this at
   all, period"), matching the original ruling's "at the very bottom"
   wording literally rather than "below checked unless also notNeeded."
+- **Prep time is hands-on and wait, and the sort runs on the total**
+  (P-034, 2026-09-17). `prepMinutes` had no defined meaning: stock is 5
+  minutes to a chef thinking hands-on and 360 to a chef thinking
+  wall-clock, same item, same kitchen, same field — and the sheet sorts on
+  that number, so the start order flipped depending on who typed it in.
+  Same defect class as the P-019 unit fallback, a field whose meaning
+  silently varies feeding something that acts on it. Now `activeMinutes`
+  (required at the form) and `inactiveMinutes` (optional, blank writes an
+  explicit `0`) are stored and `totalMinutes()` derives the sort key.
+  **Sorting on active alone inverts the order on exactly the items that
+  wreck a prep day**: a six-hour braise with five minutes of hands-on has
+  to go on before ninety minutes of straight butchery. That inversion is
+  the guard test in `prepEngine.test.ts`, sanity-checked by reverting the
+  comparator to active-only and confirming it fires.
+  - **Labels are kitchen language, not spec language**: "Hands-on time"
+    and "Wait time" on the form (the latter naming what it means —
+    unattended: braise, brine, cure, chill, proof, thaw), ACTIVE and WAIT
+    on the row and the sheet.
+  - **The split displays conditionally** (`formatPrepTime`, pure so the
+    conditional is unit-tested rather than eyeballed in a print preview):
+    `20 ACTIVE / 340 WAIT` only when there is a hold, `90 min` otherwise.
+    A cook reading "340 WAIT" knows to start it and walk away; `90 ACTIVE
+    / 0 WAIT` on every butchery row is noise on a document whose whole
+    value is that it is scannable mid-shift. One helper serves both the
+    row and the printed sheet so the two can't drift into two formats.
+  - **Legacy values are flagged, never guessed** (`needsTimeReentry`): an
+    item with `prepMinutes` and no `activeMinutes` is not mapped into
+    either new field — mapping it to `activeMinutes` is precisely the
+    wrong guess for anything with a hold. It carries the saffron dot
+    (`bg-saffron`, the token this view already uses for the Unmatched
+    Station chip — *not* the pantry's raw `bg-amber-500`, which
+    `check:color` flags) and reads "was N min — re-enter" as read-only
+    context. `totalMinutes` reads 0 for it, so it sinks to the bottom of
+    its tier until re-entered — the same pressure P-012 applied to a
+    missing estimate. **The old value is deliberately not prefilled into
+    the edit form**: a number already sitting in the Hands-on field is an
+    invitation to keep it. Re-entry never deletes the dead field; the flag
+    clears on the presence of `activeMinutes`, not the absence of
+    `prepMinutes`.
 - **`printableItems` (not checked, not notNeeded) is the single source for
   both the printed sheet and the `prep_history` doc it writes** — neither
   the print DOM nor the history write carries its own filter, so the two
@@ -462,9 +501,14 @@ touch the app at all.
   not the on-hand count, is what prints (labeled "Make"). An over-stocked
   item never prints or logs as a negative instruction.
 - **`toDoc` (PrepItemForm.tsx) is a partial-write contract**: the add/edit
-  form owns exactly the seven catalog fields (name, station, spec, unit,
-  par, onHand, prepMinutes) and never touches
-  checked/notNeeded/printedDate. `updateDoc`'s partial-merge semantics
+  form owns exactly the eight catalog fields (name, station, spec, unit,
+  par, onHand, activeMinutes, inactiveMinutes) and never touches
+  checked/notNeeded/printedDate — nor legacy `prepMinutes`, which it never
+  writes again. `inactiveMinutes` is the one field that writes an explicit
+  `0` when blank rather than omitting the key: wait time is optional, so
+  blank is a real answer, and a chef clearing a wait time on edit must
+  actually clear it — omitting would leave the old value in the doc under
+  partial merge and silently ignore the edit. `updateDoc`'s partial-merge semantics
   mean a catalog fix — a chef correcting a par level — can never silently
   un-check a cook's already-finished prep.
 - **Print is one `writeBatch`**: a `prep_history` doc (one per printed
@@ -481,6 +525,12 @@ touch the app at all.
   every item on the active station, and nothing else — the catalog
   (items, pars, times, specs) is untouched. `prep_history` is never
   touched by Reset Shift; it is a write-once log, not shift state.
+- **The printed sheet's columns are Item / Spec / Make / Unit / Time**,
+  ordered by `totalMinutes` descending. Time was added by P-034 (ruled
+  2026-09-17), superseding P-012's original column set, under which time
+  was the sort key only and never reached paper — a cook working from the
+  sheet could not see that a braise was a six-hour hold. The Time cell is
+  `formatPrepTime`, the same string the on-screen row shows.
 - **Unmatched Station**: a pseudo-tab (`UNMATCHED_STATION_KEY`, not a real
   station, never selectable on the add/edit form) grouping every item
   whose stored `assignedStation` matches no current preset — a preset was
@@ -507,9 +557,16 @@ touch the app at all.
   listener on a write-once, ever-growing log would mean every session
   loads the whole history forever.
 - **CSV export** headers are the raw field names
-  (`date,station,printedAt,name,spec,makeQty,unit,prepMinutes`), one row
-  per item across every history doc in the current filtered range,
-  RFC4180-escaped.
+  (`date,station,printedAt,name,spec,makeQty,unit,activeMinutes,inactiveMinutes,legacyPrepMinutes`),
+  one row per item across every history doc in the current filtered range,
+  RFC4180-escaped. The third time column exists because `prep_history` is
+  write-once: sheets printed before P-034 hold lines carrying `prepMinutes`
+  and neither new field, and those export under their own header (ruled
+  2026-09-17). Filing them as `activeMinutes` would assert a meaning the
+  number never had; exporting them blank would drop them out of an audit
+  log. Every absent field exports blank, never the string `undefined`.
+  The history detail table shows the same lines as `N legacy` across the
+  two time columns.
 - **Delete uses the inline per-row two-step swap** (action buttons →
   confirm text + check/X icons), matching the convention actually used by
   `Vendors.tsx`/`Staff.tsx`/`EventCalendar.tsx` — not the `AlertDialog`
