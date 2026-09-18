@@ -104,12 +104,15 @@ export const PrepHistoryView: React.FC<{ onBack: () => void }> = ({ onBack }) =>
   };
 
   const exportCsv = () => {
-    const headers = ['date', 'station', 'printedAt', 'name', 'spec', 'makeQty', 'unit', 'activeMinutes', 'inactiveMinutes'];
-    // A pre-P-034 line has neither field; both export blank rather than
-    // the legacy number, which had no defined meaning to export as
-    // either one (ruling 6). Blank, never the string "undefined".
+    const headers = ['date', 'station', 'printedAt', 'name', 'spec', 'makeQty', 'unit', 'activeMinutes', 'inactiveMinutes', 'legacyPrepMinutes'];
+    // prep_history is write-once, so a sheet printed before P-034 holds
+    // lines with prepMinutes and neither new field. Those export under
+    // legacyPrepMinutes, never under either new header — the number had no
+    // defined meaning, and filing it as activeMinutes would assert one
+    // (ruling 6). Nothing leaves the audit export; every cell is blank
+    // rather than the string "undefined" where the field is absent.
     const rows = filtered.flatMap(doc =>
-      doc.items.map(item => [doc.date, doc.station, doc.printedAt, item.name, item.spec ?? '', item.makeQty, item.unit, item.activeMinutes ?? '', item.inactiveMinutes ?? ''])
+      doc.items.map(item => [doc.date, doc.station, doc.printedAt, item.name, item.spec ?? '', item.makeQty, item.unit, item.activeMinutes ?? '', item.inactiveMinutes ?? '', item.prepMinutes ?? ''])
     );
     const csv = [headers, ...rows].map(row => row.map(csvEscape).join(',')).join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
