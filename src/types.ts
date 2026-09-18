@@ -12,6 +12,29 @@ export interface PrepItem {
   unit: string;
   onHand: number;
   par: number;
+  /**
+   * Hands-on time. Required on every save (canSavePrepItemForm), optional
+   * on the type for exactly one reason: a legacy doc carrying only
+   * `prepMinutes` has neither new field and must stay representable —
+   * P-034 ruling 6 flags those for re-entry rather than guessing a value
+   * into them. Same convention `prepMinutes` itself already used under
+   * P-012: required at the form, optional on the type.
+   */
+  activeMinutes?: number;
+  /** Unattended time — braise, brine, cure, chill, proof, thaw. Absent reads
+   * as 0 (totalMinutes), same "absent reads as a stated default" convention
+   * as recipeStatus(). Optional at the form too: most prep has no wait, and
+   * a second mandatory number on every add is friction the Friday-service
+   * bar doesn't accept. */
+  inactiveMinutes?: number;
+  /**
+   * LEGACY, P-034. Never written again; read-only context on an item
+   * flagged for re-entry. Its meaning is undefined by construction — a
+   * chef thinking hands-on typed 5 for the same item a chef thinking
+   * wall-clock typed 360 — so it is not mapped into activeMinutes or
+   * inactiveMinutes. Mapping it to activeMinutes is precisely the wrong
+   * guess for anything with a hold.
+   */
   prepMinutes?: number;
   checked: boolean;
   notNeeded?: boolean;
