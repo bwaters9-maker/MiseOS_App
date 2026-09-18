@@ -7,7 +7,7 @@
  * the legacy dark-zinc style IngredientForm.tsx itself still carries.
  *
  * Covers only the catalog fields (name, station, spec, unit, par, onHand,
- * prepMinutes) — never checked/notNeeded/printedDate. toDoc's output is a
+ * activeMinutes, inactiveMinutes) — never checked/notNeeded/printedDate. toDoc's output is a
  * partial field set by design: spread onto fresh-item defaults on add, or
  * passed straight to updateDoc on edit, where Firestore's partial-merge
  * semantics leave today's shift state (checked/notNeeded/printedDate)
@@ -46,7 +46,8 @@ export interface FormState {
   unit: string;
   par: string;
   onHand: string;
-  prepMinutes: string;
+  activeMinutes: string;
+  inactiveMinutes: string;
 }
 
 export const BLANK: FormState = {
@@ -56,7 +57,8 @@ export const BLANK: FormState = {
   unit: '',
   par: '',
   onHand: '',
-  prepMinutes: '',
+  activeMinutes: '',
+  inactiveMinutes: '',
 };
 
 export const toForm = (item: PrepItem): FormState => ({
@@ -66,17 +68,20 @@ export const toForm = (item: PrepItem): FormState => ({
   unit: item.unit,
   par: String(item.par),
   onHand: String(onHandValue(item)),
-  prepMinutes: item.prepMinutes != null ? String(item.prepMinutes) : '',
+  activeMinutes: item.activeMinutes != null ? String(item.activeMinutes) : '',
+  inactiveMinutes: item.inactiveMinutes != null ? String(item.inactiveMinutes) : '',
 });
 
-/** The seven catalog fields this form owns, nothing else. See the file
- * header for why prepMinutes is included only when the field parses —
- * an edit session that leaves it blank must leave a stored value alone,
- * not zero it out. */
-export type PrepItemCatalogFields = Pick<PrepItem, 'name' | 'assignedStation' | 'unit' | 'par' | 'onHand' | 'spec' | 'prepMinutes'>;
+/** The catalog fields this form owns, nothing else. Legacy `prepMinutes`
+ * is deliberately absent: the form never writes it again (P-034 ruling 6),
+ * so a re-entered legacy item simply gains activeMinutes and leaves the
+ * dead value where it lies — needsTimeReentry goes false on the presence
+ * of activeMinutes, not on the absence of prepMinutes. */
+export type PrepItemCatalogFields = Pick<PrepItem, 'name' | 'assignedStation' | 'unit' | 'par' | 'onHand' | 'spec' | 'activeMinutes' | 'inactiveMinutes'>;
 
 export const toDoc = (f: FormState): PrepItemCatalogFields => {
-  const prepMinutes = parseFloat(f.prepMinutes);
+  const activeMinutes = parseFloat(f.activeMinutes);
+  const inactiveMinutes = parseFloat(f.inactiveMinutes);
   return {
     name: f.name.trim(),
     assignedStation: f.assignedStation,
@@ -84,18 +89,28 @@ export const toDoc = (f: FormState): PrepItemCatalogFields => {
     par: parseFloat(f.par) || 0,
     onHand: parseFloat(f.onHand) || 0,
     ...(f.spec.trim() && { spec: f.spec.trim() }),
-    ...(f.prepMinutes !== '' && !isNaN(prepMinutes) && { prepMinutes }),
+    ...(f.activeMinutes !== '' && !isNaN(activeMinutes) && { activeMinutes }),
+    // Blank writes an explicit 0, where blank spec/activeMinutes omit the
+    // key. The difference is deliberate: wait time is optional, so blank is
+    // a real answer ("no hold"), and a chef clearing a wait time on edit
+    // must actually clear it. Omitting the key would leave the old value in
+    // the doc under Firestore's partial merge and silently ignore the edit.
+    inactiveMinutes: f.inactiveMinutes !== '' && !isNaN(inactiveMinutes) ? inactiveMinutes : 0,
   };
 };
 
 /**
  * par and onHand must be positive, matching what the form this replaces
- * already required. prepMinutes is required on every save, add or edit —
- * the sort is execution-critical (a missing estimate sinks an item to the
- * bottom of the printed sheet, so a 3-hour braise could print below a
- * 10-minute garnish) and the chef is already in the form, so this is the
- * point a legacy item without one gets converted, opportunistically and
- * without a migration.
+ * already required. activeMinutes is required on every save, add or edit
+ * (P-034 ruling 2, carrying P-012's requirement forward to the hands-on
+ * field only) — the sort is execution-critical and the chef is already in
+ * the form, so this is the point a legacy item gets re-entered,
+ * opportunistically and without a migration.
+ *
+ * inactiveMinutes is optional: most prep has no wait, and two mandatory
+ * numbers on every add is real friction against the Friday-service bar.
+ * Blank is valid; a typed value must parse as a non-negative number, so a
+ * half-typed "-" or "abc" blocks save rather than silently storing 0.
  */
 export const canSavePrepItemForm = (f: FormState, isEditing: boolean): boolean =>
   f.name.trim() !== ''
@@ -103,7 +118,8 @@ export const canSavePrepItemForm = (f: FormState, isEditing: boolean): boolean =
   && f.unit !== ''
   && parseFloat(f.par) > 0
   && parseFloat(f.onHand) > 0
-  && parseFloat(f.prepMinutes) > 0;
+  && parseFloat(f.activeMinutes) > 0
+  && (f.inactiveMinutes === '' || parseFloat(f.inactiveMinutes) >= 0);
 
 /** Presets plus the form's current value if it isn't one — an item whose
  * stored station/unit was since renamed or removed must still show and
@@ -182,7 +198,7 @@ export const PrepItemForm: React.FC<{
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-[13px]">
+      <div className="grid grid-cols-2 gap-[13px]">
         <div>
           <label className={FIELD_LABEL}>Par</label>
           <input
@@ -207,17 +223,34 @@ export const PrepItemForm: React.FC<{
             className={INPUT_NUMERIC}
           />
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-[13px]">
         <div>
-          <label className={FIELD_LABEL}>Prep Minutes</label>
+          <label className={FIELD_LABEL}>Hands-on time</label>
           <input
             type="number"
-            value={form.prepMinutes}
-            onChange={e => set('prepMinutes', e.target.value)}
+            value={form.activeMinutes}
+            onChange={e => set('activeMinutes', e.target.value)}
             placeholder="0"
             min="0"
             step="1"
             className={INPUT_NUMERIC}
           />
+          <p className="text-[11px] text-slate mt-[5px]">Minutes you are working on it.</p>
+        </div>
+        <div>
+          <label className={FIELD_LABEL}>Wait time — Optional</label>
+          <input
+            type="number"
+            value={form.inactiveMinutes}
+            onChange={e => set('inactiveMinutes', e.target.value)}
+            placeholder="0"
+            min="0"
+            step="1"
+            className={INPUT_NUMERIC}
+          />
+          <p className="text-[11px] text-slate mt-[5px]">Minutes it takes care of itself — braise, brine, cure, chill, proof, thaw.</p>
         </div>
       </div>
 
