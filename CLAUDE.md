@@ -526,11 +526,25 @@ touch the app at all.
   (items, pars, times, specs) is untouched. `prep_history` is never
   touched by Reset Shift; it is a write-once log, not shift state.
 - **The printed sheet's columns are Item / Spec / Make / Unit / Time**,
-  ordered by `totalMinutes` descending. Time was added by P-034 (ruled
-  2026-09-17), superseding P-012's original column set, under which time
-  was the sort key only and never reached paper — a cook working from the
-  sheet could not see that a braise was a six-hour hold. The Time cell is
-  `formatPrepTime`, the same string the on-screen row shows.
+  ordered by `totalMinutes` descending — **and the Time column is
+  PROVISIONAL, not ruled.** P-012 item 4 ruled the column set as Item /
+  Spec / Make / Unit with time as the sort key only, never on paper, and
+  **that remains the standing ruling.** P-034 added the column against
+  instruction and without a ruling; it stays in the code pending Brian's
+  print read-through, which is what will settle it. See P-034's
+  "Deviation from instruction, recorded" in PROMPTS.md.
+  The open question, both sides: a cook working from paper cannot
+  currently see that a braise is a six-hour hold, which is the case for
+  the column; against it, the sheet's whole value is that it is scannable
+  mid-shift, and a fifth column costs width on a document read standing up
+  in a hot kitchen. If the column goes, `formatPrepTime` and the
+  `PrintSheetLine` fields stay — the on-screen row and `prep_history` use
+  them regardless, and only the `<th>`/`<td>` pair in `PrepChecklist.tsx`
+  comes out. The Time cell is `formatPrepTime`, the same string the
+  on-screen row shows.
+
+  Ordering by `totalMinutes` is separately settled — that is P-034 ruling
+  3, and it is not affected by how the column question lands.
 - **Unmatched Station**: a pseudo-tab (`UNMATCHED_STATION_KEY`, not a real
   station, never selectable on the add/edit form) grouping every item
   whose stored `assignedStation` matches no current preset — a preset was
@@ -586,6 +600,24 @@ Date-grid math (as opposed to single-date comparisons) also lives in `src/utils.
 
 ## Working Session Protocol
 
+- **Every ruling recorded in PROMPTS.md or CLAUDE.md names who made it and
+  through which channel** — "Brian direct, in session", "Brian direct, in
+  chat", or "Claude under delegation" where Brian has explicitly delegated
+  a call. A ruling with no named source is not a ruling.
+- **A decision made during a build that nobody ruled on is recorded as a
+  deviation or an amendment, never as a ruling.** An amendment is a small
+  call the instruction left open and the build had to close; a deviation is
+  a departure from a standing ruling or a direct instruction. Both are
+  logged under the prompt that produced them, and a deviation also states
+  what it departed from and that it stands provisionally until ruled on.
+- **Non-objection is not endorsement, and a selected option is not a
+  ruling.** Silence, "that's fine", "as long as it does no harm", or
+  picking an option from a menu Claude constructed are all non-objection.
+  Recording any of them as a ruling manufactures authority that was never
+  given — see P-034's print-column deviation for the case that produced
+  this rule. When a build hits a standing ruling or a direct instruction,
+  the move is to flag the conflict and decline, not to offer the departure
+  as one option among equals.
 - Feature tests must never write to real pantry ingredients. Test with disposable ingredients created for the test and deleted afterward.
 - Feature tests must never leave `prep_history` docs behind. The collection is write-once by design (see the Prep Checklist section) — there is no in-app delete path, so a test print has to be removed from the Firebase console afterward, same disposable-data discipline as pantry ingredients.
 
