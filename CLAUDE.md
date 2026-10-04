@@ -467,15 +467,24 @@ touch the app at all.
   comparator to active-only and confirming it fires.
   - **Labels are kitchen language, not spec language**: "Hands-on time"
     and "Wait time" on the form (the latter naming what it means —
-    unattended: braise, brine, cure, chill, proof, thaw), ACTIVE and WAIT
-    on the row and the sheet.
+    unattended: braise, brine, cure, chill, proof, thaw). The card and the
+    sheet read as a sentence, not as field names — see the format below.
   - **The split displays conditionally** (`formatPrepTime`, pure so the
     conditional is unit-tested rather than eyeballed in a print preview):
-    `20 ACTIVE / 340 WAIT` only when there is a hold, `90 min` otherwise.
-    A cook reading "340 WAIT" knows to start it and walk away; `90 ACTIVE
-    / 0 WAIT` on every butchery row is noise on a document whose whole
-    value is that it is scannable mid-shift. One helper serves both the
-    row and the printed sheet so the two can't drift into two formats.
+    `10 min + 12 hr wait` when there is a hold, `45 min` otherwise. Wait
+    converts to whole hours when it divides evenly, `1 hr 30 min` when it
+    doesn't, bare minutes under an hour; hands-on always stays in minutes,
+    because it is a working figure and a cook sizing up a task thinks in
+    minutes of knife time. A cook reading "12 hr wait" knows to start it
+    and walk away; "+ 0 hr wait" on every butchery row is noise on a
+    document whose whole value is that it is scannable mid-shift.
+    **One helper serves both the card and the printed sheet so the two
+    can't drift into two formats** — P-035 briefly split them in two and
+    P-036 (2026-09-20) collapsed them back, with a test asserting the
+    card and the sheet render identical strings for the same record. The format
+    itself was ruled by the Grill print read-through (P-035): the earlier
+    `20 ACTIVE / 340 WAIT` wrapped to two lines on paper and read as raw
+    data.
   - **Legacy values are flagged, never guessed** (`needsTimeReentry`): an
     item with `prepMinutes` and no `activeMinutes` is not mapped into
     either new field — mapping it to `activeMinutes` is precisely the
@@ -525,26 +534,48 @@ touch the app at all.
   every item on the active station, and nothing else — the catalog
   (items, pars, times, specs) is untouched. `prep_history` is never
   touched by Reset Shift; it is a write-once log, not shift state.
-- **The printed sheet's columns are Item / Spec / Make / Unit / Time**,
-  ordered by `totalMinutes` descending — **and the Time column is
-  PROVISIONAL, not ruled.** P-012 item 4 ruled the column set as Item /
-  Spec / Make / Unit with time as the sort key only, never on paper, and
-  **that remains the standing ruling.** P-034 added the column against
-  instruction and without a ruling; it stays in the code pending Brian's
-  print read-through, which is what will settle it. See P-034's
-  "Deviation from instruction, recorded" in PROMPTS.md.
-  The open question, both sides: a cook working from paper cannot
-  currently see that a braise is a six-hour hold, which is the case for
-  the column; against it, the sheet's whole value is that it is scannable
-  mid-shift, and a fifth column costs width on a document read standing up
-  in a hot kitchen. If the column goes, `formatPrepTime` and the
-  `PrintSheetLine` fields stay — the on-screen row and `prep_history` use
-  them regardless, and only the `<th>`/`<td>` pair in `PrepChecklist.tsx`
-  comes out. The Time cell is `formatPrepTime`, the same string the
-  on-screen row shows.
+- **The printed sheet's columns are Done / Item / Spec / Make / Unit /
+  Time**, ordered by `totalMinutes` descending. **Settled by the Grill
+  print read-through, 2026-09-20 (Brian direct).** The Time column had
+  been added by P-034 against instruction and carried provisionally; the
+  read-through kept it and ruled on its format rather than removing it,
+  which resolves the deviation recorded under P-034 in PROMPTS.md. It
+  supersedes P-012 item 4's original four-column set. A cook working from
+  paper can now see that a braise is a six-hour hold.
+  The Time cell is `formatPrepTime`, the same string the on-screen card
+  shows. The **Done** column (P-035) is a 14px pen box — a bordered
+  `<span>`, never an `<input>`, because the print CSS hides form controls.
+  - **Two stylesheets style this table, not one.** The component `<style>`
+    block in `PrepChecklist.tsx` and `src/index.css`'s `@media print`
+    block both apply, and the latter's `th, td { padding: 6px 10px
+    !important }` and `border: 1px solid #000 !important` carry
+    `!important` and win over the component's 8px padding and
+    bottom-rule-only border. **Anyone measuring this table against the
+    component block alone gets wrong numbers** — that is exactly how the
+    "nowrap takes its width out of Spec" claim was produced, and it was
+    wrong. Measure against the full cascade or don't cite numbers.
+  - **The `done-cell` 28px pin does not hold.** The column renders **56px**.
+    The floor is set by the header word DONE at `font-weight: 800`, not by
+    the 16px box or the 20px horizontal padding, so the declared 28px is
+    never the operative width. Do not reason about this column's width
+    from that declaration.
+  - **`white-space: nowrap` on `time-cell` guarantees the Time cell never
+    wraps, at the cost of width taken from every auto column — Item
+    included.** Under CSS auto table-layout the width does not come out of
+    any one column. Measured at 720px / 10pt against the full cascade:
 
-  Ordering by `totalMinutes` is separately settled — that is P-034 ruling
-  3, and it is not affected by how the column question lands.
+    | | Done | Item | Spec | Make | Unit | Time |
+    |---|---|---|---|---|---|---|
+    | pre-P-035 | 56 | 144 | 297 | 56 | 51 | 115 |
+    | P-035 nowrap | 56 | 127 | 207 | 56 | 51 | 221 |
+
+    Time gains 106px; Spec gives up 90 and **Item gives up 17**.
+  - **The Item-width question is closed, not open** (paper verification,
+    2026-09-20). Against live Grill records only one item name wraps —
+    "Compound Herb Butter for Steaks and Chops" — and that is the name's
+    length, not the column's width. Real spec strings on that station are
+    short enough that Item keeps its width. No further tuning is wanted
+    here.
 - **Unmatched Station**: a pseudo-tab (`UNMATCHED_STATION_KEY`, not a real
   station, never selectable on the add/edit form) grouping every item
   whose stored `assignedStation` matches no current preset — a preset was

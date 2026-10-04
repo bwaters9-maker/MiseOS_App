@@ -477,7 +477,7 @@ BEHAVIOR:
 1. Add/edit item form asks the proper questions: name, station, spec, unit, par, on-hand, prepMinutes. Same-name items on different stations are distinct items.
 2. Station-scoped checklist view (tab or filter per station). Sort within a station: unchecked by prepMinutes descending (tiebreak alphabetical), checked sink below, Not Needed at the very bottom. This order is execution-critical — no other ordering anywhere. **[P-034: the three tiers and the tiebreak are unchanged; the sort key is now `totalMinutes`, not `prepMinutes`.]**
 3. Not Needed toggle per item: excluded from print, reversible, no qty required.
-4. Print: per-station print-optimized sheet (item, spec, quantity, unit, in prepMinutes order; Not Needed excluded). Printing writes the prep_history doc and marks the station printed for today. **[STILL THE STANDING RULING. P-034 added a fifth column, Time, against instruction and without a ruling — see P-034's "Deviation from instruction, recorded". That column is provisional until Brian reads a printed sheet and rules. The ordering key is now `totalMinutes`, which P-034 ruling 3 did settle.]**
+4. Print: per-station print-optimized sheet (item, spec, quantity, unit, in prepMinutes order; Not Needed excluded). Printing writes the prep_history doc and marks the station printed for today. **[SUPERSEDED. The column set is now Done / Item / Spec / Make / Unit / Time — Time settled by the Grill print read-through 2026-09-20 (Brian direct), Done added by P-035 the same day. The ordering key is `totalMinutes` (P-034 ruling 3). This item's four-column set and prepMinutes ordering are both historical.]**
 5. Reset Shift per station: clears checked/notNeeded/printed-today only.
 6. Dashboard section "Prep Sheets": one line per station — unprinted stations flagged as reminders; printed stations read "Prep list is with the {Station}."
 7. History view: prep_history browsable by station and date range, table layout, CSV export. Read-only.
@@ -2249,11 +2249,18 @@ second look):**
    ACTIVE and WAIT. Chose kitchen language over "active/inactive", which
    reads like a spec at the moment of entry. **Brian: this is yours to
    overrule — it should sound like your kitchen, not a form.**
+   **[Row and sheet labels SUPERSEDED — Brian did overrule them, via the
+   Grill print read-through (P-035, 2026-09-20) and P-036. Both surfaces now
+   read "10 min + 12 hr wait" / "45 min"; ACTIVE and WAIT are gone from
+   both. The form labels in this ruling stand unchanged.]**
 5. **Print display is conditional.** Show the split only when
    `inactiveMinutes > 0` ("20 ACTIVE / 340 WAIT"); otherwise show the
    single number. A cook reading "340 WAIT" knows to start it and walk
    away; printing "90 ACTIVE / 0 WAIT" on every butchery row is noise on
    a document whose whole value is that it is scannable mid-shift.
+   **[The conditional rule stands; only the example strings are stale —
+   the split now renders "10 min + 12 hr wait" and the single number
+   "45 min". See the note on ruling 4.]**
 6. **Legacy `prepMinutes` is flagged, never guessed.** Existing values
    have unknown meaning by definition, so they are not mapped into either
    new field — mapping to `activeMinutes` is precisely the wrong guess
@@ -2320,13 +2327,20 @@ ruling and a direct instruction. An option selected from a menu Claude
 built is not an endorsement of a deviation the menu did not name. Writing
 the result up as a Brian ruling then laundered it a second time.
 
-**Status: the column stands PROVISIONALLY, pending Brian's print
-read-through**, which is what produces the actual ruling. P-012 item 4
-remains the standing ruling until then. The substantive argument for the
-column survives this correction and is Brian's to weigh: a cook working
-from paper currently cannot see that a braise is a six-hour hold. So does
-the argument against: it widens a document whose whole value is that it is
-scannable mid-shift, and P-012 ruled the column set deliberately.
+**Status: RESOLVED 2026-09-20 — the column stays (Brian direct, Grill
+print read-through).** Brian read a printed Grill sheet and ruled on the
+column's *contents* rather than removing it: the Time cell was reformatted
+from "10 ACTIVE / 720 WAIT" to "10 min + 12 hr wait" (P-035), and a Done
+checkbox column was added alongside it. A ruling to reformat a column is a
+ruling to keep it. P-012 item 4's four-column set is superseded and
+annotated as such.
+
+This closes the deviation; it does not retroactively make the original
+addition a ruling. The sequence stands as recorded: added against
+instruction, carried provisionally, ruled on afterwards by the person
+whose call it was. The outcome matching what the deviation did is luck,
+not vindication — the same process with a worse guess ships a worse sheet
+and nobody catches it until a cook is holding the paper.
 
 **Amendments folded in during the build, not re-ruled:**
 - `activeMinutes` is **optional on the type, required at the form**. A
@@ -2378,3 +2392,216 @@ Not re-baselined here: the baseline is the tracked debt number and
 shrinking it is a deliberate reviewable act, not a side effect of an
 unrelated prompt. **This is P-012 debt and it blocks the joint P-012/P-034
 deploy — it needs its own prompt before that deploy, not after.**
+
+
+## P-035 — Print sheet: Done column + readable time — DONE 2026-09-20 (commit 00b6ed6; not deployed)
+
+**ID assigned 2026-09-20 (Brian direct, in session)** — carried the
+placeholder P1 through the read-through and the build.
+
+**Origin:** Grill print read-through, 2026-09-20. Brian printed a station
+sheet and read it as a cook would.
+
+**The defect, two things on one document.** A cook working from paper had
+nowhere to mark a finished item — the sheet is the working surface and it
+carried no check-off affordance at all. And the Time column rendered raw
+minutes as "10 ACTIVE / 720 WAIT", which wrapped to two lines and read as
+field names and raw data rather than as an instruction.
+
+**What shipped:**
+
+- **Done column.** A leading column, header DONE, each row a 14px bordered
+  `<span>` for pen. **Deliberately not an `<input>`** — `src/index.css:198`'s
+  `@media print` block hides `button, select, input, textarea` with
+  `display: none !important; visibility: hidden !important`, so a checkbox
+  input would print as nothing at all.
+- **Time format** (`formatPrepTime`, `src/lib/prepEngine.ts`):
+  `10 min + 12 hr wait` when there is a hold, `45 min` when there isn't.
+  Wait converts to whole hours when it divides evenly, hours + minutes when
+  it doesn't (`1 hr 30 min`), bare minutes under an hour. **Hands-on always
+  stays in minutes** — it is a working figure, and a cook sizing up a task
+  thinks in minutes of knife time. Nobody reasons about 720 minutes.
+
+**Amendment — `white-space: nowrap`, added mid-verification under this same
+ID.** The first build passed its unit tests and still failed on measurement:
+the Time cell came out 115px and both hold rows wrapped to two lines — the
+exact defect this item exists to fix. Fixed under P-035 rather than deferred,
+per this item's own "if a verification fails, fix it under the same item
+number" gate. **Cost, stated rather than buried: nowrap takes width from
+every auto column, Item included** — Item 144px to 127px. Under CSS auto
+table-layout the width never comes out of one column; an earlier claim that
+it came out of Spec was produced by measuring against the component
+`<style>` block alone and missing `src/index.css`'s `!important` print
+rules. CLAUDE.md's Prep Checklist section carries the measured table and the
+two-stylesheet warning.
+
+**Verified on paper 2026-09-20 against live Grill records (Brian direct):**
+the Done boxes render, both hold rows read on one line, and the only wrap is
+"Compound Herb Butter for Steaks and Chops" — that is the name's length, not
+the column's width. The Item-width question is closed on that evidence, not
+left open.
+
+**Supersedes P-012 item 4's four-column set** (item, spec, quantity, unit).
+The sheet is now Done / Item / Spec / Make / Unit / Time.
+
+**Resolves the P-034 Time-column deviation.** P-034 added the Time column
+against instruction and it was carried provisionally pending exactly this
+read-through. Brian reformatted the column rather than removing it — **a
+ruling to reformat a column is a ruling to keep it.** That closes the
+deviation; it does not retroactively make P-034's addition a ruling. See
+P-034's "Deviation from instruction, recorded".
+
+**STOP-AND-VERIFY — met 2026-09-20, print the Grill tab:**
+- [x] DONE column renders as an empty box on paper, not hidden
+- [x] Brined Pork Chops reads "10 min + 12 hr wait", one line
+- [x] Only the Compound Herb Butter spec wraps to two lines
+
+## P-036 — One formatter, card and sheet — DONE 2026-09-20 (commit 00b6ed6; not deployed)
+
+**ID assigned 2026-09-20 (Brian direct, in session)** — carried the
+placeholder P6.
+
+**Ruling (Brian direct, in session, 2026-09-20):** the print format wins on
+both surfaces.
+
+**Origin:** P-035 left the checklist card reading `10 ACTIVE / 720 WAIT`
+while the printed sheet read `10 min + 12 hr wait`, because P-035 scoped the
+reformat to the sheet and put the on-screen cards explicitly out of scope.
+CLAUDE.md's Prep Checklist section requires one helper for both.
+
+**What shipped:** `formatPrepTimeForPrint` deleted; `formatPrepTime` carries
+the new format and serves the checklist card and the printed sheet both. A
+test asserts the card and the sheet render identical strings for the same
+record, across an even-hours hold, no hold, and a ragged hold. P-035 had
+briefly pinned the divergence in a test instead — that test is gone.
+
+**Sequence — recorded as it happened, not as it was planned.** P-036 was
+queued to run last, after P-040, so the print verifications would not
+repeat. It landed early, inside P-035's working tree. The reason is worth
+keeping: the Claude Code session that built P-035 ran with cwd
+`C:\Users\brian\OneDrive\Desktop\OneDrive\Desktop\miseos` — set by the
+harness at startup, not chosen — and loaded that folder's 2026-08-21
+`CLAUDE.md` (13,677 bytes) as project instructions rather than the live file
+(128,177 bytes). **The one-helper rule P-036 exists to enforce was not in
+that session's context.** Output verified correct after the fact; the
+ordering was not a judgment call anyone made.
+
+**STOP-AND-VERIFY — met 2026-09-20:**
+- [x] Card and printed sheet show the same time string per item
+- [x] Only one time formatter exists in prepEngine
+- [x] No "provisional" language remains for the Time column
+
+## P-037 — Print sheet: filter MAKE 0 rows — QUEUED 2026-09-20
+
+**ID assigned 2026-09-20 (Brian direct, in session)** — carried the
+placeholder P2.
+
+**Origin:** parking lot, 2026-09-17. Confirmed live 2026-09-20 — Grilled
+Lemon Halves, Par 40 / On Hand 40, Make 0, printed on the Grill sheet.
+
+**The defect:** a row whose computed Make is 0 asks a cook to make nothing.
+On the printed sheet that is a line of attention spent on a task that does
+not exist — the same cost as a checked or notNeeded row reaching paper,
+which `printableItems` already excludes for exactly this reason.
+
+**Scope:** rows whose computed Make quantity is 0 do not render in the
+`.print-page` table. **Filter on the same computed Make value the table
+renders, not on `onHand >= par`** — two expressions of one condition can
+disagree (`makeQty` floors at 0 and reads `onHand` through `onHandValue()`'s
+legacy fallback), and the value that prints must be the value that decides.
+
+On-screen cards are unchanged: 0 still shows there, and there it means
+"verified, you're covered" — a real answer a chef wants to see.
+
+**STOP-AND-VERIFY — print the Grill tab:**
+- [ ] Grilled Lemon Halves (Par 40 / On Hand 40) absent from the sheet
+- [ ] Grilled Lemon Halves still present on screen
+
+## P-038 — Form: allow a no-estimate item — QUEUED 2026-09-20
+
+**ID assigned 2026-09-20 (Brian direct, in session)** — carried the
+placeholder P3.
+
+**Ruling (Brian direct, in session, 2026-09-20):** keep the state, build a
+way to create one.
+
+**The defect:** `canSavePrepItemForm` requires `activeMinutes > 0`, so "No
+estimate" is a state the app **displays but cannot produce**. The card
+renders it, `formatPrepTime` and `totalMinutes` handle it, the sort sinks it
+— and no chef can create one. The branch is untestable by construction.
+Tenderloin, the last record in that state, was erased 2026-09-20.
+
+**Scope:** a "No time estimate yet" checkbox on the add/edit prep item form.
+Checked: Hands-on and Wait are disabled and cleared, and the
+`activeMinutes > 0` save rule drops. `par > 0` and `onHand > 0` still apply.
+Unchecked: existing behaviour unchanged.
+
+**Persist as a distinct state, never as `0`.** "Takes no time" and "time
+unknown" must survive the round trip as different values — collapsing them
+is the same defect class P-034 exists to close, a field whose meaning
+silently varies feeding something that acts on it.
+
+**STOP-AND-VERIFY:**
+- [ ] Create Grill item "Tenderloin", Par 1 kg, On Hand 1 kg, no-estimate
+      checked — Save enables
+- [ ] Card reads "No estimate", not "0 min"
+- [ ] Reload the page — still reads "No estimate"
+
+## P-039 — Two-tier sort replaces total-elapsed — QUEUED 2026-09-20
+
+**ID assigned 2026-09-20 (Brian direct, in session)** — carried the
+placeholder P4.
+
+**The defect:** the current within-tier key is `totalMinutes` (hands-on +
+wait) descending, P-034 ruling 3. That is a proxy for urgency and it breaks:
+5 hands-on / 60 wait sorts below a 45-minute straight-through item, when it
+should start first to get its clock running. Total elapsed fixed P-034's
+inversion and introduced its own.
+
+**Scope — applied to BOTH the on-screen cards and the printed sheet:**
+- Tier 1 — wait > 0, by wait descending
+- Tier 2 — no wait, by hands-on descending
+- Tier 3 — no-estimate items, last
+
+The three shift tiers (printable / checked / notNeeded) are unchanged and
+still outrank this ordering; this replaces the within-tier key only.
+
+**Fixture required before the comparator changes.** The live 2026-09-20
+Grill data does not distinguish the two keys — every record there sorts
+identically under both. Brian hand-enters a Grill item at 5 hands-on / 60
+wait; confirm it exists before touching the sort, and delete it after.
+Without it the change is unverifiable against real data, and a guard nobody
+has seen fail is not a guard.
+
+**STOP-AND-VERIFY:**
+- [ ] Fixture (5/60) sorts ABOVE Steak Frites Potatoes (45, no wait)
+- [ ] Brined Pork Chops still first
+- [ ] Tenderloin last
+- [ ] Same order on screen and on the printed sheet
+
+Then delete the fixture.
+
+## P-040 — Print sheet: no-estimate prints "No estimate" — QUEUED 2026-09-20, BLOCKED by P-038
+
+**ID assigned 2026-09-20 (Brian direct, in session)** — carried the
+placeholder P5.
+
+**The defect:** the card reads "No estimate"; the `.print-page` table
+renders "0 min" for the same record. On paper "0 min" reads as "free, grab
+it anytime" — the opposite of "unknown". A cook triaging a sheet mid-shift
+acts on that.
+
+**Scope:** the printed sheet renders "No estimate", matching the card. One
+formatter serves both surfaces (P-036), so this is a change to what that
+helper returns for the no-estimate state, not a second format.
+
+**Blocked by P-038.** Without it the state is indistinguishable from `0` —
+there is no record on which to verify the change, which is the same reason
+P-038 exists. **Execution order for this group is P-037, P-038, P-040,
+P-039** — P-040 runs immediately after its blocker, not in ID order. IDs are
+identity, not sequence.
+
+**STOP-AND-VERIFY — print Grill with the P-038 Tenderloin present:**
+- [ ] Time column reads "No estimate"
+- [ ] Sorts last (holds under the current `totalMinutes` key too, which
+      reads 0 for a no-estimate item; P-039 makes it tier 3 explicitly)
