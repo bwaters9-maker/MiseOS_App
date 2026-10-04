@@ -259,6 +259,9 @@ export const PrepChecklist: React.FC<{
           .print-page table { border-collapse: collapse; width: 100%; }
           .print-page th, .print-page td { border-bottom: 1px solid #d1d5db; padding: 8px; text-align: left; }
           .print-page th { text-transform: uppercase; font-size: 10px; letter-spacing: 0.08em; }
+          .print-page th.done-cell, .print-page td.done-cell { width: 28px; }
+          .print-page th.time-cell, .print-page td.time-cell { white-space: nowrap; }
+          .print-page .done-box { display: inline-block; width: 14px; height: 14px; border: 1px solid #111; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
       `}</style>
 
@@ -267,16 +270,17 @@ export const PrepChecklist: React.FC<{
         <p className="text-xs mb-[21px]">{todayDateKey()}</p>
         <table>
           <thead>
-            <tr><th>Item</th><th>Spec</th><th>Make</th><th>Unit</th><th>Time</th></tr>
+            <tr><th className="done-cell">Done</th><th>Item</th><th>Spec</th><th>Make</th><th>Unit</th><th className="time-cell">Time</th></tr>
           </thead>
           <tbody>
             {printSheet.map(line => (
               <tr key={line.name}>
+                <td className="done-cell"><span className="done-box" /></td>
                 <td>{line.name}</td>
                 <td>{line.spec ?? ''}</td>
                 <td>{line.makeQty}</td>
                 <td>{line.unit}</td>
-                <td>{formatPrepTime(line)}</td>
+                <td className="time-cell">{formatPrepTime(line)}</td>
               </tr>
             ))}
           </tbody>

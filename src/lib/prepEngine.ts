@@ -136,22 +136,43 @@ export interface PrintSheetLine {
 }
 
 /**
- * The one time string both the checklist row and the printed sheet show,
+ * Wait time in the units a cook reads standing up: whole hours when it
+ * divides evenly, hours + minutes when it doesn't, bare minutes under an
+ * hour. 720 -> "12 hr", 90 -> "1 hr 30 min", 45 -> "45 min".
+ */
+const formatWait = (mins: number): string => {
+  const hr = Math.floor(mins / 60);
+  const min = mins % 60;
+  if (hr === 0) return `${min} min`;
+  if (min === 0) return `${hr} hr`;
+  return `${hr} hr ${min} min`;
+};
+
+/**
+ * The one time string both the checklist card and the printed sheet show,
  * pure so the conditional is unit-tested rather than eyeballed in a print
  * preview. Split only when there is a hold (P-034 ruling 5): a cook
- * reading "340 WAIT" knows to start it and walk away, while
- * "90 ACTIVE / 0 WAIT" on every butchery row is noise on a document whose
- * whole value is that it is scannable mid-shift.
+ * reading "12 hr wait" knows to start it and walk away, while "+ 0 hr
+ * wait" on every butchery row is noise on a document whose whole value is
+ * that it is scannable mid-shift.
+ *
+ * Format ruled by the Grill print read-through (P1, 2026-09-20; unified
+ * onto both surfaces by P6). The earlier "10 ACTIVE / 720 WAIT" wrapped to
+ * two lines on paper and read as raw data; this reads as one line of
+ * English. Hands-on stays in minutes — it is a working figure, and a cook
+ * sizing up a task thinks in minutes of knife time. Wait gets hours
+ * because nobody reasons about 720 minutes.
  *
  * Accepts a PrepItem or a PrintSheetLine — the line's required numbers are
- * assignable to the item's optional ones, so the row and the sheet cannot
+ * assignable to the item's optional ones, so the card and the sheet cannot
  * drift into two formats.
  */
 export const formatPrepTime = (item: Pick<PrepItem, 'activeMinutes' | 'inactiveMinutes'>): string => {
   const wait = inactiveMinutesValue(item);
+  const active = activeMinutesValue(item);
   return wait > 0
-    ? `${activeMinutesValue(item)} ACTIVE / ${wait} WAIT`
-    : `${activeMinutesValue(item)} min`;
+    ? `${active} min + ${formatWait(wait)} wait`
+    : `${active} min`;
 };
 
 /**

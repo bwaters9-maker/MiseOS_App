@@ -72,20 +72,43 @@ describe('prepMinutesValue (legacy reader)', () => {
 });
 
 describe('formatPrepTime', () => {
-  it('splits into ACTIVE and WAIT when there is a hold', () => {
-    expect(formatPrepTime(mkItem({ id: '1', name: 'Braise', activeMinutes: 20, inactiveMinutes: 340 })))
-      .toBe('20 ACTIVE / 340 WAIT');
+  it('reads as one line of English when there is a hold', () => {
+    // The P1 case from the Grill read-through: "10 ACTIVE / 720 WAIT"
+    // wrapped to two lines on paper and read as raw data.
+    expect(formatPrepTime(mkItem({ id: '1', name: 'Brined Pork Chops', activeMinutes: 10, inactiveMinutes: 720 })))
+      .toBe('10 min + 12 hr wait');
   });
 
-  it('shows a single number when there is no hold, rather than "90 ACTIVE / 0 WAIT"', () => {
+  it('shows hands-on alone in minutes when there is no hold', () => {
     expect(formatPrepTime(mkItem({ id: '1', name: 'Butchery', activeMinutes: 90 }))).toBe('90 min');
     expect(formatPrepTime(mkItem({ id: '1', name: 'Butchery', activeMinutes: 90, inactiveMinutes: 0 }))).toBe('90 min');
   });
 
-  it('formats a print sheet line identically to the item it came from', () => {
-    // The row and the sheet must never drift into two formats.
-    const item = mkItem({ id: '1', name: 'Braise', par: 1, activeMinutes: 20, inactiveMinutes: 340 });
-    expect(formatPrepTime(buildPrintSheet([item])[0])).toBe(formatPrepTime(item));
+  it('converts wait to whole hours only when it divides evenly', () => {
+    const wait = (m: number) => formatPrepTime(mkItem({ id: '1', name: 'x', activeMinutes: 5, inactiveMinutes: m }));
+    expect(wait(60)).toBe('5 min + 1 hr wait');
+    expect(wait(120)).toBe('5 min + 2 hr wait');
+    expect(wait(90)).toBe('5 min + 1 hr 30 min wait');
+    expect(wait(45)).toBe('5 min + 45 min wait');
+    expect(wait(1445)).toBe('5 min + 24 hr 5 min wait');
+  });
+
+  it('THE CARD AND THE SHEET RENDER THE SAME STRING for the same record', () => {
+    // P6. One helper, both surfaces. P1 had briefly split these in two
+    // (card "10 ACTIVE / 720 WAIT", sheet "10 min + 12 hr wait"); this is
+    // the assertion that keeps them from drifting apart again. The card
+    // formats the PrepItem, the sheet formats the PrintSheetLine built
+    // from it, and the two must be indistinguishable.
+    const cases = [
+      mkItem({ id: '1', name: 'Brined Pork Chops', par: 1, activeMinutes: 10, inactiveMinutes: 720 }),
+      mkItem({ id: '2', name: 'Steak Frites Potatoes', par: 1, activeMinutes: 45 }),
+      mkItem({ id: '3', name: 'Odd hold', par: 1, activeMinutes: 5, inactiveMinutes: 90 }),
+    ];
+    cases.forEach(item => {
+      const card = formatPrepTime(item);
+      const sheet = formatPrepTime(buildPrintSheet([item])[0]);
+      expect(sheet).toBe(card);
+    });
   });
 });
 
