@@ -130,6 +130,18 @@ describe('formatPrepTime', () => {
     expect(wait(1445)).toBe('5 min + 24 hr 5 min wait');
   });
 
+  it('reads "No estimate", not "0 min", for anything without a real estimate (P-040)', () => {
+    expect(formatPrepTime(mkItem({ id: '1', name: 'Tenderloin', noEstimate: true }))).toBe('No estimate');
+    expect(formatPrepTime(mkItem({ id: '1', name: 'Aged stock', prepMinutes: 360 }))).toBe('No estimate');
+    expect(formatPrepTime(mkItem({ id: '1', name: 'Apples' }))).toBe('No estimate');
+    // A stale number under the flag does not resurrect a time string.
+    expect(formatPrepTime(mkItem({ id: '1', name: 'Tenderloin', noEstimate: true, activeMinutes: 45 }))).toBe('No estimate');
+  });
+
+  it('still says "0 min" for a stored 0 — that is a claim, not an unknown', () => {
+    expect(formatPrepTime(mkItem({ id: '1', name: 'Garnish', activeMinutes: 0 }))).toBe('0 min');
+  });
+
   it('THE CARD AND THE SHEET RENDER THE SAME STRING for the same record', () => {
     // P6. One helper, both surfaces. P1 had briefly split these in two
     // (card "10 ACTIVE / 720 WAIT", sheet "10 min + 12 hr wait"); this is
@@ -140,6 +152,9 @@ describe('formatPrepTime', () => {
       mkItem({ id: '1', name: 'Brined Pork Chops', par: 1, activeMinutes: 10, inactiveMinutes: 720 }),
       mkItem({ id: '2', name: 'Steak Frites Potatoes', par: 1, activeMinutes: 45 }),
       mkItem({ id: '3', name: 'Odd hold', par: 1, activeMinutes: 5, inactiveMinutes: 90 }),
+      // P-040: the no-estimate record is the one that was mismatched
+      // (card "No estimate", sheet "0 min") — it belongs in this set.
+      mkItem({ id: '4', name: 'Tenderloin', par: 1, noEstimate: true }),
     ];
     cases.forEach(item => {
       const card = formatPrepTime(item);
@@ -377,10 +392,15 @@ describe('buildPrintSheet', () => {
     expect(buildPrintSheet([item])[0]).not.toHaveProperty('inactiveMinutes');
   });
 
-  it('never carries a legacy prepMinutes onto the line, under either time field', () => {
+  it('never carries a legacy prepMinutes onto the line, under either time field — nor the flag', () => {
+    // P-040 amendment: a legacy item awaiting re-entry writes none of the
+    // three. Its number is withheld, not declared unknown, so it must stay
+    // distinguishable from a chef's no-estimate in the log — and 0/0 would
+    // have printed "0 min" on paper for a record the card says needs
+    // re-entering.
     const item = mkItem({ id: '1', name: 'Aged stock', par: 10, onHand: 4, unit: 'lb', prepMinutes: 360 });
     expect(buildPrintSheet([item])).toEqual([
-      { name: 'Aged stock', makeQty: 6, unit: 'lb', activeMinutes: 0, inactiveMinutes: 0 },
+      { name: 'Aged stock', makeQty: 6, unit: 'lb' },
     ]);
   });
 

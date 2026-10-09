@@ -210,11 +210,20 @@ const formatWait = (mins: number): string => {
  * sizing up a task thinks in minutes of knife time. Wait gets hours
  * because nobody reasons about 720 minutes.
  *
- * Accepts a PrepItem or a PrintSheetLine — the line's required numbers are
+ * Accepts a PrepItem or a PrintSheetLine — the line's numbers are
  * assignable to the item's optional ones, so the card and the sheet cannot
  * drift into two formats.
+ *
+ * An item with no real estimate (hasTimeEstimate false — declared
+ * no-estimate, legacy awaiting re-entry, or nothing entered) reads
+ * "No estimate" on both surfaces (P-040). Before this the sheet printed
+ * "0 min" for the record the card called "No estimate"; on paper "0 min"
+ * reads as "free, grab it anytime", the opposite of "unknown", and a cook
+ * triaging a sheet mid-shift acts on that. One formatter, so the fix is a
+ * change to what this returns, not a second format.
  */
 export const formatPrepTime = (item: Pick<PrepItem, 'activeMinutes' | 'inactiveMinutes' | 'noEstimate'>): string => {
+  if (!hasTimeEstimate(item)) return 'No estimate';
   const wait = inactiveMinutesValue(item);
   const active = activeMinutesValue(item);
   return wait > 0
@@ -251,12 +260,16 @@ export const buildPrintSheet = (items: PrepItem[]): PrintSheetLine[] =>
       ...(item.spec && { spec: item.spec }),
       makeQty: makeQty(item),
       unit: item.unit,
-      // A no-estimate item writes the flag and no numbers; an estimated
-      // item writes both numbers and no flag. Never 0/0 for "unknown" —
-      // see the PrintSheetLine comment. A legacy item awaiting re-entry
-      // is not a declared no-estimate, so it still writes 0/0 as before
-      // (its number is withheld, not unknown — needsTimeReentry).
-      ...(item.noEstimate
-        ? { noEstimate: true as const }
-        : { activeMinutes: activeMinutesValue(item), inactiveMinutes: inactiveMinutesValue(item) }),
+      // An estimated item writes both numbers and no flag. Anything
+      // without a real estimate writes NO numbers — never 0/0 for
+      // "unknown" (see the PrintSheetLine comment) — and only a
+      // chef-declared no-estimate also writes the flag. A legacy item
+      // awaiting re-entry (needsTimeReentry) therefore lands in history
+      // with none of the three: its number is withheld, not declared
+      // unknown, and the two stay distinguishable in the log. Either way
+      // formatPrepTime reads the line as "No estimate" on paper (P-040
+      // amendment), where 0/0 would have printed "0 min".
+      ...(hasTimeEstimate(item)
+        ? { activeMinutes: activeMinutesValue(item), inactiveMinutes: inactiveMinutesValue(item) }
+        : item.noEstimate ? { noEstimate: true as const } : {}),
     }));
