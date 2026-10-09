@@ -2620,9 +2620,17 @@ above it under wait-first) and pins the discrimination with a
 `totalMinutes` assertion. **Enter 5 / 30, not 5 / 60, for the paper
 check.** The STOP-AND-VERIFY list below is amended accordingly.
 
+**RULED 2026-10-09 (Brian direct, in chat: "rulings: I defer to you" →
+Claude under delegation): all six items standing provisionally across
+P-037..P-040 are accepted as rulings — P-037's history-side filter;
+P-038's explicit `noEstimate` field and its no-numbers history line
+(incl. the PrepHistoryView touch); P-040's legacy-item amendment;
+P-039's deviation (built without the live fixture) and its fixture
+finding (5/30, not 5/60). Nothing in the four entries remains
+provisional.**
+
 **Verification findings (Brian direct, in chat, 2026-10-09) — parked
-here because PARKING-LOT.md (OneDrive) was unreachable; move them on
-the next triage:**
+here and copied to the PARKING-LOT Inbox the same night:**
 - `canSavePrepItemForm` requires On Hand > 0 (P-012). An item the kitchen
   is completely out of — the commonest reason to put something on a prep
   list — cannot be entered. Blocked two fixture entries tonight. Needs a
