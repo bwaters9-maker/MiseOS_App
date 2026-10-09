@@ -104,15 +104,18 @@ export const PrepHistoryView: React.FC<{ onBack: () => void }> = ({ onBack }) =>
   };
 
   const exportCsv = () => {
-    const headers = ['date', 'station', 'printedAt', 'name', 'spec', 'makeQty', 'unit', 'activeMinutes', 'inactiveMinutes', 'legacyPrepMinutes'];
+    const headers = ['date', 'station', 'printedAt', 'name', 'spec', 'makeQty', 'unit', 'activeMinutes', 'inactiveMinutes', 'legacyPrepMinutes', 'noEstimate'];
     // prep_history is write-once, so a sheet printed before P-034 holds
     // lines with prepMinutes and neither new field. Those export under
     // legacyPrepMinutes, never under either new header — the number had no
     // defined meaning, and filing it as activeMinutes would assert one
-    // (ruling 6). Nothing leaves the audit export; every cell is blank
-    // rather than the string "undefined" where the field is absent.
+    // (ruling 6). A no-estimate line (P-038) carries neither time field by
+    // design and exports blank under both, with `true` in its own column
+    // so blank-because-unknown is distinguishable from blank-because-legacy.
+    // Nothing leaves the audit export; every cell is blank rather than the
+    // string "undefined" where the field is absent.
     const rows = filtered.flatMap(doc =>
-      doc.items.map(item => [doc.date, doc.station, doc.printedAt, item.name, item.spec ?? '', item.makeQty, item.unit, item.activeMinutes ?? '', item.inactiveMinutes ?? '', item.prepMinutes ?? ''])
+      doc.items.map(item => [doc.date, doc.station, doc.printedAt, item.name, item.spec ?? '', item.makeQty, item.unit, item.activeMinutes ?? '', item.inactiveMinutes ?? '', item.prepMinutes ?? '', item.noEstimate ? 'true' : ''])
     );
     const csv = [headers, ...rows].map(row => row.map(csvEscape).join(',')).join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -228,7 +231,9 @@ export const PrepHistoryView: React.FC<{ onBack: () => void }> = ({ onBack }) =>
                                   <td className="p-[8px] text-slate">{item.spec ?? ''}</td>
                                   <td className="p-[8px] font-mono text-navy text-right">{item.makeQty}</td>
                                   <td className="p-[8px] text-slate">{item.unit}</td>
-                                  {item.activeMinutes == null && item.prepMinutes != null ? (
+                                  {item.noEstimate ? (
+                                    <td colSpan={2} className="p-[8px] text-slate text-right">No estimate</td>
+                                  ) : item.activeMinutes == null && item.prepMinutes != null ? (
                                     <td colSpan={2} className="p-[8px] font-mono text-slate text-right">{item.prepMinutes} <span className="font-body not-italic text-[10px] uppercase tracking-wider">legacy</span></td>
                                   ) : (
                                     <>

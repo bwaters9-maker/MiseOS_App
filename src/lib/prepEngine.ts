@@ -20,13 +20,15 @@ export const UNMATCHED_STATION_KEY = '__unmatched_station__';
 /** Hands-on time; absent reads as 0, same "absent reads as a stated
  * default" convention as recipeStatus(). Absent means either a brand-new
  * item mid-entry or a legacy item awaiting re-entry (needsTimeReentry). */
-export const activeMinutesValue = (item: Pick<PrepItem, 'activeMinutes'>): number =>
-  item.activeMinutes ?? 0;
+export const activeMinutesValue = (item: Pick<PrepItem, 'activeMinutes' | 'noEstimate'>): number =>
+  item.noEstimate ? 0 : (item.activeMinutes ?? 0);
 
 /** Unattended time — braise, brine, cure, chill, proof, thaw. Optional at
- * the form, so absent is the ordinary case for most prep, not a gap. */
-export const inactiveMinutesValue = (item: Pick<PrepItem, 'inactiveMinutes'>): number =>
-  item.inactiveMinutes ?? 0;
+ * the form, so absent is the ordinary case for most prep, not a gap. Both
+ * readers return 0 for a noEstimate item regardless of what the doc
+ * carries (P-038, see hasTimeEstimate) — the flag wins. */
+export const inactiveMinutesValue = (item: Pick<PrepItem, 'inactiveMinutes' | 'noEstimate'>): number =>
+  item.noEstimate ? 0 : (item.inactiveMinutes ?? 0);
 
 /**
  * Wall-clock time the item consumes. Derived, never stored (P-034 ruling
@@ -39,7 +41,7 @@ export const inactiveMinutesValue = (item: Pick<PrepItem, 'inactiveMinutes'>): n
  * minutes of straight butchery, and sorting on active alone inverts the
  * order on exactly the long-hold items that wreck a prep day.
  */
-export const totalMinutes = (item: Pick<PrepItem, 'activeMinutes' | 'inactiveMinutes'>): number =>
+export const totalMinutes = (item: Pick<PrepItem, 'activeMinutes' | 'inactiveMinutes' | 'noEstimate'>): number =>
   activeMinutesValue(item) + inactiveMinutesValue(item);
 
 /** LEGACY reader, P-034 — display-only context on a flagged item, never a
@@ -57,8 +59,22 @@ export const prepMinutesValue = (item: Pick<PrepItem, 'prepMinutes'>): number =>
  * last until a chef re-enters it, the same pressure P-012 already applied
  * to an item with no estimate at all.
  */
-export const needsTimeReentry = (item: Pick<PrepItem, 'activeMinutes' | 'prepMinutes'>): boolean =>
-  item.activeMinutes == null && item.prepMinutes != null;
+export const needsTimeReentry = (item: Pick<PrepItem, 'activeMinutes' | 'prepMinutes' | 'noEstimate'>): boolean =>
+  item.activeMinutes == null && item.prepMinutes != null && !item.noEstimate;
+
+/**
+ * Whether the item carries a real time estimate (P-038). False for a
+ * chef-declared no-estimate item, for a legacy item awaiting re-entry,
+ * and for a brand-new item with nothing entered — all three read "No
+ * estimate" rather than "0 min", because 0 is a claim ("takes no time")
+ * and none of them is making it. The flag is checked first and wins:
+ * a doc that somehow carries both noEstimate: true and a stale
+ * activeMinutes is still a no-estimate item, so the number can't leak
+ * back into the sort or the sheet. Every reader that renders or ranks a
+ * time goes through this, never through `activeMinutes != null` directly.
+ */
+export const hasTimeEstimate = (item: Pick<PrepItem, 'activeMinutes' | 'noEstimate'>): boolean =>
+  !item.noEstimate && item.activeMinutes != null;
 
 /**
  * onHand was renamed from `quantity` in the P-012 schema rewrite with no
@@ -147,14 +163,23 @@ export const sortPrepItems = (items: PrepItem[]): PrepItem[] => {
   return [...active, ...checked, ...notNeeded];
 };
 
-/** One line of a printed sheet / prep_history doc — see buildPrintSheet. */
+/**
+ * One line of a printed sheet / prep_history doc — see buildPrintSheet.
+ * An estimated line always carries both numbers (an explicit 0 wait, never
+ * an absent key). A no-estimate line (P-038) carries `noEstimate: true`
+ * and NEITHER number: writing 0/0 into a write-once audit log would be
+ * exactly the "unknown becomes zero" collapse the flag exists to prevent,
+ * and a naive reader of the stored doc (the CSV export, a spreadsheet)
+ * then sees blank, not 0, without having to know about the flag.
+ */
 export interface PrintSheetLine {
   name: string;
   spec?: string;
   makeQty: number;
   unit: string;
-  activeMinutes: number;
-  inactiveMinutes: number;
+  activeMinutes?: number;
+  inactiveMinutes?: number;
+  noEstimate?: true;
 }
 
 /**
@@ -189,7 +214,7 @@ const formatWait = (mins: number): string => {
  * assignable to the item's optional ones, so the card and the sheet cannot
  * drift into two formats.
  */
-export const formatPrepTime = (item: Pick<PrepItem, 'activeMinutes' | 'inactiveMinutes'>): string => {
+export const formatPrepTime = (item: Pick<PrepItem, 'activeMinutes' | 'inactiveMinutes' | 'noEstimate'>): string => {
   const wait = inactiveMinutesValue(item);
   const active = activeMinutesValue(item);
   return wait > 0
@@ -206,12 +231,9 @@ export const formatPrepTime = (item: Pick<PrepItem, 'activeMinutes' | 'inactiveM
  * onHandValue and KitchenEvent.attendees/covers, and for the same reason:
  * no migration write over an archive.
  */
-export type StoredPrintSheetLine =
-  Omit<PrintSheetLine, 'activeMinutes' | 'inactiveMinutes'> & {
-    activeMinutes?: number;
-    inactiveMinutes?: number;
-    prepMinutes?: number;
-  };
+export type StoredPrintSheetLine = PrintSheetLine & {
+  prepMinutes?: number;
+};
 
 /**
  * The shape shared by the printed DOM and the prep_history doc, built
@@ -229,6 +251,12 @@ export const buildPrintSheet = (items: PrepItem[]): PrintSheetLine[] =>
       ...(item.spec && { spec: item.spec }),
       makeQty: makeQty(item),
       unit: item.unit,
-      activeMinutes: activeMinutesValue(item),
-      inactiveMinutes: inactiveMinutesValue(item),
+      // A no-estimate item writes the flag and no numbers; an estimated
+      // item writes both numbers and no flag. Never 0/0 for "unknown" —
+      // see the PrintSheetLine comment. A legacy item awaiting re-entry
+      // is not a declared no-estimate, so it still writes 0/0 as before
+      // (its number is withheld, not unknown — needsTimeReentry).
+      ...(item.noEstimate
+        ? { noEstimate: true as const }
+        : { activeMinutes: activeMinutesValue(item), inactiveMinutes: inactiveMinutesValue(item) }),
     }));

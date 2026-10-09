@@ -7,7 +7,7 @@
  * the legacy dark-zinc style IngredientForm.tsx itself still carries.
  *
  * Covers only the catalog fields (name, station, spec, unit, par, onHand,
- * activeMinutes, inactiveMinutes) — never checked/notNeeded/printedDate. toDoc's output is a
+ * activeMinutes, inactiveMinutes, noEstimate) — never checked/notNeeded/printedDate. toDoc's output is a
  * partial field set by design: spread onto fresh-item defaults on add, or
  * passed straight to updateDoc on edit, where Firestore's partial-merge
  * semantics leave today's shift state (checked/notNeeded/printedDate)
@@ -48,6 +48,9 @@ export interface FormState {
   onHand: string;
   activeMinutes: string;
   inactiveMinutes: string;
+  /** "No time estimate yet" (P-038). Checked clears and disables both
+   * time inputs and lifts the activeMinutes > 0 save rule. */
+  noEstimate: boolean;
 }
 
 export const BLANK: FormState = {
@@ -59,6 +62,7 @@ export const BLANK: FormState = {
   onHand: '',
   activeMinutes: '',
   inactiveMinutes: '',
+  noEstimate: false,
 };
 
 export const toForm = (item: PrepItem): FormState => ({
@@ -68,8 +72,11 @@ export const toForm = (item: PrepItem): FormState => ({
   unit: item.unit,
   par: String(item.par),
   onHand: String(onHandValue(item)),
-  activeMinutes: item.activeMinutes != null ? String(item.activeMinutes) : '',
-  inactiveMinutes: item.inactiveMinutes != null ? String(item.inactiveMinutes) : '',
+  // A noEstimate doc has no times by construction; reading them through
+  // the flag keeps a stale number out of the inputs if one ever existed.
+  activeMinutes: !item.noEstimate && item.activeMinutes != null ? String(item.activeMinutes) : '',
+  inactiveMinutes: !item.noEstimate && item.inactiveMinutes != null ? String(item.inactiveMinutes) : '',
+  noEstimate: item.noEstimate === true,
 });
 
 /** The catalog fields this form owns, nothing else. Legacy `prepMinutes`
@@ -77,7 +84,7 @@ export const toForm = (item: PrepItem): FormState => ({
  * so a re-entered legacy item simply gains activeMinutes and leaves the
  * dead value where it lies — needsTimeReentry goes false on the presence
  * of activeMinutes, not on the absence of prepMinutes. */
-export type PrepItemCatalogFields = Pick<PrepItem, 'name' | 'assignedStation' | 'unit' | 'par' | 'onHand' | 'spec' | 'activeMinutes' | 'inactiveMinutes'>;
+export type PrepItemCatalogFields = Pick<PrepItem, 'name' | 'assignedStation' | 'unit' | 'par' | 'onHand' | 'spec' | 'activeMinutes' | 'inactiveMinutes' | 'noEstimate'>;
 
 export const toDoc = (f: FormState): PrepItemCatalogFields => {
   const activeMinutes = parseFloat(f.activeMinutes);
@@ -89,13 +96,21 @@ export const toDoc = (f: FormState): PrepItemCatalogFields => {
     par: parseFloat(f.par) || 0,
     onHand: parseFloat(f.onHand) || 0,
     ...(f.spec.trim() && { spec: f.spec.trim() }),
-    ...(f.activeMinutes !== '' && !isNaN(activeMinutes) && { activeMinutes }),
-    // Blank writes an explicit 0, where blank spec/activeMinutes omit the
-    // key. The difference is deliberate: wait time is optional, so blank is
-    // a real answer ("no hold"), and a chef clearing a wait time on edit
-    // must actually clear it. Omitting the key would leave the old value in
-    // the doc under Firestore's partial merge and silently ignore the edit.
-    inactiveMinutes: f.inactiveMinutes !== '' && !isNaN(inactiveMinutes) ? inactiveMinutes : 0,
+    // P-038: always written explicitly, same reasoning as inactiveMinutes
+    // below — unchecking it on edit must actually clear it under partial
+    // merge. A no-estimate save writes NEITHER time key (see
+    // PrepChecklist.handleEdit for how the edit path removes stale ones;
+    // on add there is nothing to remove).
+    noEstimate: f.noEstimate,
+    ...(!f.noEstimate && {
+      ...(f.activeMinutes !== '' && !isNaN(activeMinutes) && { activeMinutes }),
+      // Blank writes an explicit 0, where blank spec/activeMinutes omit the
+      // key. The difference is deliberate: wait time is optional, so blank is
+      // a real answer ("no hold"), and a chef clearing a wait time on edit
+      // must actually clear it. Omitting the key would leave the old value in
+      // the doc under Firestore's partial merge and silently ignore the edit.
+      inactiveMinutes: f.inactiveMinutes !== '' && !isNaN(inactiveMinutes) ? inactiveMinutes : 0,
+    }),
   };
 };
 
@@ -111,6 +126,10 @@ export const toDoc = (f: FormState): PrepItemCatalogFields => {
  * numbers on every add is real friction against the Friday-service bar.
  * Blank is valid; a typed value must parse as a non-negative number, so a
  * half-typed "-" or "abc" blocks save rather than silently storing 0.
+ *
+ * "No time estimate yet" (P-038) lifts the activeMinutes rule only — the
+ * chef is saying the time is unknown, which is a real answer the app can
+ * display (hasTimeEstimate), not a skipped field. par/onHand still apply.
  */
 export const canSavePrepItemForm = (f: FormState, isEditing: boolean): boolean =>
   f.name.trim() !== ''
@@ -118,8 +137,10 @@ export const canSavePrepItemForm = (f: FormState, isEditing: boolean): boolean =
   && f.unit !== ''
   && parseFloat(f.par) > 0
   && parseFloat(f.onHand) > 0
-  && parseFloat(f.activeMinutes) > 0
-  && (f.inactiveMinutes === '' || parseFloat(f.inactiveMinutes) >= 0);
+  && (f.noEstimate || (
+    parseFloat(f.activeMinutes) > 0
+    && (f.inactiveMinutes === '' || parseFloat(f.inactiveMinutes) >= 0)
+  ));
 
 /** Presets plus the form's current value if it isn't one — an item whose
  * stored station/unit was since renamed or removed must still show and
@@ -235,7 +256,8 @@ export const PrepItemForm: React.FC<{
             placeholder="0"
             min="0"
             step="1"
-            className={INPUT_NUMERIC}
+            disabled={form.noEstimate}
+            className={`${INPUT_NUMERIC} disabled:opacity-40 disabled:cursor-not-allowed`}
           />
           <p className="text-[11px] text-slate mt-[5px]">Minutes you are working on it.</p>
         </div>
@@ -248,11 +270,28 @@ export const PrepItemForm: React.FC<{
             placeholder="0"
             min="0"
             step="1"
-            className={INPUT_NUMERIC}
+            disabled={form.noEstimate}
+            className={`${INPUT_NUMERIC} disabled:opacity-40 disabled:cursor-not-allowed`}
           />
           <p className="text-[11px] text-slate mt-[5px]">Minutes it takes care of itself — braise, brine, cure, chill, proof, thaw.</p>
         </div>
       </div>
+
+      <label className="flex items-center gap-[8px] text-xs text-navy cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={form.noEstimate}
+          onChange={e => setForm(
+            // Checking clears both inputs so a number can't ride along
+            // disabled and reappear on uncheck looking like a choice.
+            e.target.checked
+              ? { ...form, noEstimate: true, activeMinutes: '', inactiveMinutes: '' }
+              : { ...form, noEstimate: false },
+          )}
+          className="accent-teal w-[14px] h-[14px]"
+        />
+        No time estimate yet
+      </label>
 
       <div className="flex gap-[8px] justify-end pt-[5px]">
         <button type="button" onClick={onCancel} className={BTN_GHOST}>Cancel</button>

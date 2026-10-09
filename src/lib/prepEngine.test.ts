@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { activeMinutesValue, inactiveMinutesValue, totalMinutes, needsTimeReentry, formatPrepTime, prepMinutesValue, onHandValue, makeQty, printableItems, sheetItems, sortPrepItems, buildPrintSheet } from './prepEngine';
+import { activeMinutesValue, inactiveMinutesValue, totalMinutes, needsTimeReentry, hasTimeEstimate, formatPrepTime, prepMinutesValue, onHandValue, makeQty, printableItems, sheetItems, sortPrepItems, buildPrintSheet } from './prepEngine';
 import type { PrepItem } from '../types';
 
 // par 1 / onHand 0 by default so a fixture has something to make and
@@ -60,6 +60,41 @@ describe('needsTimeReentry', () => {
 
   it('does not flag a new item that simply has no times yet', () => {
     expect(needsTimeReentry(mkItem({ id: '1', name: 'Apples' }))).toBe(false);
+  });
+});
+
+describe('hasTimeEstimate / noEstimate (P-038)', () => {
+  it('is true only when a real hands-on number is stored and the flag is not set', () => {
+    expect(hasTimeEstimate(mkItem({ id: '1', name: 'Carrots', activeMinutes: 20 }))).toBe(true);
+    expect(hasTimeEstimate(mkItem({ id: '1', name: 'Carrots', activeMinutes: 20, noEstimate: false }))).toBe(true);
+  });
+
+  it('is false for a declared no-estimate item, a legacy item, and a bare item', () => {
+    expect(hasTimeEstimate(mkItem({ id: '1', name: 'Tenderloin', noEstimate: true }))).toBe(false);
+    expect(hasTimeEstimate(mkItem({ id: '1', name: 'Stock', prepMinutes: 45 }))).toBe(false);
+    expect(hasTimeEstimate(mkItem({ id: '1', name: 'Apples' }))).toBe(false);
+  });
+
+  it('the flag wins over a stale number — it cannot leak back into the sort or the sheet', () => {
+    const stale = mkItem({ id: '1', name: 'Tenderloin', noEstimate: true, activeMinutes: 45, inactiveMinutes: 60 });
+    expect(hasTimeEstimate(stale)).toBe(false);
+    expect(activeMinutesValue(stale)).toBe(0);
+    expect(inactiveMinutesValue(stale)).toBe(0);
+    expect(totalMinutes(stale)).toBe(0);
+  });
+
+  it('"no estimate" and "0 minutes" are different stored states, not the same value', () => {
+    // The whole point of the ruling: "takes no time" and "time unknown"
+    // must survive the round trip as different records.
+    const unknown = mkItem({ id: '1', name: 'A', noEstimate: true });
+    const zero = mkItem({ id: '2', name: 'B', activeMinutes: 0 });
+    expect(hasTimeEstimate(unknown)).toBe(false);
+    expect(hasTimeEstimate(zero)).toBe(true);
+    expect(unknown).not.toHaveProperty('activeMinutes');
+  });
+
+  it('a legacy item the chef marks no-estimate is resolved, not still flagged for re-entry', () => {
+    expect(needsTimeReentry(mkItem({ id: '1', name: 'Stock', prepMinutes: 45, noEstimate: true }))).toBe(false);
   });
 });
 
@@ -328,6 +363,18 @@ describe('buildPrintSheet', () => {
     expect(buildPrintSheet([item])).toEqual([
       { name: 'Carrots', makeQty: 6, unit: 'lb', activeMinutes: 20, inactiveMinutes: 0 },
     ]);
+  });
+
+  it('writes a no-estimate line as the flag and NO numbers — never 0/0 for "unknown" (P-038)', () => {
+    // A write-once audit log that recorded 0/0 here would be the exact
+    // collapse the flag exists to prevent, and a naive reader (CSV, a
+    // spreadsheet) must see blank, not 0, without knowing about the flag.
+    const item = mkItem({ id: '1', name: 'Tenderloin', par: 1, onHand: 0, unit: 'kg', noEstimate: true });
+    expect(buildPrintSheet([item])).toEqual([
+      { name: 'Tenderloin', makeQty: 1, unit: 'kg', noEstimate: true },
+    ]);
+    expect(buildPrintSheet([item])[0]).not.toHaveProperty('activeMinutes');
+    expect(buildPrintSheet([item])[0]).not.toHaveProperty('inactiveMinutes');
   });
 
   it('never carries a legacy prepMinutes onto the line, under either time field', () => {

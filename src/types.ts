@@ -13,12 +13,14 @@ export interface PrepItem {
   onHand: number;
   par: number;
   /**
-   * Hands-on time. Required on every save (canSavePrepItemForm), optional
-   * on the type for exactly one reason: a legacy doc carrying only
+   * Hands-on time. Required on every save (canSavePrepItemForm) unless
+   * the chef has checked "No time estimate yet" (noEstimate, P-038);
+   * optional on the type for two reasons: a legacy doc carrying only
    * `prepMinutes` has neither new field and must stay representable —
    * P-034 ruling 6 flags those for re-entry rather than guessing a value
-   * into them. Same convention `prepMinutes` itself already used under
-   * P-012: required at the form, optional on the type.
+   * into them — and a noEstimate item has it absent by design. Same
+   * convention `prepMinutes` itself already used under P-012: required at
+   * the form, optional on the type.
    */
   activeMinutes?: number;
   /** Unattended time — braise, brine, cure, chill, proof, thaw. Absent reads
@@ -27,6 +29,18 @@ export interface PrepItem {
    * a second mandatory number on every add is friction the Friday-service
    * bar doesn't accept. */
   inactiveMinutes?: number;
+  /**
+   * The chef has said "no time estimate yet" (P-038). A distinct stored
+   * state, never collapsed into activeMinutes: 0 — "takes no time" and
+   * "time unknown" must survive the round trip as different values, the
+   * same defect class P-034 exists to close. When true, activeMinutes and
+   * inactiveMinutes are absent from the doc (the form clears them and the
+   * edit path deletes them); readers go through hasTimeEstimate() rather
+   * than testing either field directly. Written explicitly as false on
+   * every ordinary save so unchecking it on edit actually clears it under
+   * Firestore's partial merge; absent (pre-P-038 docs) reads as false.
+   */
+  noEstimate?: boolean;
   /**
    * LEGACY, P-034. Never written again; read-only context on an item
    * flagged for re-entry. Its meaning is undefined by construction — a

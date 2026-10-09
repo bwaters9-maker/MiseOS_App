@@ -6,7 +6,7 @@ import { rCollection, rDoc } from './lib/firestorePaths';
 import { useRestaurantId } from './components/AuthContext';
 import { useKitchenSelector } from './components/KitchenStateContext';
 import { useStationPresets } from './hooks/useStationPresets';
-import { sortPrepItems, makeQty, onHandValue, printableItems, buildPrintSheet, formatPrepTime, needsTimeReentry, prepMinutesValue, UNMATCHED_STATION_KEY } from './lib/prepEngine';
+import { sortPrepItems, makeQty, onHandValue, printableItems, buildPrintSheet, formatPrepTime, needsTimeReentry, hasTimeEstimate, prepMinutesValue, UNMATCHED_STATION_KEY } from './lib/prepEngine';
 import { PrepItemForm, BLANK, toForm, toDoc, type FormState } from './components/prep/PrepItemForm';
 import { PrepHistoryView } from './components/prep/PrepHistoryView';
 import { BTN_ACTION, BTN_GHOST, BADGE } from './lib/formStyles';
@@ -120,11 +120,21 @@ export const PrepChecklist: React.FC<{
     if (!editId || saving) return;
     setSaving(true);
     try {
-      // toDoc returns only the seven catalog fields it owns -- never
+      // toDoc returns only the catalog fields it owns -- never
       // checked/notNeeded/printedDate. updateDoc's partial merge leaves
       // today's shift state exactly as it was; a catalog fix can never
       // silently un-check a cook's finished prep. See PrepItemForm.tsx.
-      await updateDoc(rDoc(restaurantId, 'prepItems', editId), toDoc(editForm));
+      //
+      // P-038: a no-estimate save omits both time keys, and under partial
+      // merge "omitted" means "kept" -- so the edit path deletes them
+      // explicitly. Otherwise an item edited from 45 min to "no estimate"
+      // would still carry activeMinutes: 45 in the doc. Readers already
+      // treat the flag as authoritative (hasTimeEstimate), so this is
+      // hygiene for the stored record, not the only line of defence.
+      const fields = toDoc(editForm);
+      await updateDoc(rDoc(restaurantId, 'prepItems', editId), fields.noEstimate
+        ? { ...fields, activeMinutes: deleteField(), inactiveMinutes: deleteField() }
+        : fields);
       setEditId(null);
     } finally {
       setSaving(false);
@@ -499,7 +509,7 @@ const PrepItemCard: React.FC<{
             Par {item.par} {item.unit} · On Hand {onHandValue(item)} {item.unit}
             {reentry
               ? ` · was ${prepMinutesValue(item)} min — re-enter`
-              : item.activeMinutes != null ? ` · ${formatPrepTime(item)}` : ' · No estimate'}
+              : hasTimeEstimate(item) ? ` · ${formatPrepTime(item)}` : ' · No estimate'}
           </p>
         </div>
         <div className="text-right shrink-0">
