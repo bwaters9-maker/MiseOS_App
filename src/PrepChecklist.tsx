@@ -198,6 +198,10 @@ export const PrepChecklist: React.FC<{
     setPrintError(null);
     try {
       const today = todayDateKey();
+      // Stamp the broader printable set, not just the rows on the sheet:
+      // a Make 0 item (P-037) is deliberately absent from paper, but this
+      // print still covers it, so it must not read as "added since print"
+      // on the Dashboard for the rest of the day.
       const printable = printableItems(activeItems);
       const batch = writeBatch(db);
       const historyRef = doc(rCollection(restaurantId, 'prep_history'));

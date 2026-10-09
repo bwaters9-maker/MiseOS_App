@@ -96,13 +96,35 @@ const isPrintable = (item: Pick<PrepItem, 'checked' | 'notNeeded'>): boolean =>
   !item.checked && !item.notNeeded;
 
 /**
- * The single source of what reaches paper. Both the print DOM
- * (PrepChecklist.tsx) and the prep_history doc it writes derive from
- * this — never their own filter — so the printed sheet and the log it
- * produces can't drift apart.
+ * The items a print covers: not done, not skipped. This is the set that
+ * gets the printedDate stamp and the set the Dashboard reads for "is
+ * this station handled". What actually renders on the sheet (and lands
+ * in prep_history) is the narrower sheetItems below — both the print DOM
+ * (PrepChecklist.tsx) and the history doc derive from that one function,
+ * never their own filter, so the printed sheet and the log it produces
+ * can't drift apart.
  */
 export const printableItems = (items: PrepItem[]): PrepItem[] =>
   items.filter(isPrintable);
+
+/**
+ * What actually reaches paper: printable AND with something to make
+ * (P-037, Grill read-through 2026-09-20). A row whose Make is 0 asks a
+ * cook to make nothing — the same cost as a checked or notNeeded row
+ * reaching paper, and excluded for the same reason. The filter runs on
+ * the same computed makeQty the sheet renders, never on `onHand >= par`:
+ * two expressions of one condition can disagree (makeQty floors at 0 and
+ * reads onHand through onHandValue()'s legacy fallback), and the value
+ * that prints must be the value that decides.
+ *
+ * On screen the card still shows Make 0 — there it means "verified,
+ * you're covered", a real answer a chef wants to see. printableItems
+ * (the broader set) still drives the printedDate stamp and the
+ * Dashboard's "is this station handled" signal, so a Make 0 item is
+ * covered by a print even though it never appears on one.
+ */
+export const sheetItems = (items: PrepItem[]): PrepItem[] =>
+  printableItems(items).filter(item => makeQty(item) > 0);
 
 /**
  * Three tiers, in order: (1) printable — unchecked and not notNeeded,
@@ -193,13 +215,14 @@ export type StoredPrintSheetLine =
 
 /**
  * The shape shared by the printed DOM and the prep_history doc, built
- * on printableItems so the two can never diverge. Ordered the same way
- * the checklist view shows printable items (totalMinutes descending,
- * name tiebreak) — what prints top-to-bottom is what the sheet reads
- * top-to-bottom.
+ * on sheetItems so the two can never diverge — a Make 0 row is absent
+ * from both (P-037), since the log should read as what was actually
+ * asked for. Ordered the same way the checklist view shows printable
+ * items (totalMinutes descending, name tiebreak) — what prints
+ * top-to-bottom is what the sheet reads top-to-bottom.
  */
 export const buildPrintSheet = (items: PrepItem[]): PrintSheetLine[] =>
-  printableItems(items)
+  sheetItems(items)
     .sort(byTotalMinutesThenName)
     .map((item): PrintSheetLine => ({
       name: item.name,

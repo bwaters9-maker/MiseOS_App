@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { activeMinutesValue, inactiveMinutesValue, totalMinutes, needsTimeReentry, formatPrepTime, prepMinutesValue, onHandValue, makeQty, printableItems, sortPrepItems, buildPrintSheet } from './prepEngine';
+import { activeMinutesValue, inactiveMinutesValue, totalMinutes, needsTimeReentry, formatPrepTime, prepMinutesValue, onHandValue, makeQty, printableItems, sheetItems, sortPrepItems, buildPrintSheet } from './prepEngine';
 import type { PrepItem } from '../types';
 
+// par 1 / onHand 0 by default so a fixture has something to make and
+// reaches the sheet unless a test says otherwise (P-037 filters Make 0).
 const mkItem = (o: Partial<PrepItem> & { id: string; name: string }): PrepItem => ({
   assignedStation: 'Sauté',
   unit: 'lb',
   onHand: 0,
-  par: 0,
+  par: 1,
   checked: false,
   ...o,
 });
@@ -172,6 +174,41 @@ describe('printableItems', () => {
   });
 });
 
+describe('sheetItems (P-037)', () => {
+  it('drops a printable item whose computed Make is 0 — the live Grill case', () => {
+    // Grilled Lemon Halves, Par 40 / On Hand 40, printed as "Make 0" on
+    // the 2026-09-20 Grill sheet. A row that asks a cook to make nothing.
+    const lemons = mkItem({ id: '1', name: 'Grilled Lemon Halves', par: 40, onHand: 40, activeMinutes: 10 });
+    const chops = mkItem({ id: '2', name: 'Brined Pork Chops', par: 12, onHand: 4, activeMinutes: 10, inactiveMinutes: 720 });
+    expect(printableItems([lemons, chops]).map(i => i.id)).toEqual(['1', '2']);
+    expect(sheetItems([lemons, chops]).map(i => i.id)).toEqual(['2']);
+  });
+
+  it('drops an over-stocked item too — Make is floored at 0, not negative', () => {
+    const over = mkItem({ id: '1', name: 'Carrots', par: 4, onHand: 10, activeMinutes: 5 });
+    expect(sheetItems([over])).toEqual([]);
+  });
+
+  it('decides on the same computed Make the sheet renders, so a legacy quantity doc is read the same way', () => {
+    // onHand absent, legacy `quantity` carries the count. If the filter
+    // compared onHand >= par directly it would read undefined and the row
+    // would print as Make 3 while "qualifying" as nothing to make — or the
+    // reverse. One expression, one answer.
+    const legacyCovered = { id: '1', name: 'Duck', assignedStation: 'Grill', unit: 'kg', par: 3, checked: false, quantity: 3, activeMinutes: 5 } as unknown as PrepItem;
+    const legacyShort = { id: '2', name: 'Duck', assignedStation: 'Grill', unit: 'kg', par: 3, checked: false, quantity: 1, activeMinutes: 5 } as unknown as PrepItem;
+    expect(sheetItems([legacyCovered, legacyShort]).map(i => i.id)).toEqual(['2']);
+  });
+
+  it('still excludes checked and notNeeded items, same as printableItems', () => {
+    const items = [
+      mkItem({ id: '1', name: 'Carrots', par: 5 }),
+      mkItem({ id: '2', name: 'Beets', par: 5, checked: true }),
+      mkItem({ id: '3', name: 'Squash', par: 5, notNeeded: true }),
+    ];
+    expect(sheetItems(items).map(i => i.id)).toEqual(['1']);
+  });
+});
+
 describe('sortPrepItems', () => {
   it('sorts the printable tier by totalMinutes descending', () => {
     const short = mkItem({ id: '1', name: 'Salt', activeMinutes: 2 });
@@ -253,6 +290,16 @@ describe('buildPrintSheet', () => {
       mkItem({ id: '3', name: 'Squash', notNeeded: true }),
     ];
     expect(buildPrintSheet(items).map(l => l.name)).toEqual(['Carrots']);
+  });
+
+  it('excludes a Make 0 row from the sheet AND the history line it writes (P-037)', () => {
+    // One function feeds both, so the history can never log a row the
+    // paper never carried.
+    const items = [
+      mkItem({ id: '1', name: 'Grilled Lemon Halves', par: 40, onHand: 40, activeMinutes: 10 }),
+      mkItem({ id: '2', name: 'Brined Pork Chops', par: 12, onHand: 4, activeMinutes: 10, inactiveMinutes: 720 }),
+    ];
+    expect(buildPrintSheet(items).map(l => l.name)).toEqual(['Brined Pork Chops']);
   });
 
   it('orders lines the same way sortPrepItems orders the printable tier', () => {
