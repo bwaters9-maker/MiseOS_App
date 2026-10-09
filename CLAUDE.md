@@ -64,7 +64,7 @@ See the Error reporting section below for what is actually reported.
 
 ```
 server.ts                        Express entry point
-functions/                        Deployed Cloud Functions (own package.json/tsconfig, Node 20)
+functions/                        Deployed Cloud Functions (own package.json/tsconfig, Node 22)
   src/
     aiProxyHandler.ts              Shared /api/ai proxy core — imported by both this and server.ts
     index.ts                       Cloud Function entry points (currently just `ai`)
