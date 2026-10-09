@@ -2710,3 +2710,66 @@ identity, not sequence.
 - [x] Time column reads "No estimate"
 - [x] Sorts last (holds under the current `totalMinutes` key too, which
       reads 0 for a no-estimate item; P-039 makes it tier 3 explicitly)
+
+## P-041 — Cloud Functions Node 20 → 22 + deploy — QUEUED 2026-10-09
+
+**ID assigned 2026-10-09 (Brian direct, in chat: "prompt for code").**
+Roadmap item p8. **HARD DATE: the Node.js 20 Cloud Functions runtime is
+decommissioned 2026-10-30.** Every deploy since August has warned about it.
+
+**Why it is small:** `functions/package.json` already carries
+`firebase-functions ^7.3.0` and `firebase-admin ^14.2.0`, both of which
+support the Node 22 runtime; the Firebase CLI is 15.30.1 and the local Node
+is 22.20.0. The change is the engine pin plus the places that echo it.
+Nothing in `functions/src` needs to change.
+
+**Scope — four edits, one deploy:**
+1. `functions/package.json`: `"engines": { "node": "22" }`.
+2. `functions/package-lock.json`: run `npm install` inside `functions/` so
+   the lockfile's root `engines` entry matches. Commit the lockfile diff
+   even if it is one line. Do NOT run `npm update`; this is not a
+   dependency bump.
+3. `.github/workflows/ci.yml`: `node-version: '20'` → `'22'`, and the
+   comment on line 8 that says "Node 20".
+4. `CLAUDE.md` project-structure line for `functions/`: "Node 20" → "Node 22".
+
+Then `npm --prefix functions run build` must pass (the predeploy hook runs
+it anyway, P-024). Root `npm run lint` and `npm test` unchanged — the
+functions package is separate, but run them so the commit is certified.
+
+**Deploy (ruled: Brian direct, in chat 2026-10-09 — "I defer to you" on
+tonight's rulings; the deploy decision itself is a STOP-AND-VERIFY below,
+not pre-ruled):** this is a FUNCTIONS deploy, not hosting-only. The
+hosting deploy that ships P-034..P-040 rides along in the same command
+because the Grill-sheet gate those were waiting on is cleared.
+
+```
+npm run build
+firebase deploy --only functions,hosting
+```
+
+`npm run build` immediately before the deploy, never earlier (lesson from
+the P-018 session: a stale `dist/` ships silently). Watch the deploy
+output for `ai` being UPDATED on `nodejs22` and for the three secrets
+(`ANTHROPIC_API_KEY`, `SENTRY_DSN`, `ALLOWED_TEST_UIDS`) still bound — a
+runtime change recreates the function's configuration and a dropped secret
+would 500 every AI call.
+
+**STOP-AND-VERIFY 1 — before the deploy (Code stops here):**
+- [ ] `git diff` shows exactly the four files above, nothing else
+- [ ] `npm --prefix functions run build` clean; root lint + tests clean
+- [ ] Commit: `P-041: Cloud Functions runtime Node 20 -> 22`
+- [ ] Brian says "deploy" — a conscious one-time yes, not a standing allow
+
+**STOP-AND-VERIFY 2 — after the deploy (Brian, on production):**
+- [ ] Firebase console → Functions → `ai` shows runtime Node.js 22, and
+      the Node 20 deprecation warning is gone from the deploy output
+- [ ] Sign in at https://miseos-app.web.app and run one AI call
+      (Recipes > Development, describe any dish → Extract). A result, not a
+      500, proves the secrets survived the runtime change.
+- [ ] Prep List → Grill → Print: the sheet matches last night's verified
+      PDF (Done column, "No estimate" row, wait-first order, no Make 0 rows)
+- [ ] Flip P-034, P-035, P-036, P-037, P-038, P-039, P-040 and this entry
+      to "deployed 2026-10-xx" in PROMPTS.md; CLAUDE.md's "not deployed"
+      remarks for the Prep Checklist go with them. Code does this on
+      Brian's "verified".
