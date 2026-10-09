@@ -2491,10 +2491,26 @@ ordering was not a judgment call anyone made.
 - [x] Only one time formatter exists in prepEngine
 - [x] No "provisional" language remains for the Time column
 
-## P-037 — Print sheet: filter MAKE 0 rows — QUEUED 2026-09-20
+## P-037 — Print sheet: filter MAKE 0 rows — ISSUED 2026-10-09 (built + committed 3f0d91e by Claude.ai under delegation; verification pending; not deployed)
 
 **ID assigned 2026-09-20 (Brian direct, in session)** — carried the
 placeholder P2.
+
+**Status (2026-10-09, Claude under delegation — Brian direct, in chat:
+"tie up any loose ends ... if it's something you can do please go
+ahead"):** built and committed by Claude.ai via Desktop Commander, not by
+Claude Code — a one-off under that delegation, not a change to the
+division of labor. `sheetItems` (printable AND `makeQty > 0`) feeds
+`buildPrintSheet`; `printableItems` still drives the `printedDate` stamp
+and the Dashboard signal. `npm run lint` clean, 265/265 tests (4 new),
+`npm run build` clean. The paper check below is Brian's.
+
+**Amendment (Claude under delegation, 2026-10-09):** the scope named the
+`.print-page` table only; the filter lives in `buildPrintSheet`, so it
+also governs the `prep_history` line. The standing CLAUDE.md rule ("the
+print DOM and the history write never carry their own filter") forbids
+the DOM dropping a row the log keeps, so the two could not be split
+without breaking it. Stands provisionally until ruled on.
 
 **Origin:** parking lot, 2026-09-17. Confirmed live 2026-09-20 — Grilled
 Lemon Halves, Par 40 / On Hand 40, Make 0, printed on the Grill sheet.
@@ -2517,10 +2533,33 @@ On-screen cards are unchanged: 0 still shows there, and there it means
 - [ ] Grilled Lemon Halves (Par 40 / On Hand 40) absent from the sheet
 - [ ] Grilled Lemon Halves still present on screen
 
-## P-038 — Form: allow a no-estimate item — QUEUED 2026-09-20
+## P-038 — Form: allow a no-estimate item — ISSUED 2026-10-09 (built + committed 0264310 by Claude.ai under delegation; verification pending; not deployed)
 
 **ID assigned 2026-09-20 (Brian direct, in session)** — carried the
 placeholder P3.
+
+**Status (2026-10-09, Claude under delegation, same basis as P-037):**
+"No time estimate yet" checkbox on `PrepItemForm.tsx`; persists as
+`PrepItem.noEstimate` (a new field, written explicitly true/false on
+every save; the edit path `deleteField()`s both time keys when set).
+`hasTimeEstimate()` in prepEngine is the one reader and the flag wins
+over a stale number. `needsTimeReentry` clears when a legacy item is
+marked no-estimate. A no-estimate `prep_history` line carries the flag
+and neither number; the history view renders "No estimate" and the CSV
+gains a trailing `noEstimate` column. 9 new tests in
+`PrepItemForm.test.ts` (canSave / toDoc / toForm), 6 in
+`prepEngine.test.ts`.
+
+**Amendments (Claude under delegation, 2026-10-09), each provisional:**
+- The distinct state is an explicit field, not "activeMinutes absent".
+  Absence was already the card's test, but it is ambiguous with a legacy
+  item and with a brand-new one, and cannot be *chosen* on edit without a
+  `deleteField()` the pure `toDoc` can't express. A field the readers
+  check first is the version that survives a stale number.
+- The history line omits both numbers for a no-estimate item rather than
+  writing 0/0 — writing 0/0 into a write-once log would be the collapse
+  the ruling forbids. This touched `PrepHistoryView.tsx` (render + CSV
+  column), outside the prompt's stated scope.
 
 **Ruling (Brian direct, in session, 2026-09-20):** keep the state, build a
 way to create one.
@@ -2547,10 +2586,40 @@ silently varies feeding something that acts on it.
 - [ ] Card reads "No estimate", not "0 min"
 - [ ] Reload the page — still reads "No estimate"
 
-## P-039 — Two-tier sort replaces total-elapsed — QUEUED 2026-09-20
+## P-039 — Two-tier sort replaces total-elapsed — ISSUED 2026-10-09 (built + committed edc83dd by Claude.ai under delegation; verification pending; not deployed; carries a DEVIATION)
 
 **ID assigned 2026-09-20 (Brian direct, in session)** — carried the
 placeholder P4.
+
+**Status (2026-10-09, Claude under delegation, same basis as P-037):**
+`byUrgencyThenName` replaces `byTotalMinutesThenName` at all three call
+sites (`sortPrepItems` × 3 tiers, `buildPrintSheet`): wait desc → hands-on
+desc → no-estimate last (`hasTimeEstimate` false), name tiebreak.
+`totalMinutes` retained as the wall-clock reader, no longer a sort input.
+4 new / 3 rewritten tests. Built LAST in the group, per the execution
+order P-040 states.
+
+**DEVIATION (Claude under delegation, 2026-10-09):** this entry required
+the live hand-entered fixture to exist, confirmed, before the comparator
+changed. It was built without it — Claude.ai cannot enter or confirm a
+Firestore record, and Brian asked for the queue to be wrapped without
+further involvement. The fixture is encoded as a unit test instead (the
+Grill order Brined Pork Chops → fixture → Steak Frites → Tenderloin,
+asserted for both `sortPrepItems` and `buildPrintSheet`). The on-paper
+STOP-AND-VERIFY stands untouched and is Brian's. Departs from a direct
+instruction in this entry; stands provisionally until ruled on. One
+`git revert edc83dd` undoes it cleanly if the ruling goes the other way.
+
+**FINDING (Claude under delegation, 2026-10-09) — the fixture as written
+does not discriminate the keys.** 5 hands-on / 60 wait totals 65, and
+65 > 45, so under the OLD total key it already sorted ABOVE Steak Frites
+(45, no wait). The entry's claim that it "sorts below" under total is
+arithmetically wrong; the defect statement is right, the example isn't.
+A discriminating fixture needs total < 45 with a wait: the test uses
+**5 hands-on / 30 wait** (total 35 — below Steak Frites under total,
+above it under wait-first) and pins the discrimination with a
+`totalMinutes` assertion. **Enter 5 / 30, not 5 / 60, for the paper
+check.** The STOP-AND-VERIFY list below is amended accordingly.
 
 **The defect:** the current within-tier key is `totalMinutes` (hands-on +
 wait) descending, P-034 ruling 3. That is a proxy for urgency and it breaks:
@@ -2573,18 +2642,35 @@ wait; confirm it exists before touching the sort, and delete it after.
 Without it the change is unverifiable against real data, and a guard nobody
 has seen fail is not a guard.
 
-**STOP-AND-VERIFY:**
-- [ ] Fixture (5/60) sorts ABOVE Steak Frites Potatoes (45, no wait)
+**STOP-AND-VERIFY (fixture amended to 5/30 per the finding above):**
+- [ ] Hand-enter a Grill fixture at 5 hands-on / 30 wait, Par above On Hand
+- [ ] Fixture (5/30) sorts ABOVE Steak Frites Potatoes (45, no wait)
 - [ ] Brined Pork Chops still first
-- [ ] Tenderloin last
+- [ ] Tenderloin (re-created via P-038) last, reading "No estimate"
 - [ ] Same order on screen and on the printed sheet
 
-Then delete the fixture.
+Then delete the fixture (the prep ITEM — not a `prep_history` record).
 
-## P-040 — Print sheet: no-estimate prints "No estimate" — QUEUED 2026-09-20, BLOCKED by P-038
+## P-040 — Print sheet: no-estimate prints "No estimate" — ISSUED 2026-10-09 (built + committed d11b923 by Claude.ai under delegation; verification pending; not deployed)
 
 **ID assigned 2026-09-20 (Brian direct, in session)** — carried the
 placeholder P5.
+
+**Status (2026-10-09, Claude under delegation, same basis as P-037;
+built immediately after P-038 per the execution order below):**
+`formatPrepTime` returns "No estimate" whenever `hasTimeEstimate` is
+false; the card's own "No estimate" branch is removed and it just calls
+the formatter. The card/sheet parity test now includes the no-estimate
+record — the one that was mismatched.
+
+**Amendment (Claude under delegation, 2026-10-09):** a legacy re-entry
+item would still have printed "0 min", because its sheet line wrote
+0/0 and `formatPrepTime(line)` read that as an estimate. `buildPrintSheet`
+now writes both numbers only for an estimated item, the flag alone for a
+declared no-estimate, and none of the three for a legacy item — withheld
+and declared-unknown stay distinguishable in `prep_history`, and both
+read "No estimate" on paper. Changes what a legacy item writes to
+history (previously 0/0); stands provisionally until ruled on.
 
 **The defect:** the card reads "No estimate"; the `.print-page` table
 renders "0 min" for the same record. On paper "0 min" reads as "free, grab

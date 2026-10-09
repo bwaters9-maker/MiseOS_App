@@ -126,7 +126,7 @@ src/
     dishExtraction.ts            Development workspace's extraction/refinement system prompt, response normalization, and the refinement-reconciliation merge (P-026) — extracted from DishBuildPanel.tsx so it's unit-tested without mounting the panel, same pattern as dishDraftToRecipe.ts
     seasonalData.ts              Static seasonal produce/protein reference by US region (the Development workspace's Seasonal Matrix, also feeding the Dashboard trends strip) — no runtime calls, same pattern as yieldReference.ts
     yieldReference.ts            Common product usable-yield percentages, grounds the AI ingredient lookup's yieldPercent proposals
-    prepEngine.ts                 Prep Checklist's pure sort/print functions — tiered sort (execution-critical, notNeeded outranks checked), totalMinutes (derived, the sort key), formatPrepTime (the one ACTIVE/WAIT string both the row and the sheet use), needsTimeReentry (P-034 legacy flag), printableItems (single source for print AND prep_history, so the two can't drift), makeQty, UNMATCHED_STATION_KEY
+    prepEngine.ts                 Prep Checklist's pure sort/print functions — tiered sort (execution-critical, notNeeded outranks checked; within a tier wait-first, then hands-on, then no-estimate — P-039), totalMinutes (derived wall-clock reader, no longer a sort input), hasTimeEstimate (P-038, the one reader for "does this item carry a real time"), formatPrepTime (the one time string both the row and the sheet use, "No estimate" included — P-040), needsTimeReentry (P-034 legacy flag), printableItems (what a print covers) and sheetItems (what actually reaches paper AND prep_history — P-037 drops Make 0 — single source so the two can't drift), makeQty, UNMATCHED_STATION_KEY
 ```
 
 ## Navigation / routing
@@ -184,7 +184,7 @@ The Recipe Builder sub-tab also carries a "View Menu" button (`onViewMenu` prop)
 
 | Type | Description |
 |---|---|
-| `PrepItem` / `ProductionRun` | Station-scoped prep catalog task: id, name, assignedStation: string, spec?, unit, onHand, par, activeMinutes?, inactiveMinutes?, prepMinutes? (legacy), checked, notNeeded?, printedDate?, lastModified?. `spec` disambiguates the same `name` prepped differently on two stations (e.g. pantry carrots for salad vs. sauté oblique-cut/blanched/shocked). `assignedStation` is a plain string, not `PrepStation` — an item's station survives a preset being renamed or removed in Settings, surfacing under Prep List's "Unmatched Station" group instead of breaking. Time is two stored fields and one derived (P-034): `activeMinutes` is hands-on, `inactiveMinutes` is unattended, and the total is computed by `totalMinutes()` for display and sort, never stored — three editable numbers where only two are independent would let a chef save a total that isn't the sum. Both absent read as `0` (same "absent reads as a stated default" convention as `recipeStatus()`). `activeMinutes` is optional on the type and required at the form (`canSavePrepItemForm`), the same split `prepMinutes` used under P-012, and for a second reason now: a legacy doc must stay representable with neither field set. `prepMinutes` is legacy and read-only — see the Prep Checklist section's P-034 bullet. `onHand` was renamed from `quantity`; a doc saved before the rename has no `onHand` and is read through `onHandValue()` (`prepEngine.ts`), same code-level-fallback convention as `KitchenEvent.attendees`/`covers` — no migration write. `ProductionRun` is a legacy alias for the same type. |
+| `PrepItem` / `ProductionRun` | Station-scoped prep catalog task: id, name, assignedStation: string, spec?, unit, onHand, par, activeMinutes?, inactiveMinutes?, noEstimate?, prepMinutes? (legacy), checked, notNeeded?, printedDate?, lastModified?. `spec` disambiguates the same `name` prepped differently on two stations (e.g. pantry carrots for salad vs. sauté oblique-cut/blanched/shocked). `assignedStation` is a plain string, not `PrepStation` — an item's station survives a preset being renamed or removed in Settings, surfacing under Prep List's "Unmatched Station" group instead of breaking. Time is two stored fields and one derived (P-034): `activeMinutes` is hands-on, `inactiveMinutes` is unattended, and the total is computed by `totalMinutes()`, never stored — three editable numbers where only two are independent would let a chef save a total that isn't the sum (since P-039 the sort ranks on wait then hands-on rather than the total; `totalMinutes` remains the wall-clock reader). Both absent read as `0` (same "absent reads as a stated default" convention as `recipeStatus()`). `noEstimate?` (P-038) is the chef's explicit "no time estimate yet" — a distinct stored state, never `activeMinutes: 0`; when true both time fields are absent from the doc, every reader goes through `hasTimeEstimate()` (which the flag wins regardless of a stale number), and the form writes it explicitly true/false on every save so unchecking it on edit clears it under partial merge. `activeMinutes` is optional on the type and required at the form (`canSavePrepItemForm`) unless `noEstimate` is checked, the same split `prepMinutes` used under P-012, and for a second reason now: a legacy doc must stay representable with neither field set. `prepMinutes` is legacy and read-only — see the Prep Checklist section's P-034 bullet. `onHand` was renamed from `quantity`; a doc saved before the rename has no `onHand` and is read through `onHandValue()` (`prepEngine.ts`), same code-level-fallback convention as `KitchenEvent.attendees`/`covers` — no migration write. `ProductionRun` is a legacy alias for the same type. |
 | `Recipe` | id, name, recipeType ('sub' \| 'menu'), course, categoryId?, batchYield { qty, measureType }, portions, lines: RecipeLine[], methodSteps, menuPrice?, menuDescription?, onMenu?, status?: RecipeStatus, variants?: RecipeVariant[], updatedAt |
 | `RecipeStatus` | `'development' \| 'active'` — where a menu recipe sits in its own lifecycle. Optional on `Recipe`; every reader defaults a missing value to `'active'` via `recipeStatus()` (costEngine.ts), so no migration write was needed and nothing on the menu dropped off. Sub-recipes carry no status — they were never menu-eligible, and `toDoc` omits the field for them |
 | `RecipeVariant` | One trial version of a dish in development: `{ id, name, notes }` — **notes only**, never its own lines, cost, or nutrition, and never written to another collection. `id` is a client-side render key, not a Firestore document id. Capped at `MAX_RECIPE_VARIANTS` (3), enforced in the editor UI and by a `.slice()` on both read and write — a hand-written doc with more is silently truncated to 3 on next save |
@@ -444,22 +444,39 @@ cooks to work from. Check-off and Not Needed never require a cook to
 touch the app at all.
 
 - **Sort is execution-critical, three tiers, nothing else orders the
-  list** (`sortPrepItems`, `src/lib/prepEngine.ts`): printable items first
-  (`totalMinutes` descending, name tiebreak — the longest production goes
-  first so it isn't started late), then checked, then notNeeded.
+  list** (`sortPrepItems`, `src/lib/prepEngine.ts`): printable items first,
+  then checked, then notNeeded.
   **`notNeeded` outranks `checked` for tier placement even when an item is
   both** — it's the stronger, shift-defining statement ("not doing this at
   all, period"), matching the original ruling's "at the very bottom"
   wording literally rather than "below checked unless also notNeeded."
-- **Prep time is hands-on and wait, and the sort runs on the total**
-  (P-034, 2026-09-17). `prepMinutes` had no defined meaning: stock is 5
+  - **Within a tier the order is wait-first** (P-039, Brian direct, Grill
+    print read-through 2026-09-20; built 2026-10-09 under delegation —
+    see the deviation logged in PROMPTS.md): items with any wait, by wait
+    descending; then no-wait items by hands-on descending; then items
+    with no real estimate (`hasTimeEstimate` false — declared no-estimate,
+    legacy awaiting re-entry, or nothing entered) last; name tiebreak
+    throughout (`byUrgencyThenName`). This replaced P-034's `totalMinutes`
+    key, which was a proxy for urgency and broke on the mixed case: a
+    5-hands-on / 30-wait item (total 35) sorted below a 45-minute
+    straight-through item, yet its clock has to start first. The guard
+    test pins that case with a `totalMinutes` assertion showing the old
+    key would have ordered it the other way. **Note the queue entry's
+    own 5 / 60 fixture does not discriminate the two keys** (65 > 45
+    already sorted above under total) — verify on paper with 5 / 30. The
+    P-034 inversion (braise before butchery) still holds, because the
+    braise has a wait and the butchery does not. One comparator serves
+    `sortPrepItems` and `buildPrintSheet`, so screen and sheet agree.
+- **Prep time is hands-on and wait** (P-034, 2026-09-17; the sort ran on
+  the total until P-039 — see above). `prepMinutes` had no defined meaning: stock is 5
   minutes to a chef thinking hands-on and 360 to a chef thinking
   wall-clock, same item, same kitchen, same field — and the sheet sorts on
   that number, so the start order flipped depending on who typed it in.
   Same defect class as the P-019 unit fallback, a field whose meaning
   silently varies feeding something that acts on it. Now `activeMinutes`
   (required at the form) and `inactiveMinutes` (optional, blank writes an
-  explicit `0`) are stored and `totalMinutes()` derives the sort key.
+  explicit `0`) are stored; `totalMinutes()` derived the sort key until
+  P-039 and remains the wall-clock reader.
   **Sorting on active alone inverts the order on exactly the items that
   wreck a prep day**: a six-hour braise with five minutes of hands-on has
   to go on before ninety minutes of straight butchery. That inversion is
@@ -498,23 +515,67 @@ touch the app at all.
     the edit form**: a number already sitting in the Hands-on field is an
     invitation to keep it. Re-entry never deletes the dead field; the flag
     clears on the presence of `activeMinutes`, not the absence of
-    `prepMinutes`.
-- **`printableItems` (not checked, not notNeeded) is the single source for
+    `prepMinutes` — or on the chef marking it no-estimate (P-038), which
+    is a real re-entry answer.
+  - **"No estimate" is a state the chef can produce, and it is never
+    `0`** (P-038, Brian direct 2026-09-20: keep the state, build a way to
+    create one; built 2026-10-09). Before this, `canSavePrepItemForm`
+    required `activeMinutes > 0`, so the state the card displayed could
+    not be created — the branch was untestable by construction. The form
+    has a "No time estimate yet" checkbox: checked clears and disables
+    both time inputs and lifts the hands-on rule (par/onHand still
+    apply). It persists as `PrepItem.noEstimate`, a distinct field —
+    "takes no time" and "time unknown" must survive the round trip as
+    different values, the same defect class P-034 closes. The form writes
+    it explicitly true/false on every save (same reasoning as the
+    explicit `0` wait) and the edit path `deleteField()`s both time keys
+    when it is set, so an item edited from 45 min to no-estimate doesn't
+    keep 45 in the doc under partial merge. `hasTimeEstimate()` is the
+    one reader; the flag wins over a stale number so it can't reach the
+    sort or the sheet. **On both surfaces the record reads "No
+    estimate"** (P-040) — the sheet used to print `0 min` for it, which
+    on paper reads as "free, grab it anytime", the opposite of unknown.
+    `formatPrepTime` returns the string itself, so the fix was a change
+    to what the one formatter returns, not a second format, and the
+    card/sheet parity test includes the no-estimate record. **P-040
+    amendment (Claude under delegation, 2026-10-09):** a legacy
+    re-entry item is covered too — `buildPrintSheet` writes both numbers
+    only for an estimated line, the flag alone for a declared
+    no-estimate, and none of the three for a legacy item (withheld, not
+    declared unknown; the two stay distinguishable in `prep_history`),
+    so neither prints as `0 min`. The history view renders a no-estimate
+    line as "No estimate".
+- **`sheetItems` (printable AND `makeQty > 0`) is the single source for
   both the printed sheet and the `prep_history` doc it writes** — neither
   the print DOM nor the history write carries its own filter, so the two
   can never drift apart. A checked or notNeeded line is excluded from
   both for the same reason: a printed row a cook cannot act on costs
   attention mid-service, and a history log should read as what was
-  actually asked for, not what was already handled or skipped.
+  actually asked for, not what was already handled or skipped. **A Make 0
+  row is excluded on the same reasoning** (P-037, Brian direct, Grill
+  print read-through 2026-09-20 — Grilled Lemon Halves, Par 40 / On Hand
+  40, printed as Make 0): it asks a cook to make nothing. The filter runs
+  on the same computed `makeQty` the sheet renders, never on `onHand >=
+  par` — two expressions of one condition can disagree through the legacy
+  `quantity` fallback, and the value that prints must be the value that
+  decides. On screen the card still shows Make 0, where it means
+  "verified, you're covered". `printableItems` (the broader set, no Make
+  filter) still drives the `printedDate` stamp and the Dashboard's
+  "is this station handled" signal — a Make 0 item is covered by the print
+  it never appears on, so it doesn't read as "added since print" all day.
+  **Amendment (Claude under delegation, 2026-10-09):** P-037's scope named
+  the `.print-page` table only; the filter lives in `buildPrintSheet` so
+  it also governs the history line, because the standing single-source
+  rule above forbids the DOM carrying a filter the log doesn't.
 - **`makeQty` = `par − onHand`, floored at 0** — the production quantity,
   not the on-hand count, is what prints (labeled "Make"). An over-stocked
   item never prints or logs as a negative instruction.
 - **`toDoc` (PrepItemForm.tsx) is a partial-write contract**: the add/edit
-  form owns exactly the eight catalog fields (name, station, spec, unit,
-  par, onHand, activeMinutes, inactiveMinutes) and never touches
+  form owns exactly the nine catalog fields (name, station, spec, unit,
+  par, onHand, activeMinutes, inactiveMinutes, noEstimate) and never touches
   checked/notNeeded/printedDate — nor legacy `prepMinutes`, which it never
-  writes again. `inactiveMinutes` is the one field that writes an explicit
-  `0` when blank rather than omitting the key: wait time is optional, so
+  writes again. `inactiveMinutes` and `noEstimate` are the two fields that
+  write an explicit value when blank/unchecked rather than omitting the key: wait time is optional, so
   blank is a real answer, and a chef clearing a wait time on edit must
   actually clear it — omitting would leave the old value in the doc under
   partial merge and silently ignore the edit. `updateDoc`'s partial-merge semantics
@@ -535,7 +596,8 @@ touch the app at all.
   (items, pars, times, specs) is untouched. `prep_history` is never
   touched by Reset Shift; it is a write-once log, not shift state.
 - **The printed sheet's columns are Done / Item / Spec / Make / Unit /
-  Time**, ordered by `totalMinutes` descending. **Settled by the Grill
+  Time**, ordered wait-first (P-039, see the sort bullet above; Make 0 rows
+  absent per P-037). **Settled by the Grill
   print read-through, 2026-09-20 (Brian direct).** The Time column had
   been added by P-034 against instruction and carried provisionally; the
   read-through kept it and ruled on its format rather than removing it,
@@ -602,7 +664,7 @@ touch the app at all.
   listener on a write-once, ever-growing log would mean every session
   loads the whole history forever.
 - **CSV export** headers are the raw field names
-  (`date,station,printedAt,name,spec,makeQty,unit,activeMinutes,inactiveMinutes,legacyPrepMinutes`),
+  (`date,station,printedAt,name,spec,makeQty,unit,activeMinutes,inactiveMinutes,legacyPrepMinutes,noEstimate`),
   one row per item across every history doc in the current filtered range,
   RFC4180-escaped. The third time column exists because `prep_history` is
   write-once: sheets printed before P-034 hold lines carrying `prepMinutes`
@@ -610,8 +672,12 @@ touch the app at all.
   2026-09-17). Filing them as `activeMinutes` would assert a meaning the
   number never had; exporting them blank would drop them out of an audit
   log. Every absent field exports blank, never the string `undefined`.
-  The history detail table shows the same lines as `N legacy` across the
-  two time columns.
+  `noEstimate` (P-038) exports `true` for a chef-declared no-estimate line,
+  whose two time columns are blank by design — so blank-because-unknown is
+  distinguishable from blank-because-legacy (which has neither the flag
+  nor, since the P-040 amendment, any time field). The history detail
+  table shows legacy lines as `N legacy` and no-estimate lines as
+  "No estimate" across the two time columns.
 - **Delete uses the inline per-row two-step swap** (action buttons →
   confirm text + check/X icons), matching the convention actually used by
   `Vendors.tsx`/`Staff.tsx`/`EventCalendar.tsx` — not the `AlertDialog`
