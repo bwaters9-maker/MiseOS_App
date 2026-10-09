@@ -36,10 +36,12 @@ export const inactiveMinutesValue = (item: Pick<PrepItem, 'inactiveMinutes' | 'n
  * save a total that isn't the sum, and then something has to decide which
  * wins. Same single-source reasoning as buildPrintSheet / printableItems.
  *
- * This is the sort key. Inactive time still consumes the clock — a
- * six-hour braise with five minutes hands-on has to go on before ninety
- * minutes of straight butchery, and sorting on active alone inverts the
- * order on exactly the long-hold items that wreck a prep day.
+ * Was the sort key under P-034; not a sort input since P-039, which ranks
+ * on wait first and hands-on second (byUrgencyThenName) rather than their
+ * sum. Retained as the one wall-clock reader — the P-034 inversion it was
+ * built to fix (a six-hour braise with five minutes hands-on must go on
+ * before ninety minutes of straight butchery) still holds under the new
+ * key, because the braise has a wait and the butchery does not.
  */
 export const totalMinutes = (item: Pick<PrepItem, 'activeMinutes' | 'inactiveMinutes' | 'noEstimate'>): number =>
   activeMinutesValue(item) + inactiveMinutesValue(item);
@@ -98,9 +100,37 @@ export const onHandValue = (item: Pick<PrepItem, 'onHand'>): number =>
 export const makeQty = (item: Pick<PrepItem, 'par' | 'onHand'>): number =>
   Math.max(0, item.par - onHandValue(item));
 
-/** Descending by totalMinutes, tiebreak alphabetical by name. Array.prototype.sort is stable, so any remaining tie keeps input order. */
-const byTotalMinutesThenName = (a: PrepItem, b: PrepItem): number =>
-  totalMinutes(b) - totalMinutes(a) || a.name.localeCompare(b.name);
+/**
+ * The within-tier ordering (P-039, Grill read-through 2026-09-20; replaces
+ * P-034's totalMinutes key). Urgency is "how soon must this start", and
+ * total elapsed is only a proxy for it that breaks on the mixed case: an
+ * item at 5 hands-on / 30 wait (total 35) sorted BELOW a 45-minute
+ * straight-through item under total, yet it is the one whose clock has to
+ * start first. (The queue entry's example of 5/60 does not show this —
+ * 65 > 45, so it already sorted above under total. The discriminating
+ * fixture is one whose total is under 45; see the test.) Wait time is the
+ * clock a cook cannot compress, so it decides first:
+ *
+ *   0 — has a wait: by wait descending (the longest hold goes on first)
+ *   1 — no wait:    by hands-on descending
+ *   2 — no real estimate (hasTimeEstimate false): last, name order
+ *
+ * Name tiebreak throughout; Array.prototype.sort is stable, so any
+ * remaining tie keeps input order. The three shift tiers in sortPrepItems
+ * (printable / checked / notNeeded) still outrank this.
+ */
+const urgencyTier = (item: PrepItem): 0 | 1 | 2 =>
+  !hasTimeEstimate(item) ? 2 : inactiveMinutesValue(item) > 0 ? 0 : 1;
+
+const urgencyKey = (item: PrepItem): number => {
+  const tier = urgencyTier(item);
+  return tier === 0 ? inactiveMinutesValue(item) : tier === 1 ? activeMinutesValue(item) : 0;
+};
+
+const byUrgencyThenName = (a: PrepItem, b: PrepItem): number =>
+  urgencyTier(a) - urgencyTier(b)
+  || urgencyKey(b) - urgencyKey(a)
+  || a.name.localeCompare(b.name);
 
 /**
  * Whether a line still belongs on paper: not done, not skipped this
@@ -144,9 +174,10 @@ export const sheetItems = (items: PrepItem[]): PrepItem[] =>
 
 /**
  * Three tiers, in order: (1) printable — unchecked and not notNeeded,
- * by totalMinutes descending, tiebreak name; (2) checked; (3)
- * notNeeded. Tiers 2 and 3 get the same secondary sort as tier 1 for
- * predictability, though nothing print-relevant depends on it.
+ * ordered by byUrgencyThenName (wait desc, then hands-on desc, then
+ * no-estimate; name tiebreak); (2) checked; (3) notNeeded. Tiers 2 and 3
+ * get the same secondary sort as tier 1 for predictability, though
+ * nothing print-relevant depends on it.
  *
  * An item that is both checked AND notNeeded sorts into tier 3, not
  * tier 2 — notNeeded always wins the tier placement. It's the stronger,
@@ -157,9 +188,9 @@ export const sheetItems = (items: PrepItem[]): PrepItem[] =>
  * further than that — it still lands last.
  */
 export const sortPrepItems = (items: PrepItem[]): PrepItem[] => {
-  const active = printableItems(items).sort(byTotalMinutesThenName);
-  const checked = items.filter(i => i.checked && !i.notNeeded).sort(byTotalMinutesThenName);
-  const notNeeded = items.filter(i => i.notNeeded).sort(byTotalMinutesThenName);
+  const active = printableItems(items).sort(byUrgencyThenName);
+  const checked = items.filter(i => i.checked && !i.notNeeded).sort(byUrgencyThenName);
+  const notNeeded = items.filter(i => i.notNeeded).sort(byUrgencyThenName);
   return [...active, ...checked, ...notNeeded];
 };
 
@@ -249,12 +280,12 @@ export type StoredPrintSheetLine = PrintSheetLine & {
  * on sheetItems so the two can never diverge — a Make 0 row is absent
  * from both (P-037), since the log should read as what was actually
  * asked for. Ordered the same way the checklist view shows printable
- * items (totalMinutes descending, name tiebreak) — what prints
- * top-to-bottom is what the sheet reads top-to-bottom.
+ * items (byUrgencyThenName) — what prints top-to-bottom is what the
+ * sheet reads top-to-bottom.
  */
 export const buildPrintSheet = (items: PrepItem[]): PrintSheetLine[] =>
   sheetItems(items)
-    .sort(byTotalMinutesThenName)
+    .sort(byUrgencyThenName)
     .map((item): PrintSheetLine => ({
       name: item.name,
       ...(item.spec && { spec: item.spec }),

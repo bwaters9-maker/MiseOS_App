@@ -260,7 +260,7 @@ describe('sheetItems (P-037)', () => {
 });
 
 describe('sortPrepItems', () => {
-  it('sorts the printable tier by totalMinutes descending', () => {
+  it('sorts no-wait items by hands-on descending', () => {
     const short = mkItem({ id: '1', name: 'Salt', activeMinutes: 2 });
     const long = mkItem({ id: '2', name: 'Stock', activeMinutes: 90 });
     const mid = mkItem({ id: '3', name: 'Onions', activeMinutes: 15 });
@@ -268,7 +268,7 @@ describe('sortPrepItems', () => {
   });
 
   it('THE INVERSION: a long-hold item with tiny hands-on time sorts above a long straight-active item', () => {
-    // The whole reason P-034 sorts on total. The braise is 5 minutes of
+    // The P-034 guard, still held under P-039: the braise is 5 minutes of
     // work and six hours of clock; the butchery is 90 minutes of solid
     // work. Sorting on active alone would start the braise second and
     // miss service.
@@ -277,6 +277,41 @@ describe('sortPrepItems', () => {
     expect(sortPrepItems([butchery, braise]).map(i => i.id)).toEqual(['1', '2']);
     // And the inversion is real, not an artifact of the input order.
     expect(sortPrepItems([braise, butchery]).map(i => i.id)).toEqual(['1', '2']);
+  });
+
+  it('THE SECOND INVERSION (P-039): any wait outranks any straight-through item, even when the total is smaller', () => {
+    // Total elapsed fixed P-034's inversion and introduced its own: 5
+    // hands-on / 30 wait totals 35 and sorted BELOW a 45-minute
+    // straight-through item, yet it is the one whose clock has to start
+    // first. (The queue's 5/60 example does not discriminate the two
+    // keys — 65 > 45 already sorted above under total. 5/30 does.)
+    const hold = mkItem({ id: '1', name: 'Quick marinade', activeMinutes: 5, inactiveMinutes: 30 });
+    const frites = mkItem({ id: '2', name: 'Steak Frites Potatoes', activeMinutes: 45 });
+    expect(totalMinutes(hold)).toBeLessThan(totalMinutes(frites)); // the old key would have put it second
+    expect(sortPrepItems([frites, hold]).map(i => i.id)).toEqual(['1', '2']);
+    expect(sortPrepItems([hold, frites]).map(i => i.id)).toEqual(['1', '2']);
+  });
+
+  it('within the wait tier, ranks by wait alone — not by total, not by hands-on', () => {
+    // 100 hands-on + 30 wait totals 130; 5 hands-on + 60 wait totals 65.
+    // Total would start the first one; the longer hold has to go on first.
+    const bigWorkShortHold = mkItem({ id: '1', name: 'Terrine', activeMinutes: 100, inactiveMinutes: 30 });
+    const smallWorkLongHold = mkItem({ id: '2', name: 'Brine', activeMinutes: 5, inactiveMinutes: 60 });
+    expect(sortPrepItems([bigWorkShortHold, smallWorkLongHold]).map(i => i.id)).toEqual(['2', '1']);
+  });
+
+  it('the Grill STOP-AND-VERIFY order: Brined Pork Chops, fixture, Steak Frites, Tenderloin', () => {
+    // The 2026-09-20 Grill records plus the P-039 fixture, as the queue
+    // entry lists them. Note the fixture here is 5/30, not the queue's
+    // 5/60 — see the second-inversion test for why.
+    const chops = mkItem({ id: '1', name: 'Brined Pork Chops', activeMinutes: 10, inactiveMinutes: 720 });
+    const fixture = mkItem({ id: '2', name: 'Fixture', activeMinutes: 5, inactiveMinutes: 30 });
+    const frites = mkItem({ id: '3', name: 'Steak Frites Potatoes', activeMinutes: 45 });
+    const tenderloin = mkItem({ id: '4', name: 'Tenderloin', noEstimate: true });
+    const order = sortPrepItems([tenderloin, frites, fixture, chops]).map(i => i.name);
+    expect(order).toEqual(['Brined Pork Chops', 'Fixture', 'Steak Frites Potatoes', 'Tenderloin']);
+    // Same order on the sheet.
+    expect(buildPrintSheet([tenderloin, frites, fixture, chops]).map(l => l.name)).toEqual(order);
   });
 
   it('sorts an item with no times below every item with a real estimate, within the printable tier', () => {
@@ -297,17 +332,23 @@ describe('sortPrepItems', () => {
     expect(sortPrepItems([legacy, entered]).map(i => i.id)).toEqual(['2', '1']);
   });
 
-  it('tiebreaks equal totalMinutes alphabetically by name', () => {
+  it('tiebreaks equal hands-on alphabetically by name', () => {
     const b = mkItem({ id: '1', name: 'Beets', activeMinutes: 10 });
     const a = mkItem({ id: '2', name: 'Artichokes', activeMinutes: 10 });
     expect(sortPrepItems([b, a]).map(i => i.id)).toEqual(['2', '1']);
   });
 
-  it('tiebreaks on total, not on how the total is composed', () => {
-    // 10 = 10 active, and 10 = 4 active + 6 wait. Same total, so the
-    // name tiebreak decides; composition never does.
-    const b = mkItem({ id: '1', name: 'Beets', activeMinutes: 10 });
-    const a = mkItem({ id: '2', name: 'Artichokes', activeMinutes: 4, inactiveMinutes: 6 });
+  it('tiebreaks equal wait alphabetically by name, ignoring hands-on', () => {
+    // Same 60-minute hold; Zucchini has more hands-on but the name
+    // decides, because hands-on is not a key inside the wait tier.
+    const z = mkItem({ id: '1', name: 'Zucchini', activeMinutes: 40, inactiveMinutes: 60 });
+    const a = mkItem({ id: '2', name: 'Artichokes', activeMinutes: 4, inactiveMinutes: 60 });
+    expect(sortPrepItems([z, a]).map(i => i.id)).toEqual(['2', '1']);
+  });
+
+  it('tiebreaks no-estimate items alphabetically by name', () => {
+    const b = mkItem({ id: '1', name: 'Beets', noEstimate: true });
+    const a = mkItem({ id: '2', name: 'Artichokes', noEstimate: true });
     expect(sortPrepItems([b, a]).map(i => i.id)).toEqual(['2', '1']);
   });
 
@@ -358,7 +399,7 @@ describe('buildPrintSheet', () => {
     expect(buildPrintSheet([short, long]).map(l => l.name)).toEqual(['Stock', 'Salt']);
   });
 
-  it('orders lines by total, so the long-hold item prints first', () => {
+  it('orders lines wait-first, so the long-hold item prints first', () => {
     const braise = mkItem({ id: '1', name: 'Short rib braise', activeMinutes: 5, inactiveMinutes: 355 });
     const butchery = mkItem({ id: '2', name: 'Butchery', activeMinutes: 90 });
     expect(buildPrintSheet([butchery, braise]).map(l => l.name)).toEqual(['Short rib braise', 'Butchery']);
