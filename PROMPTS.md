@@ -2491,7 +2491,7 @@ ordering was not a judgment call anyone made.
 - [x] Only one time formatter exists in prepEngine
 - [x] No "provisional" language remains for the Time column
 
-## P-037 — Print sheet: filter MAKE 0 rows — ISSUED 2026-10-09 (built + committed 3f0d91e by Claude.ai under delegation; verification pending; not deployed)
+## P-037 — Print sheet: filter MAKE 0 rows — DONE 2026-10-09 (built + committed 3f0d91e by Claude.ai under delegation; verified on paper by Brian 2026-10-09; not deployed)
 
 **ID assigned 2026-09-20 (Brian direct, in session)** — carried the
 placeholder P2.
@@ -2530,10 +2530,10 @@ On-screen cards are unchanged: 0 still shows there, and there it means
 "verified, you're covered" — a real answer a chef wants to see.
 
 **STOP-AND-VERIFY — print the Grill tab:**
-- [ ] Grilled Lemon Halves (Par 40 / On Hand 40) absent from the sheet
-- [ ] Grilled Lemon Halves still present on screen
+- [x] Grilled Lemon Halves (Par 40 / On Hand 40) absent from the sheet
+- [x] Grilled Lemon Halves still present on screen
 
-## P-038 — Form: allow a no-estimate item — ISSUED 2026-10-09 (built + committed 0264310 by Claude.ai under delegation; verification pending; not deployed)
+## P-038 — Form: allow a no-estimate item — DONE 2026-10-09 (built + committed 0264310 by Claude.ai under delegation; verified on paper by Brian 2026-10-09; not deployed)
 
 **ID assigned 2026-09-20 (Brian direct, in session)** — carried the
 placeholder P3.
@@ -2581,12 +2581,11 @@ is the same defect class P-034 exists to close, a field whose meaning
 silently varies feeding something that acts on it.
 
 **STOP-AND-VERIFY:**
-- [ ] Create Grill item "Tenderloin", Par 1 kg, On Hand 1 kg, no-estimate
-      checked — Save enables
-- [ ] Card reads "No estimate", not "0 min"
-- [ ] Reload the page — still reads "No estimate"
+- [x] Create Grill item "Tenderloin", no-estimate checked — Save enables (entered as Par 2 / On Hand 1: the P-012 rule requires On Hand > 0 and Par 1 / On Hand 1 is Make 0, which P-037 keeps off the sheet)
+- [x] Card reads "No estimate", not "0 min"
+- [x] Reload the page — still reads "No estimate"
 
-## P-039 — Two-tier sort replaces total-elapsed — ISSUED 2026-10-09 (built + committed edc83dd by Claude.ai under delegation; verification pending; not deployed; carries a DEVIATION)
+## P-039 — Two-tier sort replaces total-elapsed — DONE 2026-10-09 (built + committed edc83dd by Claude.ai under delegation; verified on paper by Brian 2026-10-09; not deployed; carries a DEVIATION)
 
 **ID assigned 2026-09-20 (Brian direct, in session)** — carried the
 placeholder P4.
@@ -2621,6 +2620,18 @@ above it under wait-first) and pins the discrimination with a
 `totalMinutes` assertion. **Enter 5 / 30, not 5 / 60, for the paper
 check.** The STOP-AND-VERIFY list below is amended accordingly.
 
+**Verification findings (Brian direct, in chat, 2026-10-09) — parked
+here because PARKING-LOT.md (OneDrive) was unreachable; move them on
+the next triage:**
+- `canSavePrepItemForm` requires On Hand > 0 (P-012). An item the kitchen
+  is completely out of — the commonest reason to put something on a prep
+  list — cannot be entered. Blocked two fixture entries tonight. Needs a
+  ruling; not changed.
+- The card list re-sorts the instant a save lands, so the card under the
+  cursor can change between two clicks. Caused one mis-edit tonight
+  (Compound Herb Butter's times overwritten with the fixture's, caught and
+  restored before printing). UX hazard, not a data bug.
+
 **The defect:** the current within-tier key is `totalMinutes` (hands-on +
 wait) descending, P-034 ruling 3. That is a proxy for urgency and it breaks:
 5 hands-on / 60 wait sorts below a 45-minute straight-through item, when it
@@ -2643,15 +2654,15 @@ Without it the change is unverifiable against real data, and a guard nobody
 has seen fail is not a guard.
 
 **STOP-AND-VERIFY (fixture amended to 5/30 per the finding above):**
-- [ ] Hand-enter a Grill fixture at 5 hands-on / 30 wait, Par above On Hand
-- [ ] Fixture (5/30) sorts ABOVE Steak Frites Potatoes (45, no wait)
-- [ ] Brined Pork Chops still first
-- [ ] Tenderloin (re-created via P-038) last, reading "No estimate"
-- [ ] Same order on screen and on the printed sheet
+- [x] Hand-enter a Grill fixture at 5 hands-on / 30 wait, Par above On Hand
+- [x] Fixture (5/30) sorts ABOVE Steak Frites Potatoes (45, no wait)
+- [x] Brined Pork Chops still first
+- [x] Tenderloin (re-created via P-038) last, reading "No estimate"
+- [x] Same order on screen and on the printed sheet
 
 Then delete the fixture (the prep ITEM — not a `prep_history` record).
 
-## P-040 — Print sheet: no-estimate prints "No estimate" — ISSUED 2026-10-09 (built + committed d11b923 by Claude.ai under delegation; verification pending; not deployed)
+## P-040 — Print sheet: no-estimate prints "No estimate" — DONE 2026-10-09 (built + committed d11b923 by Claude.ai under delegation; verified on paper by Brian 2026-10-09; not deployed)
 
 **ID assigned 2026-09-20 (Brian direct, in session)** — carried the
 placeholder P5.
@@ -2688,6 +2699,6 @@ P-039** — P-040 runs immediately after its blocker, not in ID order. IDs are
 identity, not sequence.
 
 **STOP-AND-VERIFY — print Grill with the P-038 Tenderloin present:**
-- [ ] Time column reads "No estimate"
-- [ ] Sorts last (holds under the current `totalMinutes` key too, which
+- [x] Time column reads "No estimate"
+- [x] Sorts last (holds under the current `totalMinutes` key too, which
       reads 0 for a no-estimate item; P-039 makes it tier 3 explicitly)
