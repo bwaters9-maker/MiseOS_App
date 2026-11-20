@@ -2773,3 +2773,114 @@ would 500 every AI call.
       to "deployed 2026-10-xx" in PROMPTS.md; CLAUDE.md's "not deployed"
       remarks for the Prep Checklist go with them. Code does this on
       Brian's "verified".
+
+## P-042 — Master Pantry: batch nutrition backfill (AI-estimated, chef-confirmed) — QUEUED 2026-11-06
+
+**ID assigned 2026-11-06 (Brian direct, in chat: "let's do it").**
+**Why now:** the Console org holding the app's `ANTHROPIC_API_KEY` has $101.81
+of promotional credit expiring 2026-12-08 (UTC). Spend is otherwise ~$0/month.
+This converts expiring credit into pantry data the FDA label needs. Not
+urgent on its own; it is queued BEHIND P-041 (deploy status unconfirmed as of
+2026-11-06 — see that entry) and behind the revert of the stray App Check /
+`firebase.json` working-tree changes found 2026-11-06 (not committed, not
+from any P-ID; reverted on Brian's ruling "no idea, revert them").
+
+**What exists already (do not duplicate):**
+- `IngredientForm.tsx` `handleEstimate` + `NUTRITION_BACKFILL_PROMPT`: one
+  ingredient at a time, via `callAi(NUTRITION_BACKFILL_PROMPT, name, 1200)`,
+  stamps `nutritionSource: 'ai'`, chef sees the values before Save.
+- `nutritionEngine.ts` already flags `usesAiData` when any contributing
+  ingredient is `nutritionSource: 'ai'`; `NutritionLabel.tsx` already
+  discloses it. Nothing downstream changes.
+
+**Scope — one new modal, no new prompt, no proxy change:**
+1. Move `NUTRITION_BACKFILL_PROMPT` and the parse/`numStr`/allergen
+   normalisation out of `IngredientForm.tsx` into a shared helper
+   (`src/lib/nutritionBackfill.ts`, exporting `estimateNutrition(name)`
+   returning the same shape the form consumes). `handleEstimate` calls it;
+   behaviour of the single-item button is unchanged.
+2. New `components/ingredients/NutritionBackfill.tsx`, opened from the
+   Master Pantry view (`src/IngredientsTable.tsx`) by a button
+   "Estimate Missing Nutrition (AI)". Same modal pattern as
+   `InvoicePriceUpdate.tsx`.
+3. Candidate set: ingredients with no `nutritionPer100g` (missing or empty
+   object). Ingredients that already carry nutrition — `'ai'` OR `'manual'` —
+   are NEVER candidates. The modal shows the count before anything runs.
+4. Run: sequential, not parallel (per-uid quota is 200/UTC-day and the
+   proxy is a dumb relay — no batching endpoint). Cap one run at 150 so a
+   full run leaves the chef quota for the rest of the day. Progress row by
+   row; a per-item failure is shown and skipped, never aborts the run.
+   Cancel button stops after the in-flight call.
+5. Review table: name, the 11 nutrition fields, allergens, status
+   (estimated / failed / skipped). Accept checkbox per row, default checked
+   for successful rows. Inline edit of any value flips that row's source
+   to `'manual'` on write (same rule as the form).
+6. Apply: only checked rows are written — `updateDoc` setting
+   `nutritionPer100g`, `nutritionSource` ('ai', or 'manual' if edited),
+   `allergens` only if the chef did not already have allergens on the
+   ingredient (never overwrite a chef-entered allergen list). Nothing else
+   on the doc is touched. Unchecked rows: no write.
+7. Nothing is stored until Apply. Closing the modal discards estimates.
+
+**Master Pantry Mandate check:** every write is chef-confirmed; AI data is
+stamped `'ai'`; manual data is never overwritten. Compliant.
+
+**Model:** `claude-sonnet-4-6` as the proxy already fixes it. Do NOT add a
+model parameter to the proxy for this — at ~1,200 output tokens per item the
+whole pantry costs cents, and a proxy change widens the blast radius for no
+gain.
+
+**Out of scope (park, do not build):** re-estimating existing 'ai' rows;
+estimating sub-recipes; a scheduled/automatic run; any Firestore batch write
+helper beyond what `InvoicePriceUpdate.tsx` already does.
+
+**Tests:** `nutritionBackfill.ts` parse behaviour (number coercion, invalid
+allergen dropped, `error` payload → throw) under vitest. Candidate filter
+is a pure function; test it (missing field, `{}`, `'manual'` populated,
+`'ai'` populated).
+
+**STOP-AND-VERIFY 1 — before commit (Code stops here):**
+- [ ] `git diff --stat` shows only: `src/lib/nutritionBackfill.ts` (new),
+      `src/components/ingredients/NutritionBackfill.tsx` (new),
+      `src/components/ingredients/IngredientForm.tsx` (prompt moved out),
+      `src/IngredientsTable.tsx` (button + modal mount), tests, `CLAUDE.md`
+      (new section under Master Pantry features)
+- [ ] `npm run lint` + `npm test` clean
+- [ ] Single-item "Estimate Nutrition (AI)" on the edit form still works
+      identically (Brian, local dev)
+- [ ] Commit: `P-042: batch nutrition backfill, chef-confirmed`
+
+**STOP-AND-VERIFY 2 — chef run (Brian, local dev, real model):**
+- [ ] Modal count matches a manual count of pantry rows with no nutrition
+- [ ] Run 5 items; uncheck one; edit one value on another; Apply
+- [ ] Firestore: 4 docs updated, the unchecked one untouched, the edited
+      one `'manual'`, the rest `'ai'`; no other fields changed
+- [ ] Open a recipe using one of them: label shows the AI-estimate disclosure
+- [ ] Deploy rides with the next hosting deploy (no functions change)
+
+## P-043 — New-machine toolchain setup — DONE 2026-11-19
+
+Git, Node 22, Temurin 21, Firebase CLI installed on the new laptop; `npm ci`
+root and functions; lint, 265/265 tests, build all pass. No repo changes.
+
+**Parked, not acted on:** npm audit findings (31 root, 17 functions).
+
+## P-044 — Revert stray App Check / `firebase.json` working-tree changes — DONE 2026-11-19
+
+**Ruling this executes:** "no idea, revert them" (Brian direct, in chat,
+2026-11-06, recorded under P-042 above). **Go-ahead to execute:** Brian
+direct, in chat, 2026-11-19.
+
+**Reverted to the last commit (`git restore`):**
+- `firebase.json` — hosting `public` back to `dist` (was `y`); the `/api/ai`
+  → `ai` function rewrite restored
+- `index.html` — reCAPTCHA Enterprise `<script>` tag removed from `<head>`
+- `src/firebaseConfig.ts` — `firebase/app-check` import and the
+  `initializeAppCheck` / `ReCaptchaEnterpriseProvider` call removed
+
+**Removed (untracked):** `y/` — one file, `y/index.html`, the stock Firebase
+Hosting placeholder page.
+
+None of these changes were ever committed and none came from a P-ID. Global
+git identity set on the new laptop to match the existing history's author.
+No deploy, no push.
